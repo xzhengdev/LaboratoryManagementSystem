@@ -1,0 +1,192 @@
+import json
+import re
+from datetime import date, timedelta
+
+import requests
+
+from app.config import Config
+from app.models import Laboratory, Reservation
+from app.services.reservation_service import get_lab_schedule
+
+
+def detect_date(message):
+    # 从自然语言中尽量识别出目标日期。
+    # 当前规则支持“今天”“明天”或显式 YYYY-MM-DD。
+    if "今天" in message:
+        return date.today()
+    if "明天" in message:
+        return date.today() + timedelta(days=1)
+    matched = re.search(r"(20\d{2}-\d{2}-\d{2})", message)
+    if matched:
+        year, month, day = [int(part) for part in matched.group(1).split("-")]
+        return date(year, month, day)
+    return date.today()
+
+
+def build_help_reply():
+    # 当用户输入不明确时，返回可用问题示例和推荐跳转。
+    return {
+        "reply": (
+            "我是实验室预约助手，可以帮你用自然语言完成常见操作。"
+            "你可以试试：\n"
+            "1. 帮我看看今天有哪些实验室还能预约\n"
+            "2. 查看我的预约\n"
+            "3. A101 实验室明天的排期\n"
+            "4. 给我看统计概览"
+        ),
+        "actions": [
+            {"label": "我的预约", "path": "/pages/my-reservations/index"},
+            {"label": "实验室列表", "path": "/pages/labs/index"},
+            {"label": "统计页", "path": "/pages/statistics/index"},
+        ],
+    }
+
+
+def summarize_reservations(user):
+    # 总结当前用户最近的预约记录，适合“查看我的预约”类问题。
+    items = (
+        Reservation.query.filter_by(user_id=user.id)
+        .order_by(Reservation.reservation_date.desc(), Reservation.start_time.desc())
+        .limit(5)
+        .all()
+    )
+    if not items:
+        return {
+            "reply": "你当前还没有预约记录，可以先去实验室列表挑选可用时段。",
+            "actions": [{"label": "去预约", "path": "/pages/labs/index"}],
+        }
+
+    lines = [
+        f"{item.lab.lab_name} | {item.reservation_date.isoformat()} "
+        f"{item.start_time.strftime('%H:%M')}-{item.end_time.strftime('%H:%M')} | {item.status}"
+        for item in items
+    ]
+    return {
+        "reply": "最近的预约如下：\n" + "\n".join(lines),
+        "actions": [{"label": "查看详情", "path": "/pages/my-reservations/index"}],
+    }
+
+
+def summarize_available_labs(target_date):
+    # 汇总某一天当前可关注的实验室及占用情况。
+    labs = (
+        Laboratory.query.filter_by(status="active")
+        .order_by(Laboratory.campus_id.asc())
+        .all()
+    )
+    if not labs:
+        return {"reply": "当前没有可用实验室。", "actions": []}
+
+    lines = []
+    for lab in labs[:8]:
+        schedule = get_lab_schedule(lab, target_date)
+        lines.append(
+            f"{lab.lab_name}（{lab.campus.campus_name}）开放 "
+            f"{schedule['open_time']}-{schedule['close_time']}，"
+            f"已占用 {len(schedule['reservations'])} 个时段"
+        )
+    return {
+        "reply": f"{target_date.isoformat()} 可关注的实验室如下：\n" + "\n".join(lines),
+        "actions": [{"label": "查看实验室", "path": "/pages/labs/index"}],
+    }
+
+
+def summarize_single_lab(message, target_date):
+    # 如果自然语言里提到了某个实验室名称，则返回该实验室的专属排期摘要。
+    labs = Laboratory.query.filter_by(status="active").all()
+    matched_lab = None
+    for lab in labs:
+        if lab.lab_name in message:
+            matched_lab = lab
+            break
+    if not matched_lab:
+        return None
+
+    schedule = get_lab_schedule(matched_lab, target_date)
+    reservations = schedule["reservations"]
+    if not reservations:
+        reply = (
+            f"{matched_lab.lab_name} 在 {target_date.isoformat()} 暂无预约，"
+            f"开放时间为 {schedule['open_time']}-{schedule['close_time']}。"
+        )
+    else:
+        lines = [
+            f"{item['start_time'][:5]}-{item['end_time'][:5]} | {item['status']} | {item['purpose']}"
+            for item in reservations
+        ]
+        reply = (
+            f"{matched_lab.lab_name} 在 {target_date.isoformat()} 的排期如下：\n"
+            + "\n".join(lines)
+        )
+    return {
+        "reply": reply,
+        "actions": [
+            {
+                "label": "查看排期",
+                "path": f"/pages/schedule/index?labId={matched_lab.id}&date={target_date.isoformat()}",
+            }
+        ],
+    }
+
+
+def call_openai_compatible(user, message):
+    # 兼容 OpenAI chat completions 接口：
+    # 如果配置了 OPENAI_API_KEY，就可以切换到真实大模型回复。
+    headers = {
+        "Authorization": f"Bearer {Config.OPENAI_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    system_prompt = (
+        "你是实验室预约系统内的智能助手。"
+        "请用中文、简洁、可执行的方式回答。"
+        f"当前用户角色是 {user.role}，姓名是 {user.real_name}。"
+    )
+    payload = {
+        "model": Config.AGENT_MODEL,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": message},
+        ],
+        "temperature": 0.4,
+    }
+    response = requests.post(
+        Config.OPENAI_BASE_URL, headers=headers, data=json.dumps(payload), timeout=20
+    )
+    response.raise_for_status()
+    data = response.json()
+    content = data["choices"][0]["message"]["content"]
+    return {"reply": content, "actions": []}
+
+
+def chat(user, message):
+    # Agent 总入口：
+    # 优先尝试大模型模式，失败后回退到本地规则模式。
+    if Config.AGENT_PROVIDER == "openai" and Config.OPENAI_API_KEY:
+        try:
+            return call_openai_compatible(user, message)
+        except Exception:
+            # 外部模型异常时静默降级，避免影响系统主流程。
+            pass
+
+    target_date = detect_date(message)
+
+    # 以下是本地规则分发逻辑。
+    if "我的预约" in message or "查看预约" in message:
+        return summarize_reservations(user)
+    if "统计" in message:
+        total = Reservation.query.count()
+        approved = Reservation.query.filter_by(status="approved").count()
+        pending = Reservation.query.filter_by(status="pending").count()
+        return {
+            "reply": f"当前共有 {total} 条预约，其中已通过 {approved} 条，待审批 {pending} 条。",
+            "actions": [{"label": "去统计页", "path": "/pages/statistics/index"}],
+        }
+
+    single_lab_reply = summarize_single_lab(message, target_date)
+    if single_lab_reply:
+        return single_lab_reply
+
+    if "可预约" in message or "空闲" in message or "实验室" in message:
+        return summarize_available_labs(target_date)
+
+    return build_help_reply()

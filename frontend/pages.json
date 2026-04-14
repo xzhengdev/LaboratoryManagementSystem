@@ -1,0 +1,40 @@
+{
+  "pages": [
+    { "path": "pages/login/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/home/index", "style": { "navigationBarTitleText": "首页" } },
+    { "path": "pages/campuses/index", "style": { "navigationBarTitleText": "校区列表" } },
+    { "path": "pages/labs/index", "style": { "navigationBarTitleText": "实验室列表" } },
+    { "path": "pages/lab-detail/index", "style": { "navigationBarTitleText": "实验室详情" } },
+    { "path": "pages/schedule/index", "style": { "navigationBarTitleText": "可预约时段" } },
+    { "path": "pages/reserve/index", "style": { "navigationBarTitleText": "提交预约" } },
+    { "path": "pages/my-reservations/index", "style": { "navigationBarTitleText": "我的预约" } },
+    { "path": "pages/reservation-detail/index", "style": { "navigationBarTitleText": "预约详情" } },
+    { "path": "pages/profile/index", "style": { "navigationBarTitleText": "个人中心" } },
+    { "path": "pages/admin-dashboard/index", "style": { "navigationBarTitleText": "控制台首页" } },
+    { "path": "pages/admin-campuses/index", "style": { "navigationBarTitleText": "校区管理" } },
+    { "path": "pages/admin-labs/index", "style": { "navigationBarTitleText": "实验室管理" } },
+    { "path": "pages/admin-equipment/index", "style": { "navigationBarTitleText": "设备管理" } },
+    { "path": "pages/admin-approvals/index", "style": { "navigationBarTitleText": "预约审批" } },
+    { "path": "pages/admin-users/index", "style": { "navigationBarTitleText": "用户管理" } },
+    { "path": "pages/statistics/index", "style": { "navigationBarTitleText": "统计分析" } },
+    { "path": "pages/agent/index", "style": { "navigationBarTitleText": "智能助手" } }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "分布式实验室管理系统",
+    "navigationBarBackgroundColor": "#F7F9FC",
+    "backgroundColor": "#F7F9FC"
+  },
+  "tabBar": {
+    "color": "#7A8796",
+    "selectedColor": "#2F80ED",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "black",
+    "list": [
+      { "pagePath": "pages/home/index", "text": "首页" },
+      { "pagePath": "pages/labs/index", "text": "实验室" },
+      { "pagePath": "pages/my-reservations/index", "text": "我的预约" },
+      { "pagePath": "pages/profile/index", "text": "我的" }
+    ]
+  }
+}

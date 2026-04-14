@@ -1,0 +1,25 @@
+# Python
+backend/.venv/
+backend/__pycache__/
+backend/app/__pycache__/
+backend/app/api/__pycache__/
+backend/app/models/__pycache__/
+backend/app/services/__pycache__/
+backend/app/utils/__pycache__/
+backend/scripts/__pycache__/
+backend/*.pyc
+
+# Local environment and secrets
+backend/.env
+
+# Local databases and logs
+backend/instance/
+backend/*.log
+
+# Frontend local/build output
+frontend/unpackage/
+frontend/.hbuilderx/
+
+# OS/editor
+.DS_Store
+Thumbs.db
