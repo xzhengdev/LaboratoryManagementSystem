@@ -1,8 +1,11 @@
+from datetime import datetime
+
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
+from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models import Laboratory
+from app.models import Approval, Equipment, Laboratory, Reservation
 from app.services.reservation_service import get_lab_schedule
 from app.utils.decorators import get_current_user, role_required
 from app.utils.exceptions import AppError
@@ -11,6 +14,16 @@ from app.utils.validators import parse_date, parse_time, require_fields
 
 
 lab_bp = Blueprint("labs", __name__)
+
+
+def _reservation_can_cleanup(item, now):
+    # 可清理预约定义：
+    # 1) 已取消/已驳回
+    # 2) 已经过了结束时间（预约结束）
+    if item.status in {"cancelled", "rejected"}:
+        return True
+    end_at = datetime.combine(item.reservation_date, item.end_time)
+    return end_at <= now
 
 
 @lab_bp.get("/labs")
@@ -110,6 +123,33 @@ def delete_lab(lab_id):
     item = Laboratory.query.get_or_404(lab_id)
     if current_user.role == "lab_admin" and current_user.campus_id != item.campus_id:
         raise AppError("只能删除本校区实验室", 403, 40313)
+
+    reservations = Reservation.query.filter_by(lab_id=item.id).all()
+    now = datetime.now()
+    blocking = [r for r in reservations if not _reservation_can_cleanup(r, now)]
+    if blocking:
+        raise AppError(
+            f"该实验室下仍有 {len(blocking)} 条未结束预约，无法删除",
+            400,
+            40031,
+        )
+
+    # 所有预约都满足“可清理”后，按依赖顺序删除：
+    # 审批记录 -> 预约 -> 设备 -> 实验室
+    for reservation in reservations:
+        Approval.query.filter_by(reservation_id=reservation.id).delete(
+            synchronize_session=False
+        )
+        db.session.delete(reservation)
+
+    equipment_items = Equipment.query.filter_by(lab_id=item.id).all()
+    for equipment in equipment_items:
+        db.session.delete(equipment)
+
     db.session.delete(item)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise AppError("该实验室存在关联数据，无法删除", 400, 40032)
     return success(message="删除实验室成功")

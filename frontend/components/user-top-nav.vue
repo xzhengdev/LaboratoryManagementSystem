@@ -1,12 +1,12 @@
-<template>
+﻿<template>
   <!-- #ifdef H5 -->
   <view class="portal-nav">
     <view class="portal-nav__inner">
       <view class="portal-brand" @click="go(routes.home)">
         <view class="portal-brand__mark">LAB</view>
         <view>
-          <view class="portal-brand__title">跨校区实验室预约平台</view>
-          <view class="portal-brand__sub">PC 用户前台</view>
+          <view class="portal-brand__title">璺ㄦ牎鍖哄疄楠屽棰勭害骞冲彴</view>
+          <view class="portal-brand__sub">PC 鐢ㄦ埛鍓嶅彴</view>
         </view>
       </view>
 
@@ -23,8 +23,8 @@
       </view>
 
       <view class="portal-actions">
-        <view class="pill">{{ profile.real_name || '访客' }}</view>
-        <view v-if="isAdmin" class="btn btn-light portal-admin" @click="go(routes.adminDashboard)">管理后台</view>
+        <view class="pill">{{ profile.real_name || '璁垮' }}</view>
+        <view v-if="isAdmin" class="btn btn-light portal-admin" @click="goAdminWorkspace">绠＄悊鍚庡彴</view>
       </view>
     </view>
   </view>
@@ -34,7 +34,7 @@
 <script>
 import { getProfile, isAdminRole } from '../common/session'
 import { openPage } from '../common/router'
-import { routes, userTopNav } from '../config/navigation'
+import { getDefaultAdminPath, getUserTopNavByRole, routes } from '../config/navigation'
 
 export default {
   props: {
@@ -42,7 +42,7 @@ export default {
   },
   data() {
     return {
-      navs: userTopNav,
+      navs: [],
       routes,
       profile: {}
     }
@@ -54,10 +54,14 @@ export default {
   },
   created() {
     this.profile = getProfile()
+    this.navs = getUserTopNavByRole(this.profile.role)
   },
   methods: {
     go(path) {
       openPage(path)
+    },
+    goAdminWorkspace() {
+      openPage(getDefaultAdminPath(this.profile.role), { replace: true })
     }
   }
 }
@@ -148,3 +152,5 @@ export default {
   padding-right: 24rpx;
 }
 </style>
+
+

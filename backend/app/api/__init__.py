@@ -6,6 +6,7 @@ from .equipment import equipment_bp
 from .labs import lab_bp
 from .reservations import reservation_bp
 from .statistics import statistics_bp
+from .users import user_bp
 
 
 def register_blueprints(app):
@@ -18,6 +19,7 @@ def register_blueprints(app):
         reservation_bp,
         approval_bp,
         statistics_bp,
+        user_bp,
         agent_bp,
     ]:
         app.register_blueprint(blueprint, url_prefix="/api")
