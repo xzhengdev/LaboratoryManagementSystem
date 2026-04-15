@@ -298,99 +298,232 @@ export default {
 </script>
 
 <style lang="scss">
-// ==================== KPI指标卡片区域样式 ====================
+page {
+  background: #f5f7fa;
+}
+
+.admin-workspace {
+  background: #f5f7fa !important;
+}
+
+.card,
+.admin-kpi-card,
+.table-card {
+  border-radius: 24rpx;
+  box-shadow: 0 12rpx 32rpx rgba(16, 42, 73, 0.08);
+  transition: all 0.25s ease;
+}
+
+.card:hover,
+.admin-kpi-card:hover,
+.table-card:hover {
+  transform: translateY(-4rpx);
+  box-shadow: 0 20rpx 48rpx rgba(16, 42, 73, 0.12);
+}
+
 .admin-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));  // 三列等宽布局
-  gap: 16rpx;
-  margin-bottom: 18rpx;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24rpx;
+  margin-bottom: 28rpx;
 }
 
 .admin-kpi-card {
-  border-radius: 20rpx;
   border: 1rpx solid #dbe4f1;
   background: #fff;
-  padding: 18rpx 20rpx;
+  padding: 24rpx 28rpx;
 }
 
 .admin-kpi-card__label {
   color: #6d7f95;
   font-size: 22rpx;
+  font-weight: 600;
 }
 
 .admin-kpi-card__value {
-  margin-top: 8rpx;
+  margin-top: 10rpx;
   font-size: 52rpx;
   font-weight: 800;
   color: #132d4d;
+  line-height: 1.1;
 }
 
-// ==================== 工具栏样式 ====================
 .admin-toolbar-lite {
-  margin-bottom: 18rpx;           // 底部外边距
-  display: flex;                   // flex布局实现水平排列
-  align-items: center;             // 垂直居中对齐
-  gap: 16rpx;                      // 搜索框和按钮之间的间距
+  margin-bottom: 28rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
   flex-wrap: nowrap;
+  border-radius: 24rpx;
+  background: #f0f4fa;
+  border: 1rpx solid #dce7f4;
+  box-shadow: 0 10rpx 26rpx rgba(16, 42, 73, 0.06);
+  transition: all 0.25s ease;
+  padding: 24rpx !important;
 }
 
-// ==================== 搜索框样式 ====================
+.admin-toolbar-lite:hover {
+  transform: translateY(-3rpx);
+  box-shadow: 0 18rpx 44rpx rgba(16, 42, 73, 0.1);
+}
+
 .admin-toolbar-lite .input {
-  flex: 1;                         // 占据剩余空间，自动撑满
-  height: 64rpx;                   // 高度
-  padding: 0 24rpx;                // 左右内边距
-  border-radius: 32rpx;            // 圆角
-  background-color: #f5f7fa;       // 背景色
-  border: 1rpx solid #e4ebf5;      // 边框
-  font-size: 26rpx;                // 字体大小
-  
-  // 聚焦样式
-  &:focus {
-    border-color: #2c7da0;
-    background-color: #ffffff;
-    outline: none;
-  }
+  flex: 1;
+  height: 68rpx;
+  padding: 0 24rpx;
+  border-radius: 24rpx;
+  background-color: #ffffff;
+  border: 1rpx solid #e4ebf5;
+  font-size: 24rpx;
+  color: #132d4d;
+  transition: all 0.2s ease;
 }
 
-// ==================== 新增按钮样式 ====================
+.admin-toolbar-lite .input:focus {
+  border-color: #2c7da0;
+  background-color: #ffffff;
+  outline: none;
+  box-shadow: 0 0 0 4rpx rgba(44, 125, 160, 0.1);
+}
+
 .admin-toolbar-lite__btn {
   width: 190rpx;
-  flex-shrink: 0;                  // 防止按钮被压缩，保持固定宽度
-  height: 64rpx;                   // 与搜索框高度一致
+  flex-shrink: 0;
+  height: 68rpx;
   padding: 0 16rpx;
-  border-radius: 32rpx;
+  border-radius: 24rpx;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background-color: #2c7da0;
   color: #ffffff;
-  font-size: 26rpx;
-  font-weight: 500;
-  
-  // 悬停效果
-  &:hover {
-    background-color: #1f5e7a;
-  }
-  
-  // 点击效果
-  &:active {
-    transform: scale(0.98);
-  }
+  font-size: 24rpx;
+  font-weight: 700;
+  box-shadow: 0 8rpx 20rpx rgba(44, 125, 160, 0.25);
+  transition: all 0.2s ease;
 }
 
-// ==================== 校区模态框美化 ====================
+.admin-toolbar-lite__btn:hover {
+  background-color: #256a86;
+  transform: translateY(-2rpx);
+  box-shadow: 0 12rpx 28rpx rgba(44, 125, 160, 0.35);
+}
+
+.admin-toolbar-lite__btn:active {
+  transform: scale(0.96);
+}
+
+.table-card {
+  border: 1rpx solid #dbe4f1;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.table-header {
+  background: #f4f7fb;
+  border-bottom: 1rpx solid #e5ecf5;
+  color: #6d7f95;
+  font-weight: 600;
+}
+
+.table-row {
+  border-bottom: 1rpx solid #edf2f7;
+  padding-top: 28rpx !important;
+  padding-bottom: 28rpx !important;
+  transition: all 0.2s ease;
+}
+
+.table-row:hover {
+  background: #f7faff;
+}
+
+.table-header.campus-grid text:first-child,
+.table-row.campus-grid text:first-child {
+  padding-left: 20rpx;
+}
+
+.campus-grid {
+  grid-template-columns: 1.2fr 1.8fr 0.9fr 0.8fr 1.1fr;
+}
+
+.table-strong {
+  color: #0f2744;
+  font-weight: 800;
+}
+
+.table-row .tag {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0 0 0 24rpx;
+  border: none;
+  border-radius: 0;
+  background: transparent !important;
+  font-size: 24rpx;
+  font-weight: 800;
+}
+
+.table-row .tag::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 999rpx;
+  transform: translateY(-50%);
+  background: currentColor;
+}
+
+.table-row .tag-active {
+  color: #0d749e !important;
+}
+
+.table-row .tag-disabled {
+  color: #c81e1e !important;
+}
+
+.pill {
+  border: 1rpx solid #d9e4f2;
+  background: #ffffff;
+  color: #476183;
+  transition: all 0.2s ease;
+}
+
+.pill:hover {
+  opacity: 0.92;
+  transform: translateY(-1rpx);
+  background: #f6f9fd;
+}
+
+.pill-danger {
+  border-color: #efcaca;
+  color: #c94747;
+}
+
+.pill-muted {
+  border-color: #d7e4f4;
+  color: #366b96;
+  background: #f3f8ff;
+}
+
+.empty-state {
+  color: #6d7f95;
+}
+
 .admin-modal-mask {
-  background: rgba(10, 26, 45, 0.32);
+  background: rgba(10, 26, 45, 0.4);
   backdrop-filter: blur(4rpx);
 }
 
 .admin-campus-modal {
   width: 760rpx;
   max-width: calc(100vw - 64rpx);
-  border-radius: 24rpx;
+  border-radius: 28rpx;
   padding: 28rpx 28rpx 24rpx;
-  background: linear-gradient(180deg, #ffffff, #f9fbff);
-  box-shadow: 0 22rpx 56rpx rgba(9, 36, 69, 0.18);
+  background: #ffffff;
+  box-shadow: 0 30rpx 80rpx rgba(9, 36, 69, 0.22);
   animation: campus-modal-in 180ms ease-out;
 }
 
@@ -418,12 +551,12 @@ export default {
   justify-content: center;
   font-size: 34rpx;
   line-height: 1;
-  transition: all 140ms ease;
+  transition: all 0.2s ease;
 }
 
 .admin-campus-modal__close:hover {
-  background: #e5edf8;
-  color: #2f4a6a;
+  opacity: 0.92;
+  transform: translateY(-1rpx);
 }
 
 .admin-campus-field {
@@ -432,9 +565,9 @@ export default {
 
 .admin-campus-input {
   border-radius: 14rpx;
-  background: #f4f7fc;
+  background: #ffffff;
   border: 1rpx solid #dbe6f4;
-  transition: all 150ms ease;
+  transition: all 0.2s ease;
 }
 
 .admin-campus-input--line {
@@ -446,7 +579,7 @@ export default {
 .admin-campus-input:focus {
   border-color: #2c7da0;
   background: #ffffff;
-  box-shadow: 0 0 0 4rpx rgba(44, 125, 160, 0.12);
+  box-shadow: 0 0 0 4rpx rgba(44, 125, 160, 0.1);
 }
 
 .admin-campus-textarea {
@@ -469,15 +602,12 @@ export default {
   justify-content: center;
   font-size: 24rpx;
   font-weight: 700;
-  transition: transform 120ms ease, filter 120ms ease;
+  transition: all 0.2s ease;
 }
 
 .admin-campus-btn:hover {
-  filter: brightness(0.98);
-}
-
-.admin-campus-btn:active {
-  transform: scale(0.98);
+  opacity: 0.92;
+  transform: translateY(-1rpx);
 }
 
 .admin-campus-btn--ghost {
@@ -488,6 +618,7 @@ export default {
 .admin-campus-btn--primary {
   background: linear-gradient(135deg, #2c7da0, #276f8f);
   color: #fff;
+  box-shadow: 0 8rpx 20rpx rgba(44, 125, 160, 0.28);
 }
 
 @keyframes campus-modal-in {
@@ -501,29 +632,14 @@ export default {
   }
 }
 
-
-// ==================== 校区列表表格样式 ====================
-// 使用grid布局实现表头和行内容的列对齐
-.campus-grid {
-  grid-template-columns: 1.2fr 1.8fr 0.9fr 0.8fr 1.1fr;
-}
-
-// 校区名称强调样式
-.table-strong {
-  color: #102a49;
-  font-weight: 700;
-}
-
-// ==================== 响应式适配 ====================
 @media screen and (max-width: 1200px) {
-  // 小屏设备：KPI卡片改为单列布局
   .admin-kpi-grid {
     grid-template-columns: 1fr;
   }
-  
-  // 小屏设备：表格列宽适当调整
+
   .campus-grid {
     grid-template-columns: 1.2fr 1.2fr 0.8fr 0.8fr 1fr;
   }
 }
 </style>
+

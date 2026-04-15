@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -28,6 +29,7 @@ class User(BaseModel):
     real_name = db.Column(db.String(50), nullable=False)
     phone = db.Column(db.String(20))
     email = db.Column(db.String(100))
+    avatar_url = db.Column(db.String(500))
     role = db.Column(db.String(30), nullable=False)
     campus_id = db.Column(db.Integer, db.ForeignKey("campuses.id"))
     status = db.Column(db.String(20), default="active", nullable=False)
@@ -65,15 +67,25 @@ class Laboratory(BaseModel):
     close_time = db.Column(db.Time, nullable=False)
     status = db.Column(db.String(20), default="active", nullable=False)
     description = db.Column(db.Text)
+    photos = db.Column(db.Text, default="[]")
 
     equipment = db.relationship("Equipment", backref="lab", lazy=True)
     reservations = db.relationship("Reservation", backref="lab", lazy=True)
 
     def to_dict(self, extra=None):
         # 给前端额外补充 campus_name，方便列表直接显示。
+        photos = []
+        if self.photos:
+            try:
+                loaded = json.loads(self.photos)
+                if isinstance(loaded, list):
+                    photos = [str(item) for item in loaded if str(item).strip()]
+            except Exception:
+                photos = []
         return super().to_dict(
             {
                 "campus_name": self.campus.campus_name if self.campus else None,
+                "photos": photos,
                 **(extra or {}),
             }
         )

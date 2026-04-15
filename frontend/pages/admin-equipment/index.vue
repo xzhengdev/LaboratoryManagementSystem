@@ -244,76 +244,119 @@ export default {
 </script>
 
 <style lang="scss">
+page {
+  background: #f5f7fa;
+}
+
+.admin-workspace {
+  background: #f5f7fa !important;
+}
+
+.card,
+.admin-kpi-card,
+.table-card {
+  border-radius: 24rpx;
+  box-shadow: 0 12rpx 32rpx rgba(16, 42, 73, 0.08);
+  transition: all 0.25s ease;
+}
+
+.card:hover,
+.admin-kpi-card:hover,
+.table-card:hover {
+  transform: translateY(-4rpx);
+  box-shadow: 0 20rpx 48rpx rgba(16, 42, 73, 0.12);
+}
+
 .admin-kpi-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16rpx;
-  margin-bottom: 18rpx;
+  gap: 24rpx;
+  margin-bottom: 28rpx;
 }
 
 .admin-kpi-card {
-  border-radius: 20rpx;
+  border-radius: 26rpx;
   border: 1rpx solid #dbe4f1;
   background: #fff;
-  padding: 18rpx 20rpx;
+  padding: 24rpx 28rpx;
 }
 
 .admin-kpi-card__label {
   color: #6d7f95;
   font-size: 22rpx;
+  font-weight: 600;
 }
 
 .admin-kpi-card__value {
-  margin-top: 8rpx;
+  margin-top: 10rpx;
   font-size: 52rpx;
   font-weight: 800;
   color: #132d4d;
+  line-height: 1.1;
 }
 
 .admin-toolbar-lite {
-  margin-bottom: 18rpx;
+  margin-bottom: 28rpx;
   display: flex;
   align-items: center;
   gap: 16rpx;
   flex-wrap: nowrap;
+  border-radius: 24rpx;
+  background: #f0f4fa;
+  border: 1rpx solid #dce7f4;
+  box-shadow: 0 10rpx 26rpx rgba(16, 42, 73, 0.06);
+  transition: all 0.25s ease;
+  padding: 24rpx !important;
+}
+
+.admin-toolbar-lite:hover {
+  transform: translateY(-3rpx);
+  box-shadow: 0 18rpx 44rpx rgba(16, 42, 73, 0.1);
 }
 
 .admin-toolbar-lite__btn {
   width: 190rpx;
   flex-shrink: 0;
-  height: 64rpx;
+  height: 68rpx;
   padding: 0 16rpx;
-  border-radius: 32rpx;
+  border-radius: 24rpx;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background-color: #2c7da0;
   color: #ffffff;
-  font-size: 26rpx;
-  font-weight: 500;
+  font-size: 24rpx;
+  font-weight: 700;
+  box-shadow: 0 8rpx 20rpx rgba(44, 125, 160, 0.25);
+  transition: all 0.2s ease;
 }
 
 .admin-toolbar-lite__btn:hover {
-  background-color: #1f5e7a;
+  background-color: #256a86;
+  transform: translateY(-2rpx);
+  box-shadow: 0 12rpx 28rpx rgba(44, 125, 160, 0.35);
 }
 
 .admin-toolbar-lite__btn:active {
-  transform: scale(0.98);
+  transform: scale(0.96);
 }
 
 .admin-toolbar-lite__search {
   flex: 1;
-  height: 64rpx;
+  height: 68rpx;
   padding: 0 24rpx;
-  border-radius: 32rpx;
-  background-color: #f5f7fa;
+  border-radius: 24rpx;
+  background-color: #ffffff;
   border: 1rpx solid #e4ebf5;
-  font-size: 26rpx;
+  font-size: 24rpx;
+  color: #132d4d;
+  transition: all 0.2s ease;
 }
 
 .admin-toolbar-lite__search:focus {
   border-color: #2c7da0;
   background-color: #ffffff;
+  box-shadow: 0 0 0 4rpx rgba(44, 125, 160, 0.1);
   outline: none;
 }
 
@@ -322,36 +365,122 @@ export default {
 }
 
 .admin-toolbar-lite__picker {
-  height: 64rpx;
+  height: 68rpx;
   padding: 0 24rpx;
-  border-radius: 32rpx;
+  border-radius: 24rpx;
   border: 1rpx solid #e4ebf5;
-  background: #f5f7fa;
+  background: #f4f7fc;
   display: flex;
   align-items: center;
+  color: #486280;
+  transition: all 0.2s ease;
+}
+
+.admin-toolbar-lite__picker:hover {
+  background: #ffffff;
+}
+
+.table-card {
+  border: 1rpx solid #dbe4f1;
+  background: #ffffff;
+  overflow: hidden;
 }
 
 .equipment-grid {
   grid-template-columns: 1.4fr 1.2fr 0.7fr 0.7fr 1fr;
 }
 
+.table-header {
+  background: #f4f7fb;
+  border-bottom: 1rpx solid #e5ecf5;
+  color: #6d7f95;
+  font-weight: 600;
+}
+
+.table-row {
+  border-bottom: 1rpx solid #edf2f7;
+  padding-top: 28rpx !important;
+  padding-bottom: 28rpx !important;
+  transition: all 0.2s ease;
+}
+
+.table-row:hover {
+  background: #f7faff;
+}
+
+.table-header.equipment-grid text:first-child,
+.table-row.equipment-grid text:first-child {
+  padding-left: 20rpx;
+}
+
 .table-strong {
-  color: #102a49;
-  font-weight: 700;
+  color: #0f2744;
+  font-weight: 800;
+}
+
+.table-row .tag {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0 0 0 24rpx;
+  border: none;
+  border-radius: 0;
+  background: transparent !important;
+  font-size: 24rpx;
+  font-weight: 800;
+}
+
+.table-row .tag::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 999rpx;
+  transform: translateY(-50%);
+  background: currentColor;
+}
+
+.table-row .tag-active {
+  color: #0d749e !important;
+}
+
+.table-row .tag-disabled {
+  color: #c81e1e !important;
+}
+
+.pill {
+  border: 1rpx solid #d9e4f2;
+  background: #ffffff;
+  color: #476183;
+  transition: all 0.2s ease;
+}
+
+.pill:hover {
+  opacity: 0.92;
+  transform: translateY(-1rpx);
+  background: #f6f9fd;
+}
+
+.pill-danger {
+  border-color: #efcaca;
+  color: #c94747;
 }
 
 .admin-modal-mask {
-  background: rgba(10, 26, 45, 0.32);
+  background: rgba(10, 26, 45, 0.4);
   backdrop-filter: blur(4rpx);
 }
 
 .admin-equipment-modal {
   width: 760rpx;
   max-width: calc(100vw - 64rpx);
-  border-radius: 24rpx;
+  border-radius: 28rpx;
   padding: 28rpx 28rpx 24rpx;
-  background: linear-gradient(180deg, #ffffff, #f9fbff);
-  box-shadow: 0 22rpx 56rpx rgba(9, 36, 69, 0.18);
+  background: #ffffff;
+  box-shadow: 0 30rpx 80rpx rgba(9, 36, 69, 0.22);
   animation: equipment-modal-in 180ms ease-out;
 }
 
@@ -379,13 +508,19 @@ export default {
   justify-content: center;
   font-size: 34rpx;
   line-height: 1;
+  transition: all 0.2s ease;
+}
+
+.admin-equipment-modal__close:hover {
+  opacity: 0.92;
+  transform: translateY(-1rpx);
 }
 
 .admin-equipment-input {
   border-radius: 14rpx;
-  background: #f4f7fc;
+  background: #ffffff;
   border: 1rpx solid #dbe6f4;
-  transition: all 150ms ease;
+  transition: all 0.2s ease;
 }
 
 .admin-equipment-input--line {
@@ -397,7 +532,7 @@ export default {
 .admin-equipment-input:focus {
   border-color: #2c7da0;
   background: #ffffff;
-  box-shadow: 0 0 0 4rpx rgba(44, 125, 160, 0.12);
+  box-shadow: 0 0 0 4rpx rgba(44, 125, 160, 0.1);
 }
 
 .admin-equipment-modal__actions {
@@ -415,6 +550,12 @@ export default {
   justify-content: center;
   font-size: 24rpx;
   font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.admin-equipment-btn:hover {
+  opacity: 0.92;
+  transform: translateY(-1rpx);
 }
 
 .admin-equipment-btn--ghost {
@@ -425,6 +566,7 @@ export default {
 .admin-equipment-btn--primary {
   background: linear-gradient(135deg, #2c7da0, #276f8f);
   color: #fff;
+  box-shadow: 0 8rpx 20rpx rgba(44, 125, 160, 0.28);
 }
 
 @keyframes equipment-modal-in {
@@ -444,3 +586,4 @@ export default {
   }
 }
 </style>
+

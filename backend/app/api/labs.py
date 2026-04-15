@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
@@ -24,6 +25,38 @@ def _reservation_can_cleanup(item, now):
         return True
     end_at = datetime.combine(item.reservation_date, item.end_time)
     return end_at <= now
+
+
+def _normalize_photos(value):
+    # 允许前端传数组或 JSON 字符串，统一存储为 JSON 字符串。
+    if value in (None, ""):
+        return "[]"
+    data = value
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return "[]"
+        try:
+            data = json.loads(text)
+        except Exception:
+            raise AppError("photos 必须是数组或合法 JSON 字符串", 400, 40041)
+    if not isinstance(data, list):
+        raise AppError("photos 必须是数组", 400, 40042)
+
+    cleaned = []
+    for item in data:
+        if item in (None, ""):
+            continue
+        url = str(item).strip()
+        if not url:
+            continue
+        if len(url) > 500:
+            raise AppError("单张实验室照片地址长度不能超过 500", 400, 40043)
+        cleaned.append(url)
+
+    if len(cleaned) > 20:
+        raise AppError("实验室照片最多支持 20 张", 400, 40044)
+    return json.dumps(cleaned, ensure_ascii=False)
 
 
 @lab_bp.get("/labs")
@@ -81,6 +114,7 @@ def create_lab():
         close_time=parse_time(payload["close_time"], "close_time"),
         status=payload.get("status", "active"),
         description=payload.get("description", ""),
+        photos=_normalize_photos(payload.get("photos")),
     )
     db.session.add(item)
     db.session.commit()
@@ -100,6 +134,8 @@ def update_lab(lab_id):
     for field in ["lab_name", "location", "status", "description"]:
         if field in payload:
             setattr(item, field, payload[field])
+    if "photos" in payload:
+        item.photos = _normalize_photos(payload.get("photos"))
     if "campus_id" in payload:
         campus_id = int(payload["campus_id"])
         if current_user.role == "lab_admin" and current_user.campus_id != campus_id:

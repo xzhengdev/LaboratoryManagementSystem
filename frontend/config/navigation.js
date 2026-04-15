@@ -154,6 +154,9 @@ export function getUserTopNavByRole(role) {
       { key: 'agent', title: 'AI 助手', path: routes.agent }
     ]
   }
+  if (role === 'student') {
+    return userTopNav.filter((item) => item.key !== 'profile')
+  }
   return userTopNav
 }
 

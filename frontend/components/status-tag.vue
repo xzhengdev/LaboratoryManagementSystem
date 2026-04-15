@@ -43,6 +43,7 @@ export default {
   padding: 8rpx 18rpx;
   font-size: 22rpx;
   border: 1rpx solid transparent;
+  max-width: 120rpx;
 }
 
 .tag-pending {

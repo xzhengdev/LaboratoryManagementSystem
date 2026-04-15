@@ -27,7 +27,16 @@
           <text>操作</text>
         </view>
         <view v-for="item in filteredUsers" :key="item.id" class="table-row user-grid">
-          <text class="table-strong">{{ item.real_name }}</text>
+          <view class="user-info-cell">
+            <view class="user-avatar">
+              <image v-if="item.avatar_url" class="user-avatar__img" :src="item.avatar_url" mode="aspectFill" />
+              <view v-else class="user-avatar__fallback">{{ userAvatarText(item) }}</view>
+            </view>
+            <view class="user-info-cell__meta">
+              <text class="table-strong">{{ item.real_name }}</text>
+              <text class="user-info-cell__sub">{{ userSubText(item) }}</text>
+            </view>
+          </view>
           <text>{{ item.role_name }}</text>
           <text>{{ item.campus_name || '全校区' }}</text>
           <status-tag :status="item.status === 'active' ? 'active' : 'disabled'" />
@@ -47,7 +56,7 @@
             <view class="admin-user-modal__close" @click="closeDialog">×</view>
           </view>
           <view class="field">
-            <text class="label">用户名</text>
+            <text class="label">用户信息</text>
             <input v-model="form.username" class="input admin-user-input admin-user-input--line" placeholder="请输入用户名（登录账号）" />
           </view>
           <view class="field">
@@ -173,6 +182,13 @@ export default {
     }
   },
   methods: {
+    userAvatarText(item) {
+      const source = item?.real_name || item?.username || 'U'
+      return String(source).slice(0, 1).toUpperCase()
+    },
+    userSubText(item) {
+      return item?.email || item?.username || '--'
+    },
     async loadData() {
       const [users, campuses] = await Promise.all([api.users(), api.campuses()])
       this.campuses = (Array.isArray(campuses) ? campuses : []).map((item) => ({ id: item.id, campus_name: item.campus_name }))
@@ -282,76 +298,107 @@ export default {
 </script>
 
 <style lang="scss">
+page {
+  background: #f5f7fa;
+}
+
 .admin-kpi-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16rpx;
-  margin-bottom: 18rpx;
+  gap: 24rpx;
+  margin-bottom: 28rpx;
 }
 
 .admin-kpi-card {
-  border-radius: 20rpx;
+  border-radius: 26rpx;
   border: 1rpx solid #dbe4f1;
   background: #fff;
-  padding: 18rpx 20rpx;
+  padding: 24rpx 28rpx;
+  box-shadow: 0 12rpx 32rpx rgba(16, 42, 73, 0.08);
+  transition: all 0.25s ease;
+}
+
+.admin-kpi-card:hover {
+  transform: translateY(-4rpx);
+  box-shadow: 0 20rpx 48rpx rgba(16, 42, 73, 0.12);
 }
 
 .admin-kpi-card__label {
   color: #6d7f95;
   font-size: 22rpx;
+  font-weight: 600;
 }
 
 .admin-kpi-card__value {
-  margin-top: 8rpx;
+  margin-top: 10rpx;
   font-size: 52rpx;
   font-weight: 800;
   color: #132d4d;
+  line-height: 1.1;
 }
 
 .admin-toolbar-lite {
-  margin-bottom: 18rpx;
+  margin-bottom: 28rpx;
   display: flex;
   align-items: center;
   gap: 16rpx;
   flex-wrap: nowrap;
+  border-radius: 26rpx;
+  background: #f0f4fa;
+  border: 1rpx solid #dce7f4;
+  box-shadow: 0 12rpx 32rpx rgba(16, 42, 73, 0.08);
+  transition: all 0.25s ease;
+  padding: 24rpx !important;
+}
+
+.admin-toolbar-lite:hover {
+  transform: translateY(-3rpx);
+  box-shadow: 0 18rpx 44rpx rgba(16, 42, 73, 0.1);
 }
 
 .admin-toolbar-lite__btn {
   width: 190rpx;
   flex-shrink: 0;
-  height: 64rpx;
+  height: 68rpx;
   padding: 0 16rpx;
-  border-radius: 32rpx;
+  border-radius: 24rpx;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background-color: #2c7da0;
   color: #ffffff;
-  font-size: 26rpx;
-  font-weight: 500;
+  font-size: 24rpx;
+  font-weight: 700;
+  box-shadow: 0 8rpx 20rpx rgba(44, 125, 160, 0.25);
+  transition: all 0.2s ease;
 }
 
 .admin-toolbar-lite__btn:hover {
-  background-color: #1f5e7a;
+  background-color: #256a86;
+  transform: translateY(-2rpx);
+  box-shadow: 0 12rpx 28rpx rgba(44, 125, 160, 0.35);
 }
 
 .admin-toolbar-lite__btn:active {
-  transform: scale(0.98);
+  transform: scale(0.96);
 }
 
 .admin-toolbar-lite__search {
   flex: 1;
-  height: 64rpx;
+  height: 68rpx;
   padding: 0 24rpx;
-  border-radius: 32rpx;
-  background-color: #f5f7fa;
+  border-radius: 24rpx;
+  background-color: #ffffff;
   border: 1rpx solid #e4ebf5;
-  font-size: 26rpx;
+  font-size: 24rpx;
+  color: #132d4d;
+  transition: all 0.2s ease;
 }
 
 .admin-toolbar-lite__search:focus {
   border-color: #2c7da0;
   background-color: #ffffff;
+  box-shadow: 0 0 0 4rpx rgba(44, 125, 160, 0.1);
   outline: none;
 }
 
@@ -360,36 +407,181 @@ export default {
 }
 
 .admin-toolbar-lite__picker {
-  height: 64rpx;
+  height: 68rpx;
   padding: 0 24rpx;
-  border-radius: 32rpx;
+  border-radius: 24rpx;
   border: 1rpx solid #e4ebf5;
-  background: #f5f7fa;
+  background: #f4f7fc;
   display: flex;
   align-items: center;
+  color: #486280;
+  transition: all 0.2s ease;
+}
+
+.admin-toolbar-lite__picker:hover {
+  background: #ffffff;
 }
 
 .user-grid {
   grid-template-columns: 1fr 1fr 1.2fr 0.8fr 1.4fr;
 }
 
+.table-card {
+  border-radius: 26rpx;
+  border: 1rpx solid #dbe4f1;
+  background: #ffffff;
+  overflow: hidden;
+  box-shadow: 0 12rpx 32rpx rgba(16, 42, 73, 0.08);
+  transition: all 0.25s ease;
+}
+
+.table-card:hover {
+  transform: translateY(-4rpx);
+  box-shadow: 0 20rpx 48rpx rgba(16, 42, 73, 0.12);
+}
+
+.table-header {
+  background: #f4f7fb;
+  border-bottom: 1rpx solid #e5ecf5;
+  color: #6d7f95;
+  font-weight: 600;
+}
+
+.table-row {
+  border-bottom: 1rpx solid #edf2f7;
+  padding-top: 28rpx !important;
+  padding-bottom: 28rpx !important;
+  transition: all 0.2s ease;
+}
+
+.table-row:hover {
+  background: #f7faff;
+}
+
+.table-header.user-grid text:first-child,
+.table-row.user-grid > :first-child {
+  padding-left: 20rpx;
+}
+
 .table-strong {
-  color: #102a49;
-  font-weight: 700;
+  color: #0f2744;
+  font-weight: 800;
+}
+
+.user-info-cell {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  min-width: 0;
+}
+
+.user-avatar {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 999rpx;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #dbe7f6;
+}
+
+.user-avatar__img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.user-avatar__fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  font-weight: 800;
+  color: #ffffff;
+  background: linear-gradient(135deg, #2c7da0, #276f8f);
+}
+
+.user-info-cell__meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.user-info-cell__sub {
+  color: #617996;
+  font-size: 21rpx;
+  max-width: 360rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 短状态：圆点 + 文本 */
+.table-row .tag {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0 0 0 24rpx;
+  border: none;
+  border-radius: 0;
+  background: transparent !important;
+  font-size: 24rpx;
+  font-weight: 800;
+}
+
+.table-row .tag::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 999rpx;
+  transform: translateY(-50%);
+  background: currentColor;
+}
+
+.table-row .tag-active {
+  color: #0d749e !important;
+}
+
+.table-row .tag-disabled {
+  color: #c81e1e !important;
+}
+
+.pill {
+  border: 1rpx solid #d9e4f2;
+  background: #ffffff;
+  color: #476183;
+  transition: all 0.2s ease;
+}
+
+.pill:hover {
+  opacity: 0.92;
+  transform: translateY(-1rpx);
+  background: #f6f9fd;
+}
+
+.pill-danger {
+  border-color: #efcaca;
+  color: #c94747;
 }
 
 .admin-modal-mask {
-  background: rgba(10, 26, 45, 0.32);
+  background: rgba(10, 26, 45, 0.4);
   backdrop-filter: blur(4rpx);
 }
 
 .admin-user-modal {
   width: 760rpx;
   max-width: calc(100vw - 64rpx);
-  border-radius: 24rpx;
+  border-radius: 28rpx;
   padding: 28rpx 28rpx 24rpx;
-  background: linear-gradient(180deg, #ffffff, #f9fbff);
-  box-shadow: 0 22rpx 56rpx rgba(9, 36, 69, 0.18);
+  background: #ffffff;
+  box-shadow: 0 30rpx 80rpx rgba(9, 36, 69, 0.22);
   animation: user-modal-in 180ms ease-out;
 }
 
@@ -417,13 +609,19 @@ export default {
   justify-content: center;
   font-size: 34rpx;
   line-height: 1;
+  transition: all 0.2s ease;
+}
+
+.admin-user-modal__close:hover {
+  opacity: 0.92;
+  transform: translateY(-1rpx);
 }
 
 .admin-user-input {
   border-radius: 14rpx;
-  background: #f4f7fc;
+  background: #ffffff;
   border: 1rpx solid #dbe6f4;
-  transition: all 150ms ease;
+  transition: all 0.2s ease;
 }
 
 .admin-user-input--line {
@@ -435,7 +633,7 @@ export default {
 .admin-user-input:focus {
   border-color: #2c7da0;
   background: #ffffff;
-  box-shadow: 0 0 0 4rpx rgba(44, 125, 160, 0.12);
+  box-shadow: 0 0 0 4rpx rgba(44, 125, 160, 0.1);
 }
 
 .admin-user-modal__actions {
@@ -453,6 +651,12 @@ export default {
   justify-content: center;
   font-size: 24rpx;
   font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.admin-user-btn:hover {
+  opacity: 0.92;
+  transform: translateY(-1rpx);
 }
 
 .admin-user-btn--ghost {
@@ -463,6 +667,7 @@ export default {
 .admin-user-btn--primary {
   background: linear-gradient(135deg, #2c7da0, #276f8f);
   color: #fff;
+  box-shadow: 0 8rpx 20rpx rgba(44, 125, 160, 0.28);
 }
 
 @keyframes user-modal-in {

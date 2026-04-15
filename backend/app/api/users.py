@@ -49,6 +49,17 @@ def _build_role_text(role):
     }.get(role, "未知角色")
 
 
+def _normalize_avatar_url(value):
+    if value in (None, ""):
+        return None
+    avatar_url = str(value).strip()
+    if not avatar_url:
+        return None
+    if len(avatar_url) > 500:
+        raise AppError("头像地址长度不能超过 500", 400, 40025)
+    return avatar_url
+
+
 @user_bp.get("/users")
 @role_required("system_admin")
 def list_users():
@@ -96,6 +107,7 @@ def create_user():
         campus_id=campus_id,
         phone=payload.get("phone"),
         email=payload.get("email"),
+        avatar_url=_normalize_avatar_url(payload.get("avatar_url")),
         status=payload.get("status", "active"),
     )
     item.set_password(str(payload.get("password") or "123456"))
@@ -127,6 +139,8 @@ def update_user(user_id):
         item.phone = payload["phone"]
     if "email" in payload:
         item.email = payload["email"]
+    if "avatar_url" in payload:
+        item.avatar_url = _normalize_avatar_url(payload.get("avatar_url"))
 
     next_role = payload["role"] if "role" in payload else item.role
     next_campus_id = (
