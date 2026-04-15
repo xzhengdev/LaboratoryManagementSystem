@@ -1,9 +1,13 @@
 from datetime import datetime
 import json
+import os
+import imghdr
+from uuid import uuid4
 
-from flask import Blueprint, request
+from flask import Blueprint, request, current_app
 from flask_jwt_extended import jwt_required
 from sqlalchemy.exc import IntegrityError
+from werkzeug.utils import secure_filename
 
 from app.extensions import db
 from app.models import Approval, Equipment, Laboratory, Reservation
@@ -15,6 +19,18 @@ from app.utils.validators import parse_date, parse_time, require_fields
 
 
 lab_bp = Blueprint("labs", __name__)
+ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
+MIMETYPE_EXT_MAP = {
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+}
+IMGHDR_EXT_MAP = {
+    "jpeg": "jpg",
+    "png": "png",
+    "webp": "webp",
+}
 
 
 def _reservation_can_cleanup(item, now):
@@ -149,6 +165,45 @@ def update_lab(lab_id):
         item.close_time = parse_time(payload["close_time"], "close_time")
     db.session.commit()
     return success(item.to_dict(), "更新实验室成功")
+
+
+@lab_bp.post("/labs/upload-photo")
+@role_required("lab_admin", "system_admin")
+def upload_lab_photo():
+    if "file" not in request.files:
+        raise AppError("请上传实验室封面文件", 400, 40071)
+
+    file = request.files["file"]
+    if not file or not file.filename:
+        raise AppError("实验室封面文件无效", 400, 40072)
+
+    filename = secure_filename(file.filename)
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    mime = (file.mimetype or "").lower()
+
+    if not ext:
+        ext = MIMETYPE_EXT_MAP.get(mime, "")
+    if not ext and mime.startswith("image/"):
+        sub = mime.split("/", 1)[1].split(";", 1)[0].strip()
+        if sub == "jpeg":
+            sub = "jpg"
+        ext = sub
+    if not ext:
+        detected = imghdr.what(file.stream)
+        if detected:
+            ext = IMGHDR_EXT_MAP.get(detected, detected)
+        file.stream.seek(0)
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        raise AppError("仅支持 jpg/jpeg/png/webp 格式", 400, 40073)
+
+    save_name = f"{uuid4().hex}.{ext}"
+    relative_path = os.path.join("labs", save_name)
+    absolute_path = os.path.join(current_app.config["UPLOAD_ROOT"], relative_path)
+    file.save(absolute_path)
+
+    public_path = f"/uploads/{relative_path.replace(os.sep, '/')}"
+    public_url = f"{request.host_url.rstrip('/')}{public_path}"
+    return success({"url": public_url, "path": public_path}, "实验室封面上传成功")
 
 
 @lab_bp.delete("/labs/<int:lab_id>")

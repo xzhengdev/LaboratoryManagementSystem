@@ -44,7 +44,16 @@
       
       <!-- 表格数据行 - 遍历过滤后的实验室列表 -->
       <view v-for="item in filteredList" :key="item.id" class="table-row lab-grid">
-        <text class="table-strong">{{ item.lab_name }}</text>
+        <view class="admin-lab-name-cell">
+          <image
+            v-if="item.photos && item.photos.length"
+            class="admin-lab-name-cell__cover"
+            :src="item.photos[0]"
+            mode="aspectFill"
+          />
+          <view v-else class="admin-lab-name-cell__cover admin-lab-name-cell__cover--empty">图</view>
+          <text class="table-strong">{{ item.lab_name }}</text>
+        </view>
         <text>{{ item.campus_name }}</text>
         <text>{{ item.capacity }}</text>
         <text>{{ item.open_time.slice(0, 5) }} - {{ item.close_time.slice(0, 5) }}</text>
@@ -73,6 +82,16 @@
         <view class="field">
           <text class="label">简介</text>
           <view class="input">{{ activeLab.description || '暂无实验室简介' }}</view>
+        </view>
+        <view class="field">
+          <text class="label">封面</text>
+          <image
+            v-if="activeLab.photos && activeLab.photos.length"
+            class="admin-lab-detail-cover"
+            :src="activeLab.photos[0]"
+            mode="aspectFill"
+          />
+          <view v-else class="input">暂无封面</view>
         </view>
         <view class="actions">
           <view class="btn btn-light" @click="drawerVisible = false">关闭</view>
@@ -147,6 +166,20 @@
           <text class="label">简介</text>
           <textarea v-model="form.description" class="input textarea admin-lab-input admin-lab-textarea" />
         </view>
+
+        <view class="field">
+          <text class="label">实验室封面</text>
+          <view class="admin-lab-cover-row">
+            <image
+              v-if="form.photos && form.photos.length"
+              class="admin-lab-cover-preview"
+              :src="form.photos[0]"
+              mode="aspectFill"
+            />
+            <view v-else class="admin-lab-cover-empty">暂无封面</view>
+            <view class="admin-lab-btn admin-lab-btn--ghost" @click="pickCover">上传封面</view>
+          </view>
+        </view>
         
         <!-- 表单按钮 -->
         <view class="actions admin-lab-modal__actions">
@@ -203,7 +236,8 @@ export default {
         open_time: '08:00',  // 开放开始时间
         close_time: '21:00', // 开放结束时间
         status: 'active',    // 状态（active:启用, disabled:停用）
-        description: ''      // 实验室简介
+        description: '',     // 实验室简介
+        photos: []           // 实验室封面/图片
       }
     }
   },
@@ -386,7 +420,8 @@ export default {
           open_time: '08:00',
           close_time: '21:00',
           status: 'active',
-          description: ''
+          description: '',
+          photos: []
         }
         return
       }
@@ -401,7 +436,8 @@ export default {
         open_time: item.open_time.slice(0, 5),   // 只取时:分部分
         close_time: item.close_time.slice(0, 5), // 只取时:分部分
         status: item.status,
-        description: item.description || ''
+        description: item.description || '',
+        photos: Array.isArray(item.photos) ? item.photos : []
       }
     },
     
@@ -441,6 +477,35 @@ export default {
       // 关闭弹窗并刷新列表
       this.closeEditor()
       await this.loadLabs()
+    },
+
+    async pickCover() {
+      uni.chooseImage({
+        count: 1,
+        sizeType: ['compressed'],
+        sourceType: ['album', 'camera'],
+        success: async (res) => {
+          const list = res && res.tempFilePaths ? res.tempFilePaths : []
+          const files = res && res.tempFiles ? res.tempFiles : []
+          if (!list.length) return
+          if (files.length && files[0].size > 10 * 1024 * 1024) {
+            uni.showToast({ title: '图片不能超过10MB', icon: 'none' })
+            return
+          }
+          let loadingShown = false
+          try {
+            uni.showLoading({ title: '上传中', mask: true })
+            loadingShown = true
+            const uploaded = await api.uploadLabPhoto(list[0])
+            this.form.photos = [uploaded.url]
+            uni.showToast({ title: '封面已上传', icon: 'success' })
+          } finally {
+            if (loadingShown) {
+              uni.hideLoading()
+            }
+          }
+        }
+      })
     },
     
     /**
@@ -638,6 +703,38 @@ page {
   color: #0f2744;
   font-weight: 800;
 }
+.admin-lab-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  min-width: 0;
+}
+.admin-lab-name-cell__cover {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 14rpx;
+  border: 1rpx solid #dce6f3;
+  box-shadow: 0 4rpx 12rpx rgba(16, 42, 73, 0.1);
+  flex-shrink: 0;
+}
+.admin-lab-name-cell__cover--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eff4fb;
+  color: #6d7f95;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.admin-lab-detail-cover {
+  width: 100%;
+  height: 240rpx;
+  margin-top: 10rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid #dce6f3;
+  display: block;
+}
 
 .table-row .tag {
   position: relative;
@@ -702,10 +799,10 @@ page {
 }
 
 .admin-lab-modal {
-  width: 860rpx;
+  width: 1100rpx;
   max-width: calc(100vw - 64rpx);
   border-radius: 28rpx;
-  padding: 28rpx 28rpx 24rpx;
+  padding: 28rpx 40rpx 24rpx;
   background: #ffffff;
   box-shadow: 0 30rpx 80rpx rgba(9, 36, 69, 0.22);
   animation: admin-lab-modal-in 180ms ease-out;
@@ -738,6 +835,35 @@ page {
   transition: all 0.2s ease;
 }
 
+.admin-lab-cover-row {
+  margin-top: 10rpx;
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+}
+
+.admin-lab-cover-preview,
+.admin-lab-cover-empty {
+  width: 180rpx;
+  height: 120rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid #dbe5f2;
+  background: #f3f7fc;
+}
+
+.admin-lab-cover-preview {
+  display: block;
+}
+
+.admin-lab-cover-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6d7f95;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
 .admin-lab-modal__close:hover {
   opacity: 0.92;
   transform: translateY(-1rpx);
@@ -763,7 +889,8 @@ page {
 }
 
 .admin-lab-textarea {
-  min-height: 148rpx;
+  height: 200rpx;
+  min-height: 200rpx;
   padding-top: 14rpx;
 }
 

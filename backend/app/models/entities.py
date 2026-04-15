@@ -14,6 +14,7 @@ class Campus(BaseModel):
     campus_name = db.Column(db.String(100), nullable=False, unique=True)
     address = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text)
+    cover_url = db.Column(db.String(500))
     status = db.Column(db.String(20), default="active", nullable=False)
 
     laboratories = db.relationship("Laboratory", backref="campus", lazy=True)

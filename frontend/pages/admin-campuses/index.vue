@@ -33,7 +33,16 @@
         
         <!-- 遍历校区列表，渲染每一行数据 -->
         <view v-for="item in filteredList" :key="item.id" class="table-row campus-grid">
-          <text class="table-strong">{{ item.campus_name }}</text>
+          <view class="admin-campus-name-cell">
+            <image
+              v-if="item.cover_url"
+              class="admin-campus-name-cell__cover"
+              :src="item.cover_url"
+              mode="aspectFill"
+            />
+            <view v-else class="admin-campus-name-cell__cover admin-campus-name-cell__cover--empty">图</view>
+            <text class="table-strong">{{ item.campus_name }}</text>
+          </view>
           <text>{{ item.address }}</text>
           <text>{{ item.lab_count || 0 }}</text>
           <!-- 状态标签组件：根据status显示不同样式 -->
@@ -89,6 +98,20 @@
             <text class="label">校区简介</text>
             <textarea v-model="form.description" class="input textarea admin-campus-input admin-campus-textarea" placeholder="请输入校区简介（可选）" />
           </view>
+
+          <view class="field admin-campus-field">
+            <text class="label">校区封面</text>
+            <view class="admin-campus-cover-row">
+              <image
+                v-if="form.cover_url"
+                class="admin-campus-cover-preview"
+                :src="form.cover_url"
+                mode="aspectFill"
+              />
+              <view v-else class="admin-campus-cover-empty">暂无封面</view>
+              <view class="admin-campus-btn admin-campus-btn--ghost" @click="pickCampusCover">上传封面</view>
+            </view>
+          </view>
           
           <!-- 模态框底部按钮 -->
           <view class="actions admin-campus-modal__actions">
@@ -132,7 +155,8 @@ export default {
       form: {               // 表单数据（新增/编辑共用）
         campus_name: '',
         address: '',
-        description: ''
+        description: '',
+        cover_url: ''
       }
     }
   },
@@ -227,9 +251,10 @@ export default {
         ? { 
             campus_name: item.campus_name, 
             address: item.address, 
-            description: item.description || '' 
+            description: item.description || '',
+            cover_url: item.cover_url || ''
           }
-        : { campus_name: '', address: '', description: '' }
+        : { campus_name: '', address: '', description: '', cover_url: '' }
     },
     
     /**
@@ -249,6 +274,7 @@ export default {
       const campus_name = (this.form.campus_name || '').trim()
       const address = (this.form.address || '').trim()
       const description = (this.form.description || '').trim()
+      const cover_url = (this.form.cover_url || '').trim()
 
       if (!campus_name) {
         uni.showToast({ title: '请输入校区名称', icon: 'none' })
@@ -262,9 +288,9 @@ export default {
       this.saving = true
       try {
         if (this.editingId) {
-          await api.updateCampus(this.editingId, { campus_name, address, description })
+          await api.updateCampus(this.editingId, { campus_name, address, description, cover_url })
         } else {
-          await api.createCampus({ campus_name, address, description, status: 'active' })
+          await api.createCampus({ campus_name, address, description, cover_url, status: 'active' })
         }
         await this.fetchCampuses()
         uni.showToast({ title: '保存成功', icon: 'success' })
@@ -292,6 +318,34 @@ export default {
       } catch (error) {
         uni.showToast({ title: error?.message || '状态更新失败', icon: 'none' })
       }
+    },
+    pickCampusCover() {
+      uni.chooseImage({
+        count: 1,
+        sizeType: ['compressed'],
+        sourceType: ['album', 'camera'],
+        success: async (res) => {
+          const list = res && res.tempFilePaths ? res.tempFilePaths : []
+          const files = res && res.tempFiles ? res.tempFiles : []
+          if (!list.length) return
+          if (files.length && files[0].size > 10 * 1024 * 1024) {
+            uni.showToast({ title: '图片不能超过10MB', icon: 'none' })
+            return
+          }
+          let loadingShown = false
+          try {
+            uni.showLoading({ title: '上传中', mask: true })
+            loadingShown = true
+            const uploaded = await api.uploadCampusCover(list[0])
+            this.form.cover_url = uploaded.url
+            uni.showToast({ title: '封面已上传', icon: 'success' })
+          } finally {
+            if (loadingShown) {
+              uni.hideLoading()
+            }
+          }
+        }
+      })
     }
   }
 }
@@ -442,6 +496,10 @@ page {
   padding-left: 20rpx;
 }
 
+.table-row.campus-grid .admin-campus-name-cell {
+  padding-left: 20rpx;
+}
+
 .campus-grid {
   grid-template-columns: 1.2fr 1.8fr 0.9fr 0.8fr 1.1fr;
 }
@@ -449,6 +507,32 @@ page {
 .table-strong {
   color: #0f2744;
   font-weight: 800;
+}
+
+.admin-campus-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  min-width: 0;
+}
+
+.admin-campus-name-cell__cover {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 14rpx;
+  border: 1rpx solid #dce6f3;
+  box-shadow: 0 4rpx 12rpx rgba(16, 42, 73, 0.1);
+  flex-shrink: 0;
+}
+
+.admin-campus-name-cell__cover--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eff4fb;
+  color: #6d7f95;
+  font-size: 22rpx;
+  font-weight: 700;
 }
 
 .table-row .tag {
@@ -585,6 +669,35 @@ page {
 .admin-campus-textarea {
   min-height: 148rpx;
   padding-top: 14rpx;
+}
+
+.admin-campus-cover-row {
+  margin-top: 10rpx;
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+}
+
+.admin-campus-cover-preview,
+.admin-campus-cover-empty {
+  width: 200rpx;
+  height: 120rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid #dbe5f2;
+  background: #f3f7fc;
+}
+
+.admin-campus-cover-preview {
+  display: block;
+}
+
+.admin-campus-cover-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6d7f95;
+  font-size: 22rpx;
+  font-weight: 600;
 }
 
 .admin-campus-modal__actions {

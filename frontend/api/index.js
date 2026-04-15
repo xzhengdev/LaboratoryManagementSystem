@@ -1,10 +1,125 @@
-import { request } from './request'
+﻿import { request } from './request'
+import { getToken } from '../common/session'
+import { getApiBaseUrl } from '../common/platform'
 
-// 统一收口所有后端接口，页面层只关心“调用哪个业务方法”，
-// 不再关心具体 URL 和请求方式，方便后续整体调整。
+const BASE_URL = getApiBaseUrl()
+
 export const api = {
   login: (data) => request({ url: '/auth/login', method: 'POST', data }),
   profile: () => request({ url: '/auth/profile' }),
+  updateProfile: (data) => request({ url: '/auth/profile', method: 'PUT', data }),
+  uploadAvatar: (filePath) =>
+    new Promise((resolve, reject) => {
+      uni.uploadFile({
+        url: `${BASE_URL}/auth/upload-avatar`,
+        filePath,
+        name: 'file',
+        header: {
+          Authorization: getToken() ? `Bearer ${getToken()}` : ''
+        },
+        success: (res) => {
+          const raw = res.data
+          let payload = {}
+          if (raw && typeof raw === 'object') {
+            payload = raw
+          } else {
+            try {
+              payload = JSON.parse(raw || '{}')
+            } catch (_error) {
+              payload = {}
+            }
+          }
+
+          if (res.statusCode === 200 && payload.code === 0 && payload.data && payload.data.url) {
+            resolve(payload.data)
+            return
+          }
+
+          const errorText = payload.message || `头像上传失败(${res.statusCode})`
+          uni.showToast({ title: errorText, icon: 'none' })
+          console.error('upload-avatar failed:', { statusCode: res.statusCode, body: res.data })
+          reject(payload)
+        },
+        fail: (error) => {
+          uni.showToast({ title: '头像上传失败，请检查网络', icon: 'none' })
+          reject(error)
+        }
+      })
+    }),
+  uploadLabPhoto: (filePath) =>
+    new Promise((resolve, reject) => {
+      uni.uploadFile({
+        url: `${BASE_URL}/labs/upload-photo`,
+        filePath,
+        name: 'file',
+        header: {
+          Authorization: getToken() ? `Bearer ${getToken()}` : ''
+        },
+        success: (res) => {
+          const raw = res.data
+          let payload = {}
+          if (raw && typeof raw === 'object') {
+            payload = raw
+          } else {
+            try {
+              payload = JSON.parse(raw || '{}')
+            } catch (_error) {
+              payload = {}
+            }
+          }
+
+          if (res.statusCode === 200 && payload.code === 0 && payload.data && payload.data.url) {
+            resolve(payload.data)
+            return
+          }
+
+          const errorText = payload.message || `实验室封面上传失败(${res.statusCode})`
+          uni.showToast({ title: errorText, icon: 'none' })
+          reject(payload)
+        },
+        fail: (error) => {
+          uni.showToast({ title: '实验室封面上传失败，请检查网络', icon: 'none' })
+          reject(error)
+        }
+      })
+    }),
+  uploadCampusCover: (filePath) =>
+    new Promise((resolve, reject) => {
+      uni.uploadFile({
+        url: `${BASE_URL}/campuses/upload-cover`,
+        filePath,
+        name: 'file',
+        header: {
+          Authorization: getToken() ? `Bearer ${getToken()}` : ''
+        },
+        success: (res) => {
+          const raw = res.data
+          let payload = {}
+          if (raw && typeof raw === 'object') {
+            payload = raw
+          } else {
+            try {
+              payload = JSON.parse(raw || '{}')
+            } catch (_error) {
+              payload = {}
+            }
+          }
+
+          if (res.statusCode === 200 && payload.code === 0 && payload.data && payload.data.url) {
+            resolve(payload.data)
+            return
+          }
+
+          const errorText = payload.message || `校区封面上传失败(${res.statusCode})`
+          uni.showToast({ title: errorText, icon: 'none' })
+          reject(payload)
+        },
+        fail: (error) => {
+          uni.showToast({ title: '校区封面上传失败，请检查网络', icon: 'none' })
+          reject(error)
+        }
+      })
+    }),
   campuses: () => request({ url: '/campuses' }),
   createCampus: (data) => request({ url: '/campuses', method: 'POST', data }),
   updateCampus: (id, data) => request({ url: `/campuses/${id}`, method: 'PUT', data }),

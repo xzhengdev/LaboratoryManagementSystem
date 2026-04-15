@@ -23,7 +23,16 @@
       </view>
 
       <view class="portal-actions">
-        <view class="pill">{{ profile.real_name || '璁垮' }}</view>
+        <view class="portal-user" @click="go(routes.profile)">
+          <image
+            v-if="profile.avatar_url"
+            class="portal-user__avatar portal-user__avatar-img"
+            :src="profile.avatar_url"
+            mode="aspectFill"
+          />
+          <view v-else class="portal-user__avatar">{{ avatarText }}</view>
+          <view class="portal-user__name">{{ profile.real_name || profile.username || '访客' }}</view>
+        </view>
         <view v-if="isAdmin" class="btn btn-light portal-admin" @click="goAdminWorkspace">绠＄悊鍚庡彴</view>
       </view>
     </view>
@@ -48,6 +57,9 @@ export default {
     }
   },
   computed: {
+    avatarText() {
+      return (this.profile.real_name || this.profile.username || '访客').slice(0, 1)
+    },
     isAdmin() {
       return isAdminRole(this.profile.role)
     }
@@ -145,6 +157,37 @@ export default {
   display: flex;
   align-items: center;
   gap: 16rpx;
+}
+.portal-user {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+.portal-user__avatar {
+  width: 58rpx;
+  height: 58rpx;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1a2b4b, #2c7da0);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 24rpx;
+}
+.portal-user__avatar-img {
+  border: 1rpx solid rgba(19, 45, 77, 0.12);
+  box-shadow: 0 6rpx 16rpx rgba(19, 45, 77, 0.12);
+  object-fit: cover;
+}
+.portal-user__name {
+  max-width: 160rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #132d4d;
+  font-size: 24rpx;
+  font-weight: 700;
 }
 
 .portal-admin {

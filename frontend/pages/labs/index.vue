@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <view class="labs-page">
     <!-- #ifdef H5 -->
     <student-top-nav active="labs" />
@@ -13,7 +13,7 @@
         <view class="labs-page__hero">
           <view class="labs-page__title">实验室资源目录</view>
           <view class="labs-page__sub">
-            Clinical Prism 分布式管理系统的资源概览。浏览、筛选并预约全国各校区的先进实验空间与尖端设备。
+            浏览、筛选并预约各校区实验室资源，支持按校区与实验类型快速定位。
           </view>
         </view>
 
@@ -52,6 +52,13 @@
             :class="{ featured: index === 3 }"
           >
             <view class="labs-page__cover" :style="{ background: item.cover }">
+              <image
+                v-if="item.coverImage"
+                class="labs-page__cover-img"
+                :src="item.coverImage"
+                mode="aspectFill"
+              />
+              <view class="labs-page__cover-mask"></view>
               <view class="labs-page__cover-tags">
                 <view class="labs-page__tag status" :class="item.status === 'active' ? 'active' : 'busy'">
                   {{ item.status === 'active' ? '开放中' : '维护中' }}
@@ -141,7 +148,8 @@ export default {
           typeText,
           typeKey: this.resolveTypeKey(typeText),
           openText: `${(item.open_time || '00:00').slice(0, 5)} - ${(item.close_time || '00:00').slice(0, 5)}`,
-          cover: COVER_POOL[index % COVER_POOL.length]
+          cover: COVER_POOL[index % COVER_POOL.length],
+          coverImage: Array.isArray(item.photos) && item.photos.length ? item.photos[0] : ''
         }
       })
     },
@@ -156,6 +164,11 @@ export default {
   },
   async onShow() {
     if (!requireLogin()) return
+    const entryCampusId = uni.getStorageSync('campus_entry_campus_id')
+    if (entryCampusId) {
+      this.campusId = String(entryCampusId)
+      uni.removeStorageSync('campus_entry_campus_id')
+    }
     // #ifdef H5
     uni.hideTabBar()
     // #endif
@@ -189,8 +202,8 @@ export default {
     },
     resolveType(item) {
       const text = `${item.lab_name || ''} ${item.description || ''}`.toLowerCase()
-      if (text.includes('生') || text.includes('基因') || text.includes('医')) return '生物'
-      if (text.includes('化') || text.includes('合成')) return '化学'
+      if (text.includes('生物') || text.includes('基因') || text.includes('医学')) return '生物'
+      if (text.includes('化学') || text.includes('合成')) return '化学'
       if (text.includes('物理') || text.includes('光学') || text.includes('材料')) return '物理'
       if (text.includes('ai') || text.includes('机器') || text.includes('智能')) return '人工智能'
       return '综合'
@@ -347,6 +360,19 @@ export default {
 .labs-page__cover {
   height: 270rpx;
   position: relative;
+  overflow: hidden;
+}
+
+.labs-page__cover-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.labs-page__cover-mask {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(7, 22, 43, 0.08) 0%, rgba(7, 22, 43, 0.38) 100%);
 }
 
 .labs-page__cover-tags {
@@ -530,3 +556,6 @@ export default {
 }
 /* #endif */
 </style>
+
+
+

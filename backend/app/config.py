@@ -39,8 +39,10 @@ class Config:
     )
     SQLALCHEMY_DATABASE_URI = build_database_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    MAX_CONTENT_LENGTH = 10 * 1024 * 1024
     # 关闭 JSON ASCII 转义，保证中文直接输出而不是 \uXXXX。
     JSON_AS_ASCII = False
+    UPLOAD_DIRNAME = os.getenv("UPLOAD_DIRNAME", "uploads")
 
     # Agent 相关配置：
     # rule 表示走本地规则助手，openai 表示调用兼容 OpenAI 的对话接口。

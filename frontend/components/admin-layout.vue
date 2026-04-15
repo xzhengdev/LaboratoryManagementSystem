@@ -20,6 +20,7 @@
             :class="{ active: active === item.key }"
             @click="go(item.path)"
           >
+            <view class="admin-menu-item__icon">{{ item.icon }}</view>
             <view class="admin-menu-item__title">{{ item.title }}</view>
           </view>
         </view>
@@ -93,10 +94,20 @@ export default {
     },
     // 计算属性：根据用户角色动态生成侧边栏菜单项
     sidebarItems() {
+      const iconMap = {
+        campuses: '🏫',
+        labs: '🔬',
+        equipment: '🛠',
+        approvals: '✅',
+        users: '👥',
+        statistics: '📊',
+        settings: '⚙'
+      }
       return getAdminMenusByRole(this.currentUser.role).map((item) => ({
         key: item.key,
         title: item.title,
-        path: item.path
+        path: item.path,
+        icon: iconMap[item.key] || '•'
       }))
     }
   },
@@ -190,6 +201,7 @@ export default {
   padding: 0 18rpx;
   display: flex;
   align-items: center;
+  gap: 12rpx;
   color: #42546e;
   // 激活状态样式
   &.active {
@@ -197,6 +209,17 @@ export default {
     color: #0f2342;
     box-shadow: 0 8rpx 20rpx rgba(15, 35, 66, 0.08);
   }
+}
+.admin-menu-item__icon {
+  width: 34rpx;
+  height: 34rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  line-height: 1;
+  opacity: 0.9;
+  flex-shrink: 0;
 }
 .admin-menu-item__title {
   font-size: 30rpx;

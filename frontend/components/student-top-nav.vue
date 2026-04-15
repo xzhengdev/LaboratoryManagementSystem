@@ -22,8 +22,14 @@
 
       <view class="student-top-nav__actions">
         <view class="student-top-nav__profile" @click="go(routes.profile)">
-          <view class="student-top-nav__avatar">{{ avatarText }}</view>
-          <view class="student-top-nav__profile-text">{{ roleText }}</view>
+          <image
+            v-if="profile.avatar_url"
+            class="student-top-nav__avatar student-top-nav__avatar-img"
+            :src="profile.avatar_url"
+            mode="aspectFill"
+          />
+          <view v-else class="student-top-nav__avatar">{{ avatarText }}</view>
+          <view class="student-top-nav__profile-text">{{ displayName }}</view>
         </view>
       </view>
     </view>
@@ -33,7 +39,7 @@
 <script>
 import { openPage } from '../common/router'
 import { getProfile } from '../common/session'
-import { getRoleText, getUserTopNavByRole, routes } from '../config/navigation'
+import { getUserTopNavByRole, routes } from '../config/navigation'
 
 export default {
   props: {
@@ -50,8 +56,8 @@ export default {
     avatarText() {
       return (this.profile.real_name || this.profile.username || '用户').slice(0, 1)
     },
-    roleText() {
-      return getRoleText(this.profile.role)
+    displayName() {
+      return this.profile.real_name || this.profile.username || '用户'
     }
   },
   created() {
@@ -162,7 +168,7 @@ export default {
 .student-top-nav__avatar {
   width: 66rpx;
   height: 66rpx;
-  border-radius: 999rpx;
+  border-radius: 18rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -171,11 +177,20 @@ export default {
   font-size: 26rpx;
   font-weight: 700;
 }
+.student-top-nav__avatar-img {
+  border: 1rpx solid rgba(16, 42, 73, 0.12);
+  box-shadow: 0 6rpx 16rpx rgba(19, 45, 77, 0.12);
+  object-fit: cover;
+}
 
 .student-top-nav__profile-text {
   font-size: 22rpx;
-  font-weight: 600;
+  font-weight: 700;
   color: #031635;
+  max-width: 160rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media screen and (min-width: 1500px) {

@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask
+from flask import Flask, send_from_directory
 
 from app.api import register_blueprints
 from app.config import DevelopmentConfig
@@ -25,6 +25,10 @@ def register_error_handlers(app):
         app.logger.exception(error)
         return fail("服务器内部错误", 500, 50000)
 
+    @app.errorhandler(413)
+    def handle_413(_error):
+        return fail("上传文件过大，请控制在 10MB 以内", 413, 41300)
+
 
 def register_cli(app):
     # 提供 flask seed-data 命令，便于一键初始化演示数据。
@@ -47,6 +51,14 @@ def create_app(config_class=DevelopmentConfig):
     app = Flask(__name__, instance_path=instance_path)
     app.config.from_object(config_class)
 
+    # 上传目录（如头像）配置与初始化。
+    upload_root = os.path.join(backend_root, app.config.get("UPLOAD_DIRNAME", "uploads"))
+    os.makedirs(upload_root, exist_ok=True)
+    os.makedirs(os.path.join(upload_root, "avatars"), exist_ok=True)
+    os.makedirs(os.path.join(upload_root, "campuses"), exist_ok=True)
+    os.makedirs(os.path.join(upload_root, "labs"), exist_ok=True)
+    app.config["UPLOAD_ROOT"] = upload_root
+
     # 初始化扩展。
     db.init_app(app)
     migrate.init_app(app, db)
@@ -57,4 +69,9 @@ def create_app(config_class=DevelopmentConfig):
     register_blueprints(app)
     register_error_handlers(app)
     register_cli(app)
+
+    @app.get("/uploads/<path:filename>")
+    def serve_upload(filename):
+        return send_from_directory(app.config["UPLOAD_ROOT"], filename)
+
     return app

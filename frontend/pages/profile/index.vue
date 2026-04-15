@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <view class="profile-page">
     <!-- #ifdef H5 -->
     <student-top-nav active="profile" />
@@ -10,103 +10,59 @@
 
     <view class="profile-page__shell">
       <view class="profile-page__hero">
-        <view class="profile-page__avatar">博</view>
+        <view class="profile-page__avatar">
+          <image v-if="profile.avatar_url" class="profile-page__avatar-img" :src="profile.avatar_url" mode="aspectFill" />
+          <view v-else class="profile-page__avatar-fallback">{{ avatarText }}</view>
+        </view>
         <view class="profile-page__hero-main">
           <view class="profile-page__name">{{ profile.real_name || '未命名用户' }}</view>
           <view class="profile-page__role">{{ roleText }}</view>
           <view class="profile-page__badges">
-            <view class="profile-page__badge">ID：{{ profile.username || 'N/A' }}</view>
-            <view class="profile-page__badge">实验室协作成员</view>
-            <view class="profile-page__badge blue">核心团队</view>
+            <view class="profile-page__badge">ID: {{ profile.username || 'N/A' }}</view>
+            <view class="profile-page__badge">{{ profile.email || '未设置邮箱' }}</view>
           </view>
-        </view>
-      </view>
-
-      <view class="profile-page__stats">
-        <view class="profile-page__stat-card">
-          <view class="profile-page__stat-label">总预约次数</view>
-          <view class="profile-page__stat-value">{{ stats.total }}</view>
-          <view class="profile-page__stat-sub positive">较上月增长 {{ stats.growth }}%</view>
-        </view>
-        <view class="profile-page__stat-card">
-          <view class="profile-page__stat-label">实验室内累计时长</view>
-          <view class="profile-page__stat-value">{{ stats.hours }}h</view>
-          <view class="profile-page__progress">
-            <view class="profile-page__progress-in" :style="{ width: `${stats.progress}%` }"></view>
-          </view>
-          <view class="profile-page__stat-sub">年度目标：1200h</view>
-        </view>
-        <view class="profile-page__stat-card">
-          <view class="profile-page__stat-label">当前活跃预订</view>
-          <view class="profile-page__stat-value">{{ stats.active }}</view>
-          <view class="profile-page__stat-sub">审批中 {{ stats.pending }} 项</view>
-        </view>
-        <view class="profile-page__stat-card">
-          <view class="profile-page__stat-label">合规性评分</view>
-          <view class="profile-page__stat-value">{{ stats.score }}%</view>
-          <view class="profile-page__stat-sub">评级：优秀</view>
         </view>
       </view>
 
       <view class="profile-page__layout">
-        <view>
-          <view class="profile-page__card">
+        <view class="profile-page__card">
           <view class="profile-page__card-head">
             <view class="profile-page__card-title">基本信息设置</view>
-              <view class="profile-page__card-link" @click="toggleEdit">{{ isEditing ? '完成编辑' : '编辑所有' }}</view>
-            </view>
-            <view class="profile-page__form-grid">
-              <view class="profile-page__field">
-                <view class="profile-page__label">中文姓名</view>
-                <input v-model.trim="form.real_name" class="profile-page__input profile-page__input-field" :disabled="!isEditing" />
-              </view>
-              <view class="profile-page__field">
-                <view class="profile-page__label">英文姓名</view>
-                <input v-model.trim="form.real_name_en" class="profile-page__input profile-page__input-field" :disabled="!isEditing" />
-              </view>
-              <view class="profile-page__field">
-                <view class="profile-page__label">电子邮件</view>
-                <input v-model.trim="form.email" class="profile-page__input profile-page__input-field" :disabled="!isEditing" />
-              </view>
-              <view class="profile-page__field">
-                <view class="profile-page__label">联系电话</view>
-                <input v-model.trim="form.phone" class="profile-page__input profile-page__input-field" :disabled="!isEditing" />
-              </view>
-            </view>
-            <view class="profile-page__form-actions">
-              <view class="profile-page__btn primary" :class="{ disabled: !isEditing }" @click="saveProfile">保存更改</view>
-              <view class="profile-page__btn light" @click="cancelEdit">取消</view>
-              <view class="profile-page__btn danger" @click="logout">退出登录</view>
-            </view>
+            <view class="profile-page__card-link" @tap="toggleEdit">{{ isEditing ? '完成编辑' : '编辑资料' }}</view>
           </view>
-
-          <view class="profile-page__card">
-            <view class="profile-page__card-title">实验室准入状态</view>
-            <view class="profile-page__access-grid">
-              <view v-for="(item, index) in accessList" :key="index" class="profile-page__access-item" :class="item.state">
-                <view class="profile-page__access-icon">{{ item.icon }}</view>
-                <view>
-                  <view class="profile-page__access-name">{{ item.name }}</view>
-                  <view class="profile-page__access-sub">{{ item.sub }}</view>
+          <view class="profile-page__form-grid">
+            <view class="profile-page__field profile-page__field--full">
+              <view class="profile-page__label">头像</view>
+              <view class="profile-page__avatar-row">
+                <view class="profile-page__avatar profile-page__avatar--small">
+                  <image v-if="form.avatar_url" class="profile-page__avatar-img" :src="form.avatar_url" mode="aspectFill" />
+                  <view v-else class="profile-page__avatar-fallback">{{ avatarText }}</view>
                 </view>
+                <view class="profile-page__btn light" :class="{ disabled: !isEditing }" @click="pickAvatar">更换头像</view>
               </view>
             </view>
-          </view>
-        </view>
-
-        <view class="profile-page__card profile-page__timeline-card">
-          <view class="profile-page__card-title">最近活动记录</view>
-          <view class="profile-page__timeline">
-            <view v-for="(item, idx) in timeline" :key="idx" class="profile-page__timeline-item">
-              <view class="profile-page__timeline-dot" :class="item.type"></view>
-              <view class="profile-page__timeline-main">
-                <view class="profile-page__timeline-title">{{ item.title }}</view>
-                <view class="profile-page__timeline-desc">{{ item.desc }}</view>
-                <view class="profile-page__timeline-time">{{ item.time }}</view>
-              </view>
+            <view class="profile-page__field">
+              <view class="profile-page__label">中文姓名</view>
+              <input v-model.trim="form.real_name" class="profile-page__input profile-page__input-field" :disabled="!isEditing" />
+            </view>
+            <view class="profile-page__field">
+              <view class="profile-page__label">英文姓名</view>
+              <input v-model.trim="form.real_name_en" class="profile-page__input profile-page__input-field" :disabled="!isEditing" />
+            </view>
+            <view class="profile-page__field">
+              <view class="profile-page__label">电子邮件</view>
+              <input v-model.trim="form.email" class="profile-page__input profile-page__input-field" :disabled="!isEditing" />
+            </view>
+            <view class="profile-page__field">
+              <view class="profile-page__label">联系电话</view>
+              <input v-model.trim="form.phone" class="profile-page__input profile-page__input-field" :disabled="!isEditing" />
             </view>
           </view>
-          <view class="profile-page__timeline-btn">查看完整历史</view>
+          <view class="profile-page__form-actions">
+            <view class="profile-page__btn primary" :class="{ disabled: !isEditing }" @click="saveProfile">保存更改</view>
+            <view class="profile-page__btn light" @click="cancelEdit">取消</view>
+            <view class="profile-page__btn danger" @click="logout">退出登录</view>
+          </view>
         </view>
       </view>
     </view>
@@ -131,13 +87,13 @@ export default {
     return {
       routes,
       profile: {},
-      reservations: [],
       isEditing: false,
       form: {
         real_name: '',
         real_name_en: '',
         email: '',
-        phone: ''
+        phone: '',
+        avatar_url: ''
       }
     }
   },
@@ -145,51 +101,9 @@ export default {
     roleText() {
       return getRoleText(this.profile.role)
     },
-    stats() {
-      const list = this.reservations
-      const total = list.length
-      const active = list.filter((item) => item.status === 'approved').length
-      const pending = list.filter((item) => item.status === 'pending').length
-      const minutes = list.reduce((sum, item) => {
-        const start = (item.start_time || '00:00').split(':').map(Number)
-        const end = (item.end_time || '00:00').split(':').map(Number)
-        return sum + Math.max(0, end[0] * 60 + end[1] - (start[0] * 60 + start[1]))
-      }, 0)
-      const hours = Math.round((minutes / 60) * 10) / 10
-      const progress = Math.min(100, Math.round((hours / 1200) * 100))
-      return {
-        total,
-        active,
-        pending,
-        hours,
-        progress,
-        growth: Math.min(99, 8 + pending),
-        score: Math.max(80, 98 - Math.min(8, list.filter((i) => i.status === 'cancelled').length))
-      }
-    },
-    accessList() {
-      const campus = this.profile.campus_name || '主校区'
-      return [
-        { icon: '⎈', name: `${campus} · 生物安全二级实验室`, sub: '有效期至 2025-12-31', state: 'ok' },
-        { icon: '⚗', name: `${campus} · 化学分析中心`, sub: '有效期至 2025-06-15', state: 'ok' },
-        { icon: '⚙', name: `${campus} · 纳米技术净室`, sub: '资质审核中...', state: 'warn' },
-        { icon: '⌫', name: `${campus} · 同位素研究室`, sub: '未授权（需完成安全培训）', state: 'lock' }
-      ]
-    },
-    timeline() {
-      const latest = this.reservations.slice(0, 3)
-      const items = latest.map((item) => ({
-        type: item.status === 'approved' ? 'ok' : item.status === 'pending' ? 'warn' : 'normal',
-        title: item.status === 'approved' ? '实验预约确认' : item.status === 'pending' ? '审批处理中' : '预约状态更新',
-        desc: `${item.lab_name || '实验室'} · ${item.reservation_date || ''} ${(item.start_time || '').slice(0, 5)}-${(item.end_time || '').slice(0, 5)}`,
-        time: '刚刚'
-      }))
-      if (!items.length) {
-        return [
-          { type: 'ok', title: '账户已激活', desc: '欢迎使用分布式实验室预约系统。', time: '今天' }
-        ]
-      }
-      return items
+    avatarText() {
+      const source = this.form.real_name || this.profile.real_name || this.profile.username || 'U'
+      return String(source).slice(0, 1).toUpperCase()
     }
   },
   async onShow() {
@@ -198,15 +112,19 @@ export default {
     uni.hideTabBar()
     // #endif
     this.profile = getProfile()
+    await this.refreshProfile()
     this.syncFormFromProfile()
-    await this.loadReservations()
   },
   methods: {
-    async loadReservations() {
+    async refreshProfile() {
       try {
-        this.reservations = await api.myReservations()
-      } catch (error) {
-        this.reservations = []
+        const latestProfile = await api.profile()
+        if (latestProfile && latestProfile.id) {
+          this.profile = latestProfile
+          updateProfile(latestProfile)
+        }
+      } catch (_error) {
+        // ignore
       }
     },
     syncFormFromProfile() {
@@ -214,7 +132,8 @@ export default {
         real_name: this.profile.real_name || '',
         real_name_en: this.profile.real_name_en || this.profile.real_name || '',
         email: this.profile.email || '',
-        phone: this.profile.phone || ''
+        phone: this.profile.phone || '',
+        avatar_url: this.profile.avatar_url || ''
       }
     },
     toggleEdit() {
@@ -223,25 +142,67 @@ export default {
         this.syncFormFromProfile()
       }
     },
-    saveProfile() {
+    async saveProfile() {
       if (!this.isEditing) return
-      const merged = {
-        ...this.profile,
-        real_name: this.form.real_name || this.profile.real_name,
-        real_name_en: this.form.real_name_en || this.profile.real_name_en,
-        email: this.form.email,
-        phone: this.form.phone
+      try {
+        const payload = {
+          real_name: this.form.real_name || this.profile.real_name,
+          email: this.form.email,
+          phone: this.form.phone,
+          avatar_url: this.form.avatar_url || ''
+        }
+        const saved = await api.updateProfile(payload)
+        const merged = {
+          ...this.profile,
+          ...saved,
+          real_name_en: this.form.real_name_en || this.profile.real_name_en
+        }
+        updateProfile(merged)
+        this.profile = merged
+        this.isEditing = false
+        uni.showToast({ title: '资料已保存', icon: 'success' })
+      } catch (_error) {
+        uni.showToast({ title: '保存失败，请稍后重试', icon: 'none' })
       }
-      updateProfile(merged)
-      this.profile = merged
-      this.isEditing = false
-      uni.showToast({ title: '资料已保存', icon: 'success' })
     },
     cancelEdit() {
       this.profile = getProfile()
       this.syncFormFromProfile()
       this.isEditing = false
       uni.showToast({ title: '已恢复当前资料', icon: 'none' })
+    },
+    pickAvatar() {
+      if (!this.isEditing) return
+      uni.chooseImage({
+        count: 1,
+        sizeType: ['compressed'],
+        sourceType: ['album', 'camera'],
+        success: async (res) => {
+          const list = res && res.tempFilePaths ? res.tempFilePaths : []
+          const files = res && res.tempFiles ? res.tempFiles : []
+          if (!list.length) return
+          if (files.length && files[0].size > 10 * 1024 * 1024) {
+            uni.showToast({ title: '图片不能超过10MB', icon: 'none' })
+            return
+          }
+
+          let loadingShown = false
+          try {
+            uni.showLoading({ title: '上传中', mask: true })
+            loadingShown = true
+            const uploaded = await api.uploadAvatar(list[0])
+            this.form.avatar_url = uploaded.url
+            uni.showToast({ title: '头像已上传', icon: 'success' })
+          } catch (_error) {
+            // toast handled in api layer
+          } finally {
+            if (loadingShown) {
+              uni.hideLoading()
+            }
+          }
+        },
+        fail: () => {}
+      })
     },
     logout() {
       clearSession()
@@ -272,21 +233,37 @@ export default {
   display: flex;
   gap: 18rpx;
   align-items: center;
-  background: linear-gradient(130deg, #1a2d54, #244c7a 62%, #1e3f68);
-  color: #e8f3ff;
+  background: linear-gradient(135deg, #eaf2ff 0%, #dfeaf9 60%, #e9f3ff 100%);
+  color: #112a49;
+  border: 1rpx solid #d7e4f5;
 }
 
 .profile-page__avatar {
   width: 120rpx;
   height: 120rpx;
   border-radius: 24rpx;
-  background: rgba(4, 20, 40, 0.48);
-  border: 2rpx solid rgba(133, 183, 227, 0.4);
+  background: #ffffff;
+  border: 2rpx solid #c9daef;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 44rpx;
   font-weight: 800;
+  overflow: hidden;
+}
+
+.profile-page__avatar-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.profile-page__avatar-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .profile-page__name {
@@ -297,7 +274,7 @@ export default {
 
 .profile-page__role {
   margin-top: 8rpx;
-  color: #4fc5ff;
+  color: #2c7da0;
   font-size: 36rpx;
   font-weight: 700;
 }
@@ -315,8 +292,8 @@ export default {
   padding: 0 12rpx;
   display: inline-flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.18);
-  color: #e7f3ff;
+  background: #ffffff;
+  color: #33557a;
   font-size: 20rpx;
   font-weight: 700;
 }
@@ -378,9 +355,7 @@ export default {
 
 .profile-page__layout {
   margin-top: 16rpx;
-  display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(280rpx, 0.8fr);
-  gap: 16rpx;
+  display: block;
 }
 
 .profile-page__card {
@@ -407,6 +382,18 @@ export default {
   color: #0f5b8e;
   font-size: 24rpx;
   font-weight: 700;
+  padding: 6rpx 12rpx;
+  border-radius: 10rpx;
+  background: #edf4fb;
+  transition: all 0.2s ease;
+}
+
+.profile-page__card-link:hover {
+  background: #e4eef9;
+}
+
+.profile-page__card-link:active {
+  transform: scale(0.98);
 }
 
 .profile-page__form-grid {
@@ -414,6 +401,23 @@ export default {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12rpx;
+}
+
+.profile-page__field--full {
+  grid-column: 1 / -1;
+}
+
+.profile-page__avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+}
+
+.profile-page__avatar--small {
+  width: 84rpx;
+  height: 84rpx;
+  border-radius: 18rpx;
+  font-size: 30rpx;
 }
 
 .profile-page__label {
@@ -471,126 +475,13 @@ export default {
   color: #f2f7ff;
 }
 
+.profile-page__btn.light.disabled {
+  opacity: 0.6;
+}
+
 .profile-page__input-field {
   width: 100%;
   box-sizing: border-box;
-}
-
-.profile-page__access-grid {
-  margin-top: 12rpx;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10rpx;
-}
-
-.profile-page__access-item {
-  border-radius: 14rpx;
-  border-left: 5rpx solid #d3dce8;
-  background: #f3f7fc;
-  padding: 12rpx;
-  display: grid;
-  grid-template-columns: 40rpx 1fr;
-  gap: 10rpx;
-}
-
-.profile-page__access-item.ok {
-  border-left-color: #2ebf71;
-}
-
-.profile-page__access-item.warn {
-  border-left-color: #f3a51d;
-}
-
-.profile-page__access-item.lock {
-  border-left-color: #b5c0cf;
-}
-
-.profile-page__access-icon {
-  width: 40rpx;
-  height: 40rpx;
-  border-radius: 10rpx;
-  background: #e5edf8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #29517f;
-  font-size: 20rpx;
-}
-
-.profile-page__access-name {
-  color: #112f53;
-  font-size: 23rpx;
-  font-weight: 700;
-}
-
-.profile-page__access-sub {
-  margin-top: 4rpx;
-  color: #6f8097;
-  font-size: 20rpx;
-}
-
-.profile-page__timeline-card {
-  height: 100%;
-}
-
-.profile-page__timeline {
-  margin-top: 12rpx;
-  display: grid;
-  gap: 10rpx;
-}
-
-.profile-page__timeline-item {
-  display: grid;
-  grid-template-columns: 24rpx 1fr;
-  gap: 10rpx;
-}
-
-.profile-page__timeline-dot {
-  width: 20rpx;
-  height: 20rpx;
-  border-radius: 999rpx;
-  margin-top: 4rpx;
-  background: #c9d4e3;
-}
-
-.profile-page__timeline-dot.ok {
-  background: #3eb4ea;
-}
-
-.profile-page__timeline-dot.warn {
-  background: #f3be2f;
-}
-
-.profile-page__timeline-title {
-  color: #0d294f;
-  font-size: 24rpx;
-  font-weight: 700;
-}
-
-.profile-page__timeline-desc {
-  margin-top: 2rpx;
-  color: #63768f;
-  font-size: 21rpx;
-  line-height: 1.5;
-}
-
-.profile-page__timeline-time {
-  margin-top: 4rpx;
-  color: #8a99ae;
-  font-size: 19rpx;
-}
-
-.profile-page__timeline-btn {
-  margin-top: 14rpx;
-  height: 56rpx;
-  border-radius: 12rpx;
-  border: 1rpx solid rgba(132, 147, 168, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #455973;
-  font-size: 22rpx;
-  font-weight: 700;
 }
 
 /* #ifndef H5 */
@@ -599,13 +490,8 @@ export default {
   padding-right: 24rpx;
 }
 
-.profile-page__stats {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 .profile-page__layout,
-.profile-page__form-grid,
-.profile-page__access-grid {
+.profile-page__form-grid {
   grid-template-columns: 1fr;
 }
 
@@ -634,10 +520,10 @@ export default {
 
 @media screen and (max-width: 760px) {
   .profile-page__stats,
-  .profile-page__form-grid,
-  .profile-page__access-grid {
+  .profile-page__form-grid {
     grid-template-columns: 1fr;
   }
 }
 /* #endif */
 </style>
+
