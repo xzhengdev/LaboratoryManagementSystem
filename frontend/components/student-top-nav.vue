@@ -3,8 +3,14 @@
     <view class="student-top-nav__inner">
       <view class="student-top-nav__main">
         <view class="student-top-nav__brand" @click="go(routes.home)">
-          <view class="student-top-nav__brand-mark">LP</view>
-          <view class="student-top-nav__brand-text">实验室系统</view>
+          <view class="login-hero__badge">
+            <image 
+              class="student-top-nav__brand-mark" 
+              src="/static/logo.png" 
+              mode="aspectFill"
+            />
+          </view>
+          <view class="student-top-nav__brand-text">实验室管理系统</view>
         </view>
 
         <view class="student-top-nav__links">
@@ -110,6 +116,7 @@ export default {
   gap: 18rpx;
 }
 
+
 .student-top-nav__brand-mark {
   width: 78rpx;
   height: 78rpx;
@@ -117,11 +124,8 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #031635, #1a2b4b);
-  color: #41befd;
-  font-size: 30rpx;
-  font-weight: 800;
 }
+
 
 .student-top-nav__brand-text {
   font-size: 30rpx;

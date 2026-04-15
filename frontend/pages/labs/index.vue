@@ -346,33 +346,45 @@ export default {
 .labs-page__grid {
   margin-top: 22rpx;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 24rpx;
 }
 
 .labs-page__card {
   overflow: hidden;
+  min-height: 0;
   border-radius: 26rpx;
   background: #ffffff;
   box-shadow: 0 16rpx 34rpx rgba(8, 27, 58, 0.06);
 }
 
 .labs-page__cover {
-  height: 270rpx;
   position: relative;
+  height: 340rpx;
   overflow: hidden;
+  background-size: cover !important;
+  background-position: center !important;
 }
 
 .labs-page__cover-img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
+  object-fit: cover;
+  object-position: center;
 }
 
 .labs-page__cover-mask {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(7, 22, 43, 0.08) 0%, rgba(7, 22, 43, 0.38) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(7, 22, 43, 0.26) 0%,
+    rgba(7, 22, 43, 0.16) 48%,
+    rgba(7, 22, 43, 0.08) 100%
+  );
 }
 
 .labs-page__cover-tags {
@@ -406,7 +418,10 @@ export default {
 }
 
 .labs-page__card-body {
-  padding: 24rpx;
+  position: relative;
+  padding: 22rpx;
+  border-radius: 0;
+  background: #ffffff;
 }
 
 .labs-page__card-title {
@@ -474,20 +489,16 @@ export default {
 }
 
 .labs-page__card.featured {
-  grid-column: span 2;
-  display: grid;
-  grid-template-columns: minmax(280rpx, 1fr) minmax(0, 1fr);
+  grid-column: auto;
+  min-height: 0;
 }
 
 .labs-page__card.featured .labs-page__cover {
-  height: 100%;
-  min-height: 320rpx;
+  min-height: 340rpx;
 }
 
 .labs-page__card.featured .labs-page__card-body {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  position: relative;
 }
 
 /* #ifndef H5 */
@@ -512,13 +523,13 @@ export default {
   grid-template-columns: 1fr;
 }
 
-.labs-page__card.featured {
-  grid-column: auto;
-  grid-template-columns: 1fr;
-}
+  .labs-page__card.featured {
+    grid-column: auto;
+    min-height: 0;
+  }
 
 .labs-page__card.featured .labs-page__cover {
-  min-height: 270rpx;
+  min-height: 0;
 }
 /* #endif */
 
@@ -537,12 +548,12 @@ export default {
 
   .labs-page__card.featured {
     grid-column: auto;
-    grid-template-columns: 1fr;
+    min-height: 520rpx;
   }
 
-  .labs-page__card.featured .labs-page__cover {
-    min-height: 270rpx;
-  }
+.labs-page__card.featured .labs-page__cover {
+  min-height: 340rpx;
+}
 }
 
 @media screen and (max-width: 860px) {
@@ -556,6 +567,3 @@ export default {
 }
 /* #endif */
 </style>
-
-
-

@@ -80,24 +80,42 @@
             v-for="lab in featuredLabs"
             :key="lab.id"
             class="student-home__lab-card"
-            @click="goLabDetail(lab.id)"
           >
             <view class="student-home__lab-cover" :style="{ background: lab.cover }">
+              <image
+                v-if="lab.coverImage"
+                class="student-home__lab-cover-img"
+                :src="lab.coverImage"
+                mode="aspectFill"
+              />
+              <view class="student-home__lab-cover-mask"></view>
               <view class="student-home__lab-status" :class="lab.statusClass">
                 <view class="student-home__lab-status-dot"></view>
                 <text>{{ lab.statusText }}</text>
               </view>
-              <view class="student-home__lab-cover-mark">{{ lab.shortName }}</view>
             </view>
 
             <view class="student-home__lab-body">
+              <view class="student-home__lab-name">{{ lab.lab_name }}</view>
               <view class="student-home__lab-location">
                 {{ lab.campus_name || '校区待补充' }} · {{ lab.location || '位置待补充' }}
               </view>
-              <view class="student-home__lab-name">{{ lab.lab_name }}</view>
-              <view class="student-home__lab-bottom">
-                <text class="student-home__lab-capacity">{{ lab.capacity || 0 }} 个工位</text>
-                <text class="student-home__lab-bookmark">收藏</text>
+
+              <view class="student-home__lab-tools">
+                <view class="student-home__lab-tool">{{ lab.typeText }}</view>
+                <view class="student-home__lab-tool">容量 {{ lab.capacity || 0 }}</view>
+                <view class="student-home__lab-tool">{{ lab.openText }}</view>
+              </view>
+
+              <view class="student-home__lab-actions">
+                <view class="student-home__lab-btn light" @click="goLabDetail(lab.id)">查看详情</view>
+                <view
+                  class="student-home__lab-btn primary"
+                  :class="{ disabled: lab.status !== 'active' }"
+                  @click="goReserveFromHome(lab)"
+                >
+                  {{ lab.status === 'active' ? '立即预约' : '暂不可约' }}
+                </view>
               </view>
             </view>
           </view>
@@ -206,6 +224,18 @@ export default {
     goLabDetail(id) {
       openPage(routes.labDetail, { query: { id } })
     },
+    goReserveFromHome(lab) {
+      if (!lab || lab.status !== 'active') return
+      openPage(routes.reserve, { query: { labId: lab.id, campusId: lab.campus_id } })
+    },
+    resolveType(item) {
+      const text = `${item.lab_name || ''} ${item.description || ''}`.toLowerCase()
+      if (text.includes('生物') || text.includes('基因') || text.includes('医学')) return '生物'
+      if (text.includes('化学') || text.includes('合成')) return '化学'
+      if (text.includes('物理') || text.includes('光学') || text.includes('材料')) return '物理'
+      if (text.includes('ai') || text.includes('机器') || text.includes('智能')) return '人工智能'
+      return '综合'
+    },
     async loadData() {
       try {
         const [labsRes, reservationsRes] = await Promise.all([
@@ -217,7 +247,9 @@ export default {
         this.featuredLabs = labs.slice(0, 3).map((lab, index) => ({
           ...lab,
           cover: LAB_COVERS[index % LAB_COVERS.length],
-          shortName: (lab.lab_name || 'LAB').slice(0, 4),
+          coverImage: Array.isArray(lab.photos) && lab.photos.length ? lab.photos[0] : '',
+          typeText: this.resolveType(lab),
+          openText: `${(lab.open_time || '00:00').slice(0, 5)} - ${(lab.close_time || '00:00').slice(0, 5)}`,
           statusText: lab.status === 'active' ? (index === 1 ? '紧张' : '空闲') : '停用',
           statusClass: lab.status === 'active' ? (index === 1 ? 'demand' : 'active') : 'disabled'
         }))
@@ -607,38 +639,40 @@ export default {
 
 .student-home__lab-card {
   overflow: hidden;
-  border-radius: 28rpx;
+  border-radius: 26rpx;
   background: #ffffff;
-  box-shadow: 0 18rpx 36rpx rgba(8, 27, 58, 0.05);
+  box-shadow: 0 16rpx 34rpx rgba(8, 27, 58, 0.06);
 }
 
 .student-home__lab-cover {
   position: relative;
-  height: 300rpx;
+  height: 340rpx;
   overflow: hidden;
 }
 
-.student-home__lab-cover-mark {
+.student-home__lab-cover-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.student-home__lab-cover-mask {
   position: absolute;
-  left: 24rpx;
-  bottom: 22rpx;
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 28rpx;
-  font-weight: 800;
-  letter-spacing: 1rpx;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(7, 22, 43, 0.16) 0%, rgba(7, 22, 43, 0.06) 100%);
 }
 
 .student-home__lab-status {
   position: absolute;
-  top: 20rpx;
-  right: 20rpx;
+  top: 16rpx;
+  left: 16rpx;
   display: flex;
   align-items: center;
   gap: 8rpx;
-  padding: 10rpx 16rpx;
+  padding: 8rpx 14rpx;
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.76);
-  color: #031635;
+  background: rgba(255, 255, 255, 0.88);
+  color: #0b2652;
   font-size: 18rpx;
   font-weight: 800;
 }
@@ -659,39 +693,87 @@ export default {
 }
 
 .student-home__lab-body {
-  padding: 28rpx;
+  padding: 24rpx;
+}
+
+.student-home__lab-name {
+  color: #031635;
+  font-size: 38rpx;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.student-home__lab-location {
+  margin-top: 8rpx;
+  color: #65768c;
+  font-size: 23rpx;
+}
+
+.student-home__lab-tools {
+  margin-top: 14rpx;
+  display: flex;
+  gap: 10rpx;
+  flex-wrap: wrap;
+}
+
+.student-home__lab-tool {
+  min-height: 38rpx;
+  border-radius: 12rpx;
+  padding: 0 12rpx;
+  background: #eef2f7;
+  color: #39506d;
+  font-size: 20rpx;
+  display: inline-flex;
+  align-items: center;
+}
+
+.student-home__lab-actions {
+  margin-top: 18rpx;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12rpx;
+}
+
+.student-home__lab-btn {
+  height: 70rpx;
+  border-radius: 16rpx;
+  font-size: 24rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.student-home__lab-btn.light {
+  background: #ffffff;
+  border: 2rpx solid #0b2652;
+  color: #0b2652;
+}
+
+.student-home__lab-btn.primary {
+  background: #041c42;
+  color: #ecf4ff;
+}
+
+.student-home__lab-btn.primary.disabled {
+  background: #cfd6df;
+  color: #5d6c80;
+}
+
+.student-home__lab-btn:active {
+  transform: scale(0.98);
+}
+
+.student-home__lab-location,
+.student-home__lab-name,
+.student-home__lab-tools,
+.student-home__lab-actions {
+  position: relative;
 }
 
 .student-home__lab-location {
   font-size: 20rpx;
-  color: #75777f;
-}
-
-.student-home__lab-name {
-  margin-top: 12rpx;
-  font-size: 30rpx;
-  line-height: 1.25;
-  color: #031635;
-  font-weight: 800;
-}
-
-.student-home__lab-bottom {
-  margin-top: 18rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.student-home__lab-capacity {
-  color: #00658d;
-  font-size: 22rpx;
-  font-weight: 700;
-}
-
-.student-home__lab-bookmark {
-  color: #031635;
-  font-size: 22rpx;
-  font-weight: 700;
+  color: #65768c;
 }
 
 .student-home__timeline-card {

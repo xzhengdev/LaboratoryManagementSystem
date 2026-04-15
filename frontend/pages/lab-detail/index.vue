@@ -8,7 +8,7 @@
     <user-top-nav active="labs" />
     <!-- #endif -->
 
-    <view class="lab-detail-page__hero" :style="{ background: heroCover }">
+    <view class="lab-detail-page__hero" :style="heroStyle">
       <view class="lab-detail-page__hero-overlay">
         <view class="lab-detail-page__hero-meta">
           <view class="lab-detail-page__pill">{{ securityLabel }}</view>
@@ -18,7 +18,6 @@
         <view class="lab-detail-page__hero-title">{{ detail.lab_name || '实验室详情' }}</view>
         <view class="lab-detail-page__hero-sub">{{ detail.description || defaultDesc }}</view>
       </view>
-
       <view class="lab-detail-page__hero-action" @click="goReserve">立即预约</view>
     </view>
 
@@ -37,6 +36,11 @@
             <view class="lab-detail-page__intro">{{ introLeft }}</view>
             <view class="lab-detail-page__intro">{{ introRight }}</view>
           </view>
+          <view class="lab-detail-page__facts">
+            <view v-for="(fact, index) in labFacts" :key="index" class="lab-detail-page__fact-chip">
+              {{ fact }}
+            </view>
+          </view>
         </view>
 
         <view class="lab-detail-page__block">
@@ -44,7 +48,6 @@
             <view class="lab-detail-page__block-title">关键设备</view>
             <view class="lab-detail-page__link">查看完整库存</view>
           </view>
-
           <view v-if="!equipmentList.length" class="lab-detail-page__empty">当前暂无设备信息。</view>
           <view v-else class="lab-detail-page__equip-grid">
             <view v-for="(item, index) in equipmentList" :key="item.id || index" class="lab-detail-page__equip-card">
@@ -61,7 +64,15 @@
       <view class="lab-detail-page__side">
         <view class="lab-detail-page__card">
           <view class="lab-detail-page__card-title">位置与访问</view>
-          <view class="lab-detail-page__map"></view>
+          <view class="lab-detail-page__map">
+            <image
+              v-if="heroImage"
+              class="lab-detail-page__map-img"
+              :src="heroImage"
+              mode="aspectFill"
+            />
+            <view class="lab-detail-page__map-mask"></view>
+          </view>
           <view class="lab-detail-page__card-item">
             <view class="lab-detail-page__card-item-title">{{ detail.campus_name || '校区待定' }}</view>
             <view class="lab-detail-page__card-item-sub">{{ detail.location || '楼层与房间待补充' }}</view>
@@ -70,31 +81,52 @@
             <view class="lab-detail-page__card-item-title">仅限预约访问</view>
             <view class="lab-detail-page__card-item-sub">需携带有效校园身份凭证</view>
           </view>
+          <view class="lab-detail-page__checklist">
+            <view v-for="(item, index) in accessChecklist" :key="index" class="lab-detail-page__check-item">
+              <view class="lab-detail-page__check-dot"></view>
+              <view class="lab-detail-page__check-text">{{ item }}</view>
+            </view>
+          </view>
         </view>
 
         <view class="lab-detail-page__card">
           <view class="lab-detail-page__card-title">今日可用性</view>
           <view class="lab-detail-page__time-strip">
-            <view class="lab-detail-page__time-seg">08:00-10:00</view>
-            <view class="lab-detail-page__time-seg active">已预约</view>
-            <view class="lab-detail-page__time-seg">当前时间</view>
-          </view>
-          <view class="lab-detail-page__time-marks">
-            <text>08:00</text>
-            <text>12:00</text>
-            <text>16:00</text>
-            <text>20:00</text>
+            <view class="lab-detail-page__time-seg">{{ timeRange }}</view>
+            <view class="lab-detail-page__time-seg active">已预约 {{ bookedCount }} 段</view>
+            <view class="lab-detail-page__time-seg">可约 {{ availableSlots.length }} 段</view>
           </view>
           <view class="lab-detail-page__book-btn" @click="goReserve">新预约</view>
+          <view class="lab-detail-page__slot-head">
+            <view class="lab-detail-page__slot-title">可预约时段</view>
+            <view class="lab-detail-page__slot-count">{{ availableSlots.length }} 段</view>
+          </view>
+          <view v-if="availableSlots.length" class="lab-detail-page__slot-list">
+            <view v-for="(slot, index) in availableSlots" :key="index" class="lab-detail-page__slot-chip">
+              {{ slot }}
+            </view>
+          </view>
+          <view v-else class="lab-detail-page__slot-empty">今日可预约时段已满，请改约其他日期。</view>
           <view class="lab-detail-page__next-time">下一个可用时段：{{ nextAvailableText }}</view>
         </view>
 
-        <view class="lab-detail-page__owner">
-          <view class="lab-detail-page__owner-avatar">博</view>
-          <view class="lab-detail-page__owner-info">
-            <view class="lab-detail-page__owner-role">实验室主管</view>
-            <view class="lab-detail-page__owner-name">Alistair Vance 博士</view>
+        <view class="lab-detail-page__card">
+          <view class="lab-detail-page__card-title">预约规则</view>
+          <view class="lab-detail-page__rule-list">
+            <view v-for="(item, index) in bookingRules" :key="index" class="lab-detail-page__rule-item">
+              <view class="lab-detail-page__rule-dot"></view>
+              <view class="lab-detail-page__rule-text">{{ item }}</view>
+            </view>
           </view>
+        </view>
+
+        <view class="lab-detail-page__owner">
+          <view class="lab-detail-page__owner-avatar">管</view>
+          <view class="lab-detail-page__owner-info">
+            <view class="lab-detail-page__owner-role">实验室管理员</view>
+            <view class="lab-detail-page__owner-name">{{ contactName }}</view>
+          </view>
+          <view class="lab-detail-page__owner-action" @click="showAccessGuide">准入说明</view>
         </view>
       </view>
     </view>
@@ -118,6 +150,21 @@ const HERO_COVERS = [
   'linear-gradient(120deg, #23385c 0%, #3a5d8f 46%, #162746 100%)'
 ]
 
+function toMinuteValue(raw) {
+  if (!raw) return 0
+  const safe = String(raw).slice(0, 5)
+  const parts = safe.split(':')
+  const h = Number(parts[0] || 0)
+  const m = Number(parts[1] || 0)
+  return h * 60 + m
+}
+
+function toTimeLabel(minutes) {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
 function todayString() {
   const now = new Date()
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
@@ -134,6 +181,20 @@ export default {
     }
   },
   computed: {
+    heroImage() {
+      return Array.isArray(this.detail.photos) && this.detail.photos.length ? this.detail.photos[0] : ''
+    },
+    heroStyle() {
+      if (this.heroImage) {
+        return {
+          backgroundImage: `url(${this.heroImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        }
+      }
+      return { background: this.heroCover }
+    },
     heroCover() {
       const index = Number(this.id || 0) % HERO_COVERS.length
       return HERO_COVERS[index]
@@ -148,23 +209,81 @@ export default {
       return '2级生物安全'
     },
     defaultDesc() {
-      return '一家致力于自动化基因测序和集成人工智能机器人的高通量细胞筛选实验设施。'
+      return '面向教学与科研开放，支持标准化预约、审批与安全准入。'
     },
     introLeft() {
-      return `${this.detail.lab_name || '该实验室'}成立于近年来，为学生和研究人员提供开放的实验与研究工位。平台优先保障教学任务与科研项目，支持稳定运行。`
+      return `${this.detail.lab_name || '该实验室'}面向课程实验、科研训练与项目协作开放，提供稳定工位与标准化设备支持。`
     },
     introRight() {
-      return `该设施全天候运行自动化任务，在标准校区工作时间（${this.timeRange}）提供技术支持。所有用户需先完成预约流程并通过审批后方可进入。`
+      return `开放时间为 ${this.timeRange}，预约需经过审批并遵循准入规范，建议按可预约时段提前安排。`
+    },
+    labFacts() {
+      return [
+        `开放时段 ${this.timeRange}`,
+        `容量 ${this.detail.capacity || 0} 人`,
+        `${this.detail.status === 'active' ? '当前可预约' : '当前维护中'}`,
+        `安全等级 ${this.securityLabel}`
+      ]
     },
     timeRange() {
       if (!this.detail.open_time || !this.detail.close_time) return '08:00 - 18:00'
       return `${this.detail.open_time.slice(0, 5)} - ${this.detail.close_time.slice(0, 5)}`
     },
+    bookedCount() {
+      const reservations = Array.isArray(this.schedule?.reservations) ? this.schedule.reservations : []
+      return reservations.filter((item) => !['cancelled', 'rejected'].includes(item.status)).length
+    },
+    accessChecklist() {
+      return [
+        '需实名预约并通过审批后进入',
+        '进门请出示校园证件',
+        '进入前完成基础安全培训'
+      ]
+    },
+    availableSlots() {
+      const sourceOpen = this.schedule?.open_time || this.detail.open_time
+      const sourceClose = this.schedule?.close_time || this.detail.close_time
+      const openMinute = toMinuteValue(sourceOpen || '08:00')
+      const closeMinute = toMinuteValue(sourceClose || '18:00')
+      const reservations = Array.isArray(this.schedule?.reservations) ? this.schedule.reservations : []
+      const blocks = reservations
+        .filter((item) => !['cancelled', 'rejected'].includes(item.status))
+        .map((item) => ({
+          start: toMinuteValue(item.start_time),
+          end: toMinuteValue(item.end_time)
+        }))
+        .sort((a, b) => a.start - b.start)
+
+      const slots = []
+      let cursor = openMinute
+      blocks.forEach((item) => {
+        if (item.start > cursor) {
+          slots.push([cursor, Math.min(item.start, closeMinute)])
+        }
+        cursor = Math.max(cursor, item.end)
+      })
+      if (cursor < closeMinute) slots.push([cursor, closeMinute])
+
+      return slots
+        .filter(([start, end]) => end - start >= 30)
+        .slice(0, 5)
+        .map(([start, end]) => `${toTimeLabel(start)} - ${toTimeLabel(end)}`)
+    },
+    bookingRules() {
+      return [
+        '最短预约 30 分钟，最长预约 4 小时',
+        '仅支持开放时段内预约',
+        '开始前 15 分钟可取消，不计违约',
+        '学生与教师预约默认需要审批'
+      ]
+    },
+    contactName() {
+      return `${this.detail.campus_name || '本校区'} 管理员`
+    },
     nextAvailableText() {
-      const list = this.schedule?.reservations || []
-      if (!list.length) return '今天 14:30'
-      const latest = list[list.length - 1]
-      return `今天 ${latest.end_time ? latest.end_time.slice(0, 5) : '18:00'}`
+      const list = this.availableSlots
+      if (!list.length) return '今日已约满'
+      return list[0]
     }
   },
   onLoad(options) {
@@ -195,6 +314,13 @@ export default {
       openPage(routes.reserve, {
         query: { labId: this.id, campusId: this.detail.campus_id, date: this.selectedDate }
       })
+    },
+    showAccessGuide() {
+      uni.showToast({
+        title: '请先完成预约审批并携带有效校园证件',
+        icon: 'none',
+        duration: 2200
+      })
     }
   }
 }
@@ -210,7 +336,7 @@ export default {
 
 .lab-detail-page__hero {
   margin: 0 32rpx;
-  min-height: 360rpx;
+  min-height: 600rpx;
   border-radius: 0 0 20rpx 20rpx;
   position: relative;
   overflow: hidden;
@@ -359,6 +485,26 @@ export default {
   line-height: 1.75;
 }
 
+.lab-detail-page__facts {
+  margin-top: 16rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.lab-detail-page__fact-chip {
+  min-height: 42rpx;
+  border-radius: 999rpx;
+  padding: 0 14rpx;
+  background: #edf3fa;
+  border: 1rpx solid #d8e3f0;
+  color: #17375e;
+  font-size: 20rpx;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+}
+
 .lab-detail-page__equip-grid {
   margin-top: 16rpx;
   display: grid;
@@ -436,7 +582,21 @@ export default {
   margin-top: 12rpx;
   height: 220rpx;
   border-radius: 16rpx;
+  position: relative;
+  overflow: hidden;
   background: linear-gradient(135deg, #737b86, #b2b7bd);
+}
+
+.lab-detail-page__map-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.lab-detail-page__map-mask {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(3, 22, 53, 0.12), rgba(3, 22, 53, 0.2));
 }
 
 .lab-detail-page__card-item {
@@ -453,6 +613,33 @@ export default {
   margin-top: 4rpx;
   color: #6d7c93;
   font-size: 21rpx;
+}
+
+.lab-detail-page__checklist {
+  margin-top: 14rpx;
+  display: grid;
+  gap: 8rpx;
+}
+
+.lab-detail-page__check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8rpx;
+}
+
+.lab-detail-page__check-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  margin-top: 9rpx;
+  background: #1e8ec4;
+  flex-shrink: 0;
+}
+
+.lab-detail-page__check-text {
+  color: #3f5775;
+  font-size: 21rpx;
+  line-height: 1.5;
 }
 
 .lab-detail-page__time-strip {
@@ -479,14 +666,6 @@ export default {
   color: #f2f8ff;
 }
 
-.lab-detail-page__time-marks {
-  margin-top: 10rpx;
-  display: flex;
-  justify-content: space-between;
-  color: #586a84;
-  font-size: 20rpx;
-}
-
 .lab-detail-page__book-btn {
   margin-top: 14rpx;
   height: 74rpx;
@@ -498,6 +677,51 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.lab-detail-page__slot-head {
+  margin-top: 14rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lab-detail-page__slot-title {
+  color: #09264e;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.lab-detail-page__slot-count {
+  color: #5f7492;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
+.lab-detail-page__slot-list {
+  margin-top: 10rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+}
+
+.lab-detail-page__slot-chip {
+  min-height: 40rpx;
+  border-radius: 999rpx;
+  padding: 0 12rpx;
+  background: #eff4fb;
+  color: #1b3d67;
+  border: 1rpx solid #d7e2ef;
+  font-size: 19rpx;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+}
+
+.lab-detail-page__slot-empty {
+  margin-top: 10rpx;
+  color: #6c7f98;
+  font-size: 20rpx;
 }
 
 .lab-detail-page__next-time {
@@ -539,50 +763,51 @@ export default {
   font-weight: 700;
 }
 
-.lab-detail-page__footer {
-  padding: 12rpx 32rpx 34rpx;
-}
-
-.lab-detail-page__footer-inner {
-  border-top: 1rpx solid rgba(197, 198, 207, 0.4);
-  padding-top: 22rpx;
-  display: flex;
+.lab-detail-page__owner-action {
+  margin-left: auto;
+  min-height: 56rpx;
+  border-radius: 999rpx;
+  padding: 0 18rpx;
+  background: #edf3fa;
+  color: #1c446f;
+  font-size: 21rpx;
+  font-weight: 700;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 20rpx;
+  justify-content: center;
 }
 
-.lab-detail-page__footer-title {
-  color: #1a2b4b;
-  font-size: 28rpx;
-  font-weight: 800;
+.lab-detail-page__rule-list {
+  margin-top: 14rpx;
+  display: grid;
+  gap: 10rpx;
 }
 
-.lab-detail-page__footer-sub {
-  margin-top: 8rpx;
-  color: #7a8796;
-  font-size: 22rpx;
-}
-
-.lab-detail-page__footer-links {
+.lab-detail-page__rule-item {
   display: flex;
-  gap: 22rpx;
-  color: #7a8796;
-  font-size: 22rpx;
+  align-items: flex-start;
+  gap: 8rpx;
+}
+
+.lab-detail-page__rule-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  margin-top: 9rpx;
+  background: #0f5b91;
+  flex-shrink: 0;
+}
+
+.lab-detail-page__rule-text {
+  color: #334d6d;
+  font-size: 21rpx;
+  line-height: 1.55;
 }
 
 /* #ifndef H5 */
 .lab-detail-page__hero,
 .lab-detail-page__tabs,
-.lab-detail-page__body,
-.lab-detail-page__footer {
-  margin-left: 24rpx;
-  margin-right: 24rpx;
-  padding-left: 0;
-  padding-right: 0;
-}
-
-.lab-detail-page__hero {
+.lab-detail-page__body {
   margin-left: 24rpx;
   margin-right: 24rpx;
 }
@@ -591,18 +816,10 @@ export default {
   font-size: 52rpx;
 }
 
-.lab-detail-page__body {
-  grid-template-columns: 1fr;
-}
-
+.lab-detail-page__body,
 .lab-detail-page__intro-grid,
 .lab-detail-page__equip-grid {
   grid-template-columns: 1fr;
-}
-
-.lab-detail-page__footer-inner {
-  flex-direction: column;
-  align-items: flex-start;
 }
 /* #endif */
 
@@ -610,18 +827,14 @@ export default {
 @media screen and (min-width: 1500px) {
   .lab-detail-page__hero,
   .lab-detail-page__tabs,
-  .lab-detail-page__body,
-  .lab-detail-page__footer {
+  .lab-detail-page__body {
     margin-left: 56rpx;
     margin-right: 56rpx;
   }
 }
 
 @media screen and (max-width: 1100px) {
-  .lab-detail-page__body {
-    grid-template-columns: 1fr;
-  }
-
+  .lab-detail-page__body,
   .lab-detail-page__intro-grid,
   .lab-detail-page__equip-grid {
     grid-template-columns: 1fr;
@@ -631,7 +844,7 @@ export default {
 @media screen and (max-width: 760px) {
   .lab-detail-page__hero {
     padding: 20rpx;
-    min-height: 280rpx;
+    min-height: 340rpx;
   }
 
   .lab-detail-page__hero-title {
