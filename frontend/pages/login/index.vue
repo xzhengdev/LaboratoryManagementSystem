@@ -4,78 +4,80 @@
     <view class="login-page__glow login-page__glow--right"></view>
 
     <view class="login-page__content">
-      <view class="login-card">
-        <view class="login-hero">
-          <view class="login-hero__badge">
-            <image class="login-hero__badge-img" src="/static/logo.png" mode="aspectFill" />
+      <view class="login-page__main">
+        <view class="login-card">
+          <view class="login-hero">
+            <view class="login-hero__badge">
+              <image class="login-hero__badge-img" src="/static/logo.png" mode="aspectFill" />
+            </view>
+            <view class="login-title">登录</view>
+            <view class="login-subtitle">跨校区实验室预约管理系统</view>
           </view>
-          <view class="login-title">登录</view>
-          <view class="login-subtitle">跨校区实验室预约管理系统</view>
-        </view>
 
-        <view class="login-section">
-          <view class="login-section__label">选择身份</view>
-          <view class="role-grid">
-            <view
-              v-for="(item, index) in roleOptions"
-              :key="item.value"
-              class="role-card"
-              :class="{ 'role-card--active': roleIndex === index }"
-              @click="selectRole(index)"
-            >
-              <view class="role-card__icon" :class="item.tone">
-                <image class="role-card__icon-image" :src="item.icon" mode="aspectFit" />
+          <view class="login-section">
+            <view class="role-grid">
+              <view
+                v-for="(item, index) in roleOptions"
+                :key="item.value"
+                class="role-card"
+                :class="{ 'role-card--active': roleIndex === index }"
+                @click="selectRole(index)"
+              >
+                <view class="role-card__icon" :class="item.tone">
+                  <image class="role-card__icon-image" :src="item.icon" mode="aspectFit" />
+                </view>
+                <text class="role-card__text">{{ item.label }}</text>
               </view>
-              <text class="role-card__text">{{ item.label }}</text>
             </view>
           </view>
-        </view>
 
-        <view class="login-form">
-          <view class="input-wrap">
-            <text class="input-wrap__icon">账号</text>
-            <input
-              v-model="form.username"
-              class="login-input"
-              placeholder="请输入用户名或工号"
-              placeholder-class="login-placeholder"
-            />
-          </view>
-
-          <view class="input-wrap">
-            <text class="input-wrap__icon">密码</text>
-            <input
-              v-model="form.password"
-              class="login-input login-input--password"
-              :password="!showPassword"
-              placeholder="请输入密码"
-              placeholder-class="login-placeholder"
-            />
-            <text class="password-toggle" @click="togglePassword">{{ showPassword ? '隐藏' : '显示' }}</text>
-          </view>
-        </view>
-
-        <view class="login-tools">
-          <view class="remember-box" @click="rememberMe = !rememberMe">
-            <view class="remember-box__check" :class="{ 'remember-box__check--active': rememberMe }">
-              <text v-if="rememberMe" class="remember-box__tick">√</text>
+          <view class="login-form">
+            <view class="input-wrap">
+              <text class="input-wrap__icon">账号</text>
+              <input
+                v-model="form.username"
+                class="login-input"
+                placeholder="请输入用户名或工号"
+                placeholder-class="login-placeholder"
+              />
             </view>
-            <text class="remember-box__label">记住账号</text>
-          </view>
-          <text class="forgot-link">忘记密码</text>
-        </view>
 
-        <view class="login-button" :class="{ 'login-button--loading': loading }" @click="submit">
-          {{ loading ? '登录中...' : '立即登录' }}
+            <view class="input-wrap">
+              <text class="input-wrap__icon">密码</text>
+              <input
+                v-model="form.password"
+                class="login-input login-input--password"
+                :password="!showPassword"
+                placeholder="请输入密码"
+                placeholder-class="login-placeholder"
+              />
+              <text class="password-toggle" @click="togglePassword">{{ showPassword ? '隐藏' : '显示' }}</text>
+            </view>
+          </view>
+
+          <view class="login-tools">
+            <view class="remember-box" @click="rememberMe = !rememberMe">
+              <view class="remember-box__check" :class="{ 'remember-box__check--active': rememberMe }">
+                <text v-if="rememberMe" class="remember-box__tick">√</text>
+              </view>
+              <text class="remember-box__label">记住账号</text>
+            </view>
+            <text class="forgot-link">忘记密码</text>
+          </view>
+
+          <view class="login-button" :class="{ 'login-button--loading': loading }" @click="submit">
+            {{ loading ? '登录中...' : '立即登录' }}
+          </view>
         </view>
       </view>
 
-      <view class="login-footer">
-        <view class="login-footer__line"></view>
-        <text class="login-footer__text">仅限校内访问 · 内网安全区域</text>
+      <view class="login-page__bottom">
+        <view class="login-footer">
+          <view class="login-footer__line"></view>
+          <text class="login-footer__text">仅限校内访问 · 内网安全区域</text>
+        </view>
+        <view class="page-footer">LABORATORY MANAGEMENT PLATFORM</view>
       </view>
-
-      <view class="page-footer">LABORATORY MANAGEMENT PLATFORM</view>
     </view>
   </view>
 </template>
@@ -177,16 +179,28 @@ export default {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  padding: 36rpx 24rpx 24rpx;
+  box-sizing: border-box;
+}
+
+.login-page__main {
+  flex: 1;
+  width: 100%;
+  display: flex;
   align-items: center;
   justify-content: center;
-  padding: 36rpx 24rpx 44rpx;
-  box-sizing: border-box;
+}
+
+.login-page__bottom {
+  width: 100%;
+  text-align: center
 }
 
 .login-card {
   width: 100%;
-  max-width: 780rpx;
-  padding: 40rpx 34rpx 30rpx;
+  max-width: 729rpx;
+  // min-height: 720rpx;
+  // padding: 46rpx 34rpx 36rpx;
   border-radius: 28rpx;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(243, 248, 253, 0.86));
   border: 1rpx solid rgba(169, 198, 225, 0.55);
@@ -196,7 +210,11 @@ export default {
 
 .login-hero {
   text-align: center;
-  margin-bottom: 30rpx;
+  margin-bottom: 34rpx;
+}
+
+.login-section {
+  margin-bottom: 14rpx;
 }
 
 .login-hero__badge {
@@ -230,13 +248,6 @@ export default {
   font-weight: 600;
 }
 
-.login-section__label {
-  margin-bottom: 12rpx;
-  color: #35526f;
-  font-size: 22rpx;
-  font-weight: 700;
-}
-
 .role-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -253,7 +264,7 @@ export default {
   align-items: center;
   justify-content: center;
   gap: 8rpx;
-  min-height: 108rpx;
+  min-height: 98rpx;
   border-radius: 16rpx;
   color: #385673;
   border: 1rpx solid transparent;
@@ -268,8 +279,8 @@ export default {
 }
 
 .role-card__icon {
-  width: 52rpx;
-  height: 52rpx;
+  width: 48rpx;
+  height: 48rpx;
   border-radius: 14rpx;
   display: flex;
   align-items: center;
@@ -294,19 +305,19 @@ export default {
 }
 
 .role-card__icon-image {
-  width: 30rpx;
-  height: 30rpx;
+  width: 28rpx;
+  height: 28rpx;
 }
 
 .role-card__text {
-  font-size: 20rpx;
+  font-size: 18rpx;
   font-weight: 700;
 }
 
 .login-form {
   display: grid;
-  gap: 14rpx;
-  margin-top: 22rpx;
+  gap: 18rpx;
+  margin-top: 0;
 }
 
 .input-wrap {
@@ -357,7 +368,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 18rpx;
+  margin-top: 22rpx;
 }
 
 .remember-box {
@@ -397,7 +408,7 @@ export default {
 }
 
 .login-button {
-  margin-top: 22rpx;
+  margin-top: 30rpx;
   min-height: 80rpx;
   border-radius: 20rpx;
   background: linear-gradient(135deg, #1a3150 0%, #2c6f9a 52%, #6ec3d8 100%);
@@ -414,7 +425,7 @@ export default {
 }
 
 .login-footer {
-  margin-top: 16rpx;
+  margin-top: 0;
   text-align: center;
 }
 
@@ -430,6 +441,7 @@ export default {
   color: #4f7092;
   font-size: 19rpx;
   font-weight: 700;
+  letter-spacing: 1rpx;
 }
 
 .page-footer {
@@ -442,17 +454,22 @@ export default {
 /* #ifdef H5 */
 @media screen and (min-width: 1024px) {
   .login-page__content {
-    padding: 28px 24px 32px;
+    padding: 24px 24px 18px;
   }
 
   .login-card {
-    max-width: 520px;
-    padding: 28px 24px 20px;
+    max-width: 560px;
+    // min-height: 560px;
+    padding: 34px 24px 24px;
     border-radius: 20px;
   }
 
   .login-hero {
     margin-bottom: 18px;
+  }
+
+  .login-section {
+    margin-bottom: 8px;
   }
 
   .login-hero__badge {
@@ -476,11 +493,6 @@ export default {
     font-size: 13px;
   }
 
-  .login-section__label {
-    margin-bottom: 8px;
-    font-size: 12px;
-  }
-
   .role-grid {
     gap: 8px;
     padding: 8px;
@@ -488,29 +500,29 @@ export default {
   }
 
   .role-card {
-    min-height: 70px;
+    min-height: 62px;
     border-radius: 11px;
     gap: 6px;
   }
 
   .role-card__icon {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     border-radius: 8px;
   }
 
   .role-card__icon-image {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
   }
 
   .role-card__text {
-    font-size: 11px;
+    font-size: 10px;
   }
 
   .login-form {
-    gap: 10px;
-    margin-top: 14px;
+    gap: 11px;
+    margin-top: 0;
   }
 
   .input-wrap__icon {
@@ -555,7 +567,7 @@ export default {
   }
 
   .login-button {
-    margin-top: 14px;
+    margin-top: 18px;
     min-height: 44px;
     border-radius: 12px;
     font-size: 15px;
@@ -563,7 +575,7 @@ export default {
   }
 
   .login-footer {
-    margin-top: 10px;
+    margin-top: 0;
   }
 
   .login-footer__line {
@@ -577,7 +589,7 @@ export default {
   }
 
   .page-footer {
-    margin-top: 10px;
+    margin-top: 8px;
     font-size: 10px;
     letter-spacing: 2px;
   }
