@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <view class="student-home">
     <!-- #ifdef H5 -->
     <student-top-nav active="home" />
@@ -10,125 +10,86 @@
 
     <view class="student-home__body">
       <view class="student-home__shell">
-        <view class="student-home__welcome">
-          <view class="student-home__welcome-copy">
-            <view class="student-home__welcome-title">欢迎回来，{{ displayName }}</view>
-            <view class="student-home__welcome-sub">
-              {{ currentDateText }} · {{ timeText }}
-              <text class="student-home__welcome-highlight">{{ roleFocusText }}</text>
-            </view>
+        <view class="student-home__hero">
+          <view class="student-home__hero-title">
+            欢迎回来，<text class="student-home__hero-title-accent">{{ displayName }}</text>
           </view>
-
-          <view class="student-home__welcome-badges">
-            <view class="student-home__metric-badge">
-              <text class="student-home__metric-icon">T</text>
-              <text>22C</text>
-            </view>
-            <view class="student-home__metric-badge">
-              <text class="student-home__metric-icon">NW</text>
-              <text>High</text>
-            </view>
+          <view class="student-home__hero-sub">
+            今天想预约哪间实验室？我们已为您准备好最新的科研资源。
+          </view>
+          <view class="student-home__hero-btn" @click="go(routes.labs)">
+            <text>立即开始预约</text>
+            <text class="student-home__hero-arrow">→</text>
           </view>
         </view>
 
-        <view class="student-home__hero-grid">
-          <view class="student-home__quick-grid">
-            <view
-              v-for="item in quickCards"
-              :key="item.path"
-              class="student-home__quick-card"
-              @click="go(item.path)"
-            >
-              <view class="student-home__quick-icon">{{ item.icon }}</view>
-              <view class="student-home__quick-title">{{ item.title }}</view>
-            </view>
-          </view>
-
-          <view class="student-home__countdown">
-            <view class="student-home__countdown-orb"></view>
-            <view class="student-home__countdown-top">
-              <text class="student-home__eyebrow">Upcoming</text>
-              <text class="student-home__bell">Reminder</text>
-            </view>
-
-            <view>
-              <view class="student-home__countdown-name">
-                {{ upcomingReservation.lab_name || '当前没有即将开始的预约' }}
-              </view>
-              <view class="student-home__countdown-meta">
-                {{ upcomingMeta }}
-              </view>
-            </view>
-
-            <view class="student-home__countdown-bottom">
-              <view>
-                <view class="student-home__countdown-label">距离开始还有</view>
-                <view class="student-home__countdown-value">{{ countdownText }}</view>
-              </view>
-              <view class="student-home__countdown-btn" @click="go(routes.myReservations)">查看预约</view>
-            </view>
+        <view class="student-home__entry-grid">
+          <view
+            v-for="entry in homeEntries"
+            :key="entry.path"
+            class="student-home__entry-card"
+            @click="go(entry.path)"
+          >
+            <view class="student-home__entry-icon" :class="entry.iconClass">{{ entry.icon }}</view>
+            <view class="student-home__entry-title">{{ entry.title }}</view>
+            <view class="student-home__entry-desc">{{ entry.desc }}</view>
           </view>
         </view>
 
         <view class="student-home__section-head">
-          <view class="student-home__section-title">推荐设施</view>
-          <view class="student-home__section-link" @click="go(routes.labs)">查看所有实验室</view>
+          <view class="student-home__section-title">热门实验室推荐</view>
+          <view class="student-home__section-controls">
+            <view class="student-home__section-dot">‹</view>
+            <view class="student-home__section-dot">›</view>
+          </view>
         </view>
 
-        <view class="student-home__lab-grid">
+        <view class="student-home__list">
           <view
             v-for="lab in featuredLabs"
             :key="lab.id"
-            class="student-home__lab-card"
+            class="student-home__list-item"
           >
-            <view class="student-home__lab-cover" :style="{ background: lab.cover }">
+            <view class="student-home__list-cover" :style="{ background: lab.cover }">
               <image
                 v-if="lab.coverImage"
-                class="student-home__lab-cover-img"
+                class="student-home__list-cover-img"
                 :src="lab.coverImage"
                 mode="aspectFill"
               />
-              <view class="student-home__lab-cover-mask"></view>
-              <view class="student-home__lab-status" :class="lab.statusClass">
-                <view class="student-home__lab-status-dot"></view>
-                <text>{{ lab.statusText }}</text>
+              <view class="student-home__list-cover-mask"></view>
+            </view>
+
+            <view class="student-home__list-main">
+              <view class="student-home__list-name">{{ lab.lab_name }}</view>
+              <view class="student-home__list-tags">
+                <text class="student-home__list-tag">{{ lab.typeText }}</text>
+                <text class="student-home__list-tag">容量 {{ lab.capacity || 0 }}</text>
+              </view>
+              <view class="student-home__list-meta">
+                {{ lab.campus_name || '校区待补充' }} · {{ lab.location || '位置待补充' }}
               </view>
             </view>
 
-            <view class="student-home__lab-body">
-              <view class="student-home__lab-name">{{ lab.lab_name }}</view>
-              <view class="student-home__lab-location">
-                {{ lab.campus_name || '校区待补充' }} · {{ lab.location || '位置待补充' }}
+            <view class="student-home__list-side">
+              <view class="student-home__list-status" :class="lab.statusClass">{{ lab.statusText }}</view>
+              <view
+                class="student-home__list-action"
+                :class="{ disabled: lab.status !== 'active' }"
+                @click="goReserveFromHome(lab)"
+              >
+                {{ lab.status === 'active' ? '立即预约' : '暂不可约' }}
               </view>
-
-              <view class="student-home__lab-tools">
-                <view class="student-home__lab-tool">{{ lab.typeText }}</view>
-                <view class="student-home__lab-tool">容量 {{ lab.capacity || 0 }}</view>
-                <view class="student-home__lab-tool">{{ lab.openText }}</view>
-              </view>
-
-              <view class="student-home__lab-actions">
-                <view class="student-home__lab-btn light" @click="goLabDetail(lab.id)">查看详情</view>
-                <view
-                  class="student-home__lab-btn primary"
-                  :class="{ disabled: lab.status !== 'active' }"
-                  @click="goReserveFromHome(lab)"
-                >
-                  {{ lab.status === 'active' ? '立即预约' : '暂不可约' }}
-                </view>
-              </view>
+              <view class="student-home__list-detail" @click="goLabDetail(lab.id)">查看详情</view>
             </view>
           </view>
         </view>
       </view>
     </view>
-
-    <!-- <site-footer /> -->
   </view>
 </template>
 
 <script>
-import SiteFooter from '../../components/site-footer.vue'
 import StudentTopNav from '../../components/student-top-nav.vue'
 import UserTopNav from '../../components/user-top-nav.vue'
 import { api } from '../../api/index'
@@ -145,68 +106,49 @@ const LAB_COVERS = [
 ]
 
 export default {
-  components: { SiteFooter, StudentTopNav, UserTopNav },
+  components: { StudentTopNav, UserTopNav },
   data() {
     return {
       routes,
       profile: {},
-      featuredLabs: [],
-      reservations: []
+      featuredLabs: []
     }
   },
   computed: {
     displayName() {
       return this.profile.real_name || this.profile.username || '同学'
     },
-    currentDateText() {
-      const now = new Date()
-      return `${now.getMonth() + 1}/${now.getDate()}`
-    },
-    timeText() {
-      const now = new Date()
-      return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-    },
-    quickCards() {
-      if (this.profile.role === 'teacher') {
-        return [
-          { title: '校区资源', path: routes.campuses, icon: '校' },
-          { title: '实验室列表', path: routes.labs, icon: '实' },
-          { title: '教学预约', path: routes.reserve, icon: '约' },
-          { title: '我的预约', path: routes.myReservations, icon: '单' }
-        ]
-      }
+    homeEntries() {
       return [
-        { title: '校区资源', path: routes.campuses, icon: '校' },
-        { title: '实验室列表', path: routes.labs, icon: '实' },
-        { title: '我的预约', path: routes.myReservations, icon: '单' },
-        { title: 'AI 助手', path: routes.agent, icon: 'AI' }
+        {
+          title: '校区资源',
+          desc: '探索不同校区的尖端设施与空间布局',
+          path: routes.campuses,
+          icon: '◧',
+          iconClass: 'blue'
+        },
+        {
+          title: '实验室列表',
+          desc: '精准查找并一键预约最理想的实验空间',
+          path: routes.labs,
+          icon: '⌬',
+          iconClass: 'cyan'
+        },
+        {
+          title: '我的预约',
+          desc: '全方位管理您的实验行程与历史记录',
+          path: routes.myReservations,
+          icon: '☑',
+          iconClass: 'indigo'
+        },
+        {
+          title: '智能助手',
+          desc: '利用 AI 快速查询状态或解答系统疑问',
+          path: routes.agent,
+          icon: '✦',
+          iconClass: 'gold'
+        }
       ]
-    },
-    roleFocusText() {
-      return this.profile.role === 'teacher' ? '教学预约优先通道' : '校园活跃中'
-    },
-    upcomingReservation() {
-      const sorted = [...this.reservations].sort((a, b) => {
-        const left = `${a.reservation_date || ''} ${a.start_time || ''}`
-        const right = `${b.reservation_date || ''} ${b.start_time || ''}`
-        return left.localeCompare(right)
-      })
-      return sorted.find((item) => item.status === 'approved') || sorted[0] || {}
-    },
-    upcomingMeta() {
-      const item = this.upcomingReservation
-      if (!item.lab_name) return '去实验室列表看看今天有哪些空闲资源。'
-      return `${item.campus_name || '校区待定'} · ${item.purpose || '用途待补充'}`
-    },
-    countdownText() {
-      const item = this.upcomingReservation
-      if (!item.reservation_date || !item.start_time) return '--'
-      const target = new Date(`${item.reservation_date}T${item.start_time}`)
-      const diff = Math.max(0, target.getTime() - Date.now())
-      const totalMinutes = Math.floor(diff / 60000)
-      const hours = Math.floor(totalMinutes / 60)
-      const minutes = totalMinutes % 60
-      return `${hours}h ${minutes}m`
     }
   },
   async onShow() {
@@ -230,36 +172,26 @@ export default {
     },
     resolveType(item) {
       const text = `${item.lab_name || ''} ${item.description || ''}`.toLowerCase()
-      if (text.includes('生物') || text.includes('基因') || text.includes('医学')) return '生物'
-      if (text.includes('化学') || text.includes('合成')) return '化学'
-      if (text.includes('物理') || text.includes('光学') || text.includes('材料')) return '物理'
-      if (text.includes('ai') || text.includes('机器') || text.includes('智能')) return '人工智能'
-      return '综合'
+      if (text.includes('生物') || text.includes('基因') || text.includes('医学')) return '生物实验'
+      if (text.includes('化学') || text.includes('合成')) return '化学实验'
+      if (text.includes('物理') || text.includes('光学') || text.includes('材料')) return '材料实验'
+      if (text.includes('ai') || text.includes('机器') || text.includes('智能')) return '智能计算'
+      return '综合实验'
     },
     async loadData() {
       try {
-        const [labsRes, reservationsRes] = await Promise.all([
-          api.labs({ page: 1, page_size: 6 }),
-          api.myReservations()
-        ])
-
+        const labsRes = await api.labs({ page: 1, page_size: 6 })
         const labs = labsRes?.list || labsRes?.data || (Array.isArray(labsRes) ? labsRes : [])
         this.featuredLabs = labs.slice(0, 3).map((lab, index) => ({
           ...lab,
           cover: LAB_COVERS[index % LAB_COVERS.length],
           coverImage: Array.isArray(lab.photos) && lab.photos.length ? lab.photos[0] : '',
           typeText: this.resolveType(lab),
-          openText: `${(lab.open_time || '00:00').slice(0, 5)} - ${(lab.close_time || '00:00').slice(0, 5)}`,
-          statusText: lab.status === 'active' ? (index === 1 ? '紧张' : '空闲') : '停用',
-          statusClass: lab.status === 'active' ? (index === 1 ? 'demand' : 'active') : 'disabled'
+          statusText: lab.status === 'active' ? (index % 2 === 0 ? '空闲' : '需预约') : '停用',
+          statusClass: lab.status === 'active' ? (index % 2 === 0 ? 'active' : 'demand') : 'disabled'
         }))
-
-        const reservations =
-          reservationsRes?.list || reservationsRes?.data || (Array.isArray(reservationsRes) ? reservationsRes : [])
-        this.reservations = reservations.slice(0, 5)
       } catch (error) {
         this.featuredLabs = []
-        this.reservations = []
       }
     }
   }
@@ -269,771 +201,422 @@ export default {
 <style lang="scss">
 .student-home {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background:
-    radial-gradient(circle at top right, rgba(65, 190, 253, 0.14), transparent 26%),
-    linear-gradient(180deg, #f7f9fc 0%, #eef2f7 100%);
-}
-
-.student-home__nav {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  padding: 0;
-  background: rgba(247, 249, 252, 0.72);
-  backdrop-filter: blur(18px);
-  border-bottom: 1rpx solid rgba(197, 198, 207, 0.22);
-  box-shadow: 0 12rpx 30rpx rgba(8, 27, 58, 0.05);
-}
-
-.student-home__nav-inner {
-  width: 100%;
-  min-height: 108rpx;
-  margin: 0;
-  padding: 0 40rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 32rpx;
-  box-sizing: border-box;
-}
-
-.student-home__nav-main {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 56rpx;
-  flex: 1;
-}
-
-.student-home__brand {
-  display: flex;
-  align-items: center;
-  gap: 18rpx;
-}
-
-.student-home__brand-mark {
-  width: 78rpx;
-  height: 78rpx;
-  border-radius: 24rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #031635, #1a2b4b);
-  color: #41befd;
-  font-size: 30rpx;
-  font-weight: 800;
-}
-
-.student-home__brand-text {
-  font-size: 30rpx;
-  font-weight: 800;
-  letter-spacing: -0.5rpx;
-  color: #1a2b4b;
-   margin-left: 30rpx;  /* 鍙宠竟璺?80rpx */
-   margin-right: 80rpx;  /* 鍙宠竟璺?80rpx */
-}
-
-.student-home__nav-links {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 40rpx;
-  min-width: 0;
-  flex-wrap: nowrap;
-}
-
-.student-home__nav-link {
-  padding: 8rpx 4rpx;
-  border-bottom: 4rpx solid transparent;
-  color: #6f7b8c;
-  font-size: 24rpx;
-  font-weight: 600;
-  letter-spacing: 1rpx;
-  transition: color 180ms ease;
-}
-
-.student-home__nav-link.active {
-  color: #1a2b4b;
-  border-color: #41befd;
-}
-
-.student-home__nav-actions {
-  display: flex;
-  align-items: center;
-  gap: 18rpx;
-  justify-self: end;
-}
-
-
-.student-home__profile {
-  display: flex;
-  align-items: center;
-  gap: 14rpx;
-  padding-left: 22rpx;
-  border-left: 1rpx solid rgba(117, 119, 127, 0.18);
-}
-
-.student-home__avatar {
-  width: 66rpx;
-  height: 66rpx;
-  border-radius: 999rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #1a2b4b, #7ecfff);
-  color: #ffffff;
-  font-size: 26rpx;
-  font-weight: 700;
-}
-
-.student-home__profile-text {
-  font-size: 22rpx;
-  font-weight: 600;
-  color: #031635;
+  background: #eef2f7;
 }
 
 .student-home__body {
-  flex: 1;
-  padding: 36rpx 0 88rpx;
+  padding: 22rpx 0 88rpx;
 }
 
 .student-home__shell {
   width: 100%;
-  padding: 0 32rpx;
+  padding: 0 36rpx;
   box-sizing: border-box;
 }
 
-.student-home__welcome {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 24rpx;
-  margin-bottom: 42rpx;
-}
-
-.student-home__welcome-title {
-  font-size: 58rpx;
-  line-height: 1.08;
-  font-weight: 800;
-  color: #031635;
-}
-
-.student-home__welcome-sub {
-  margin-top: 12rpx;
-  font-size: 24rpx;
-  color: #5d6879;
-  font-weight: 500;
-}
-
-.student-home__welcome-highlight {
-  margin-left: 10rpx;
-  color: #00658d;
-  font-weight: 700;
-}
-
-.student-home__welcome-badges {
-  display: flex;
-  gap: 16rpx;
-}
-
-.student-home__metric-badge {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-  padding: 18rpx 24rpx;
-  border-radius: 24rpx;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1rpx solid rgba(197, 198, 207, 0.16);
-  backdrop-filter: blur(18px);
-  color: #031635;
-  font-size: 24rpx;
-  font-weight: 700;
-}
-
-.student-home__metric-icon {
-  color: #00658d;
-}
-
-.student-home__hero-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 2.2fr) minmax(420rpx, 1fr);
-  gap: 24rpx;
-  margin-bottom: 56rpx;
-}
-
-.student-home__quick-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18rpx;
-}
-
-.student-home__quick-card {
-  min-height: 186rpx;
-  padding: 28rpx;
-  border-radius: 28rpx;
-  background: #ffffff;
-  box-shadow: 0 18rpx 36rpx rgba(8, 27, 58, 0.05);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 22rpx;
-  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.student-home__quick-card:hover {
-  transform: translateY(-4rpx);
-  background: #031635;
-}
-
-.student-home__quick-card:hover .student-home__quick-title {
-  color: #ffffff;
-}
-
-.student-home__quick-card:hover .student-home__quick-icon {
-  background: #1a2b4b;
-  color: #41befd;
-}
-
-.student-home__quick-icon {
-  width: 92rpx;
-  height: 92rpx;
-  border-radius: 24rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #e7ebf0;
-  color: #031635;
-  font-size: 28rpx;
-  font-weight: 800;
-}
-
-.student-home__quick-title {
-  font-size: 30rpx;
-  line-height: 1.2;
-  color: #031635;
-  font-weight: 800;
-}
-
-.student-home__countdown {
+.student-home__hero {
   position: relative;
   overflow: hidden;
-  min-height: 390rpx;
-  padding: 32rpx;
-  border-radius: 28rpx;
-  background: linear-gradient(180deg, #031635 0%, #1a2b4b 100%);
-  color: #ffffff;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  padding: 58rpx 60rpx;
+  border-radius: 32rpx;
+  background: linear-gradient(112deg, #021b4c 0%, #052f72 56%, #1362a6 100%);
+  box-shadow: 0 22rpx 52rpx rgba(5, 36, 83, 0.26);
 }
 
-.student-home__countdown-orb {
+.student-home__hero::after {
+  content: '';
   position: absolute;
-  top: -80rpx;
-  right: -76rpx;
-  width: 230rpx;
-  height: 230rpx;
+  right: -110rpx;
+  top: -90rpx;
+  width: 380rpx;
+  height: 380rpx;
   border-radius: 999rpx;
-  background: rgba(65, 190, 253, 0.18);
-  filter: blur(28rpx);
+  background: radial-gradient(circle, rgba(95, 192, 255, 0.42), rgba(95, 192, 255, 0));
 }
 
-.student-home__countdown-top,
-.student-home__countdown-bottom {
+.student-home__hero-title {
   position: relative;
   z-index: 1;
-}
-
-.student-home__countdown-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.student-home__eyebrow {
-  font-size: 20rpx;
-  letter-spacing: 4rpx;
-  color: #41befd;
+  font-size: 68rpx;
+  line-height: 1.1;
   font-weight: 800;
+  color: #f7fbff;
 }
 
-.student-home__bell {
-  color: #41befd;
-  font-size: 20rpx;
+.student-home__hero-title-accent {
+  color: #4cc8ff;
+}
+
+.student-home__hero-sub {
+  position: relative;
+  z-index: 1;
+  margin-top: 20rpx;
+  font-size: 30rpx;
+  color: rgba(221, 236, 255, 0.92);
+}
+
+.student-home__hero-btn {
+  position: relative;
+  z-index: 1;
+  margin-top: 34rpx;
+  width: 260rpx;
+  height: 84rpx;
+  border-radius: 22rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  font-size: 28rpx;
   font-weight: 700;
+  color: #f5f9ff;
+  background: linear-gradient(90deg, #163f87 0%, #45bfff 100%);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    filter 180ms ease;
 }
 
-.student-home__countdown-name {
-  position: relative;
-  z-index: 1;
-  margin-top: 66rpx;
-  font-size: 38rpx;
-  line-height: 1.2;
-  font-weight: 800;
+.student-home__hero-btn:hover {
+  transform: translateY(-3rpx);
+  filter: brightness(1.05);
+  box-shadow: 0 14rpx 28rpx rgba(68, 186, 255, 0.3);
 }
 
-.student-home__countdown-meta {
-  position: relative;
-  z-index: 1;
-  margin-top: 10rpx;
-  color: rgba(182, 198, 239, 0.88);
-  font-size: 22rpx;
-  line-height: 1.5;
+.student-home__hero-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
-.student-home__countdown-bottom {
-  display: flex;
+.student-home__hero-arrow {
+  font-size: 30rpx;
+}
+
+.student-home__entry-grid {
+  margin-top: 34rpx;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 22rpx;
+}
+
+.student-home__entry-card {
+  min-height: 212rpx;
+  padding: 28rpx 24rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
+  border: 1rpx solid rgba(197, 207, 220, 0.55);
+  box-shadow: 0 12rpx 28rpx rgba(22, 44, 79, 0.05);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.student-home__entry-card:hover {
+  transform: translateY(-4rpx);
+  border-color: rgba(74, 165, 242, 0.36);
+  box-shadow: 0 20rpx 40rpx rgba(22, 44, 79, 0.1);
+}
+
+.student-home__entry-icon {
+  width: 74rpx;
+  height: 74rpx;
+  border-radius: 18rpx;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 20rpx;
+  justify-content: center;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #1f3a65;
+  background: #ecf1f8;
 }
 
-.student-home__countdown-label {
-  font-size: 20rpx;
-  color: rgba(182, 198, 239, 0.84);
-}
+.student-home__entry-icon.blue { background: #e9f1ff; color: #18498b; }
+.student-home__entry-icon.cyan { background: #e7f8ff; color: #0e6f99; }
+.student-home__entry-icon.indigo { background: #edf0ff; color: #3d4f9b; }
+.student-home__entry-icon.gold { background: #fff5df; color: #b97702; }
 
-.student-home__countdown-value {
-  margin-top: 8rpx;
-  font-size: 42rpx;
+.student-home__entry-title {
+  margin-top: 20rpx;
+  font-size: 40rpx;
   font-weight: 800;
+  color: #0d2b55;
 }
 
-.student-home__countdown-btn {
-  padding: 18rpx 28rpx;
-  border-radius: 20rpx;
-  background: #41befd;
-  color: #031635;
+.student-home__entry-desc {
+  margin-top: 10rpx;
   font-size: 24rpx;
-  font-weight: 800;
-  white-space: nowrap;
+  line-height: 1.58;
+  color: #5e718b;
 }
 
 .student-home__section-head {
+  margin-top: 44rpx;
+  margin-bottom: 22rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20rpx;
-  margin-bottom: 28rpx;
 }
 
 .student-home__section-title {
-  font-size: 38rpx;
+  font-size: 48rpx;
   font-weight: 800;
-  color: #031635;
+  color: #0b2a53;
 }
 
-.student-home__section-link {
-  color: #00658d;
+.student-home__section-controls {
+  display: inline-flex;
+  gap: 10rpx;
+}
+
+.student-home__section-dot {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 999rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 24rpx;
-  font-weight: 800;
+  color: #8fa1b8;
+  border: 1rpx solid #d7dfea;
+  background: #f8fbff;
 }
 
-.student-home__lab-grid {
+.student-home__list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24rpx;
+  gap: 18rpx;
 }
 
-.student-home__lab-card {
-  overflow: hidden;
-  border-radius: 26rpx;
+.student-home__list-item {
+  min-height: 176rpx;
+  padding: 18rpx;
+  border-radius: 24rpx;
   background: #ffffff;
-  box-shadow: 0 16rpx 34rpx rgba(8, 27, 58, 0.06);
+  border: 1rpx solid #e1e7f0;
+  display: grid;
+  grid-template-columns: 170rpx minmax(0, 1fr) 180rpx;
+  align-items: center;
+  gap: 22rpx;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
 }
 
-.student-home__lab-cover {
+.student-home__list-item:hover {
+  transform: translateY(-3rpx);
+  box-shadow: 0 18rpx 36rpx rgba(16, 41, 79, 0.09);
+}
+
+.student-home__list-cover {
   position: relative;
-  height: 340rpx;
+  height: 140rpx;
+  border-radius: 16rpx;
   overflow: hidden;
 }
 
-.student-home__lab-cover-img {
+.student-home__list-cover-img {
   width: 100%;
   height: 100%;
   display: block;
+  transform: scale(1);
+  transition: transform 220ms ease;
 }
 
-.student-home__lab-cover-mask {
+.student-home__list-item:hover .student-home__list-cover-img {
+  transform: scale(1.04);
+}
+
+.student-home__list-cover-mask {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(7, 22, 43, 0.16) 0%, rgba(7, 22, 43, 0.06) 100%);
+  background: linear-gradient(180deg, rgba(8, 26, 51, 0.08), rgba(8, 26, 51, 0.22));
 }
 
-.student-home__lab-status {
-  position: absolute;
-  top: 16rpx;
-  left: 16rpx;
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  padding: 8rpx 14rpx;
-  border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.88);
-  color: #0b2652;
-  font-size: 18rpx;
-  font-weight: 800;
+.student-home__list-main {
+  min-width: 0;
 }
 
-.student-home__lab-status-dot {
-  width: 12rpx;
-  height: 12rpx;
-  border-radius: 999rpx;
-  background: #27ae60;
-}
-
-.student-home__lab-status.demand .student-home__lab-status-dot {
-  background: #f2994a;
-}
-
-.student-home__lab-status.disabled .student-home__lab-status-dot {
-  background: #ba1a1a;
-}
-
-.student-home__lab-body {
-  padding: 24rpx;
-}
-
-.student-home__lab-name {
-  color: #031635;
-  font-size: 38rpx;
+.student-home__list-name {
+  font-size: 42rpx;
   line-height: 1.2;
   font-weight: 800;
+  color: #0c2b56;
 }
 
-.student-home__lab-location {
-  margin-top: 8rpx;
-  color: #65768c;
-  font-size: 23rpx;
-}
-
-.student-home__lab-tools {
-  margin-top: 14rpx;
+.student-home__list-tags {
+  margin-top: 12rpx;
   display: flex;
-  gap: 10rpx;
   flex-wrap: wrap;
+  gap: 8rpx;
 }
 
-.student-home__lab-tool {
-  min-height: 38rpx;
-  border-radius: 12rpx;
-  padding: 0 12rpx;
-  background: #eef2f7;
-  color: #39506d;
+.student-home__list-tag {
+  min-height: 36rpx;
+  padding: 0 10rpx;
+  border-radius: 999rpx;
+  background: #f0f4fa;
+  color: #5a6f8d;
   font-size: 20rpx;
   display: inline-flex;
   align-items: center;
 }
 
-.student-home__lab-actions {
-  margin-top: 18rpx;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12rpx;
+.student-home__list-meta {
+  margin-top: 14rpx;
+  font-size: 22rpx;
+  color: #6f7f95;
 }
 
-.student-home__lab-btn {
-  height: 70rpx;
-  border-radius: 16rpx;
-  font-size: 24rpx;
-  font-weight: 800;
+.student-home__list-side {
+  justify-self: end;
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 14rpx;
+}
+
+.student-home__list-status {
+  min-height: 40rpx;
+  padding: 0 14rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+}
+
+.student-home__list-status.active {
+  color: #0e8a4f;
+  background: #e8fbf1;
+}
+
+.student-home__list-status.demand {
+  color: #ab6f00;
+  background: #fff3dd;
+}
+
+.student-home__list-status.disabled {
+  color: #a83f3f;
+  background: #ffe9e9;
+}
+
+.student-home__list-action {
+  min-width: 138rpx;
+  height: 64rpx;
+  padding: 0 18rpx;
+  border-radius: 16rpx;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-}
-
-.student-home__lab-btn.light {
-  background: #ffffff;
-  border: 2rpx solid #0b2652;
-  color: #0b2652;
-}
-
-.student-home__lab-btn.primary {
-  background: #041c42;
-  color: #ecf4ff;
-}
-
-.student-home__lab-btn.primary.disabled {
-  background: #cfd6df;
-  color: #5d6c80;
-}
-
-.student-home__lab-btn:active {
-  transform: scale(0.98);
-}
-
-.student-home__lab-location,
-.student-home__lab-name,
-.student-home__lab-tools,
-.student-home__lab-actions {
-  position: relative;
-}
-
-.student-home__lab-location {
-  font-size: 20rpx;
-  color: #65768c;
-}
-
-.student-home__timeline-card {
-  margin-top: 60rpx;
-  padding: 34rpx;
-  border-radius: 30rpx;
-  background: #f2f4f7;
-  border: 1rpx solid rgba(197, 198, 207, 0.16);
-}
-
-.student-home__timeline-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20rpx;
-  margin-bottom: 34rpx;
-}
-
-.student-home__timeline-sub {
-  margin-top: 10rpx;
-  color: #75777f;
-  font-size: 20rpx;
-}
-
-.student-home__timeline-tabs {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-}
-
-.student-home__timeline-tab {
-  padding: 14rpx 24rpx;
-  border-radius: 16rpx;
-  color: #6a7483;
-  font-size: 22rpx;
-  font-weight: 800;
-}
-
-.student-home__timeline-tab.active {
-  background: #ffffff;
-  border: 1rpx solid rgba(197, 198, 207, 0.24);
-  color: #031635;
-}
-
-.student-home__timeline-list {
-  display: grid;
-  gap: 24rpx;
-}
-
-.student-home__timeline-row {
-  display: grid;
-  grid-template-columns: 180rpx 1fr 120rpx;
-  gap: 20rpx;
-  align-items: center;
-}
-
-.student-home__timeline-name {
-  color: #031635;
-  font-size: 22rpx;
-  font-weight: 800;
-}
-
-.student-home__timeline-track {
-  position: relative;
-  height: 34rpx;
-}
-
-.student-home__timeline-base {
-  position: absolute;
-  inset: 0;
-  border-radius: 999rpx;
-  background: #ffffff;
-}
-
-.student-home__timeline-segment {
-  position: absolute;
-  top: 0;
-  height: 100%;
-  border-radius: 999rpx;
-}
-
-.student-home__timeline-now {
-  position: absolute;
-  left: 36%;
-  top: -8rpx;
-  width: 3rpx;
-  height: 50rpx;
-  background: #00658d;
-}
-
-.student-home__timeline-state {
-  text-align: right;
-  font-size: 20rpx;
-  font-weight: 800;
-}
-
-.student-home__timeline-state.busy {
-  color: #031635;
-}
-
-.student-home__timeline-state.open {
-  color: #27ae60;
-}
-
-.student-home__timeline-state.partial {
-  color: #1a2b4b;
-}
-
-.student-home__footer {
-  padding: 48rpx 32rpx 12rpx;
-}
-
-.student-home__footer-inner {
-  width: 100%;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 28rpx;
-  padding: 32rpx;
-  border-radius: 28rpx;
-  background: #ffffff;
-  border: 1rpx solid rgba(228, 235, 245, 0.92);
-  box-shadow: 0 12rpx 36rpx rgba(47, 128, 237, 0.06);
-}
-
-.student-home__footer-title {
-  color: #1a2b4b;
-  font-size: 30rpx;
-  font-weight: 800;
-}
-
-.student-home__footer-sub {
-  margin-top: 10rpx;
-  color: #7a8796;
-  font-size: 22rpx;
-}
-
-.student-home__footer-links {
-  display: flex;
-  align-items: center;
-  gap: 18rpx;
-  flex-wrap: wrap;
-}
-
-.student-home__footer-link {
-  color: #00658d;
   font-size: 24rpx;
   font-weight: 700;
+  color: #ffffff;
+  background: #0c2a5a;
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.student-home__list-action:hover {
+  transform: translateY(-2rpx);
+  background: #143d7d;
+  box-shadow: 0 12rpx 24rpx rgba(9, 34, 73, 0.2);
+}
+
+.student-home__list-action.disabled {
+  color: #6b7d94;
+  background: #d7dee8;
+}
+
+.student-home__list-action.disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.student-home__list-detail {
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #2c4f84;
+}
+
+.student-home__list-detail:hover {
+  color: #0d3a77;
 }
 
 /* #ifndef H5 */
-.student-home__hero-grid,
-.student-home__lab-grid,
-.student-home__footer-inner {
+.student-home__shell {
+  padding: 0 24rpx;
+}
+
+.student-home__hero {
+  padding: 44rpx 34rpx;
+}
+
+.student-home__hero-title {
+  font-size: 52rpx;
+}
+
+.student-home__hero-sub {
+  font-size: 26rpx;
+}
+
+.student-home__entry-grid {
   grid-template-columns: 1fr;
-  flex-direction: column;
 }
 
-.student-home__body {
-  padding-top: 24rpx;
+.student-home__list-item {
+  grid-template-columns: 1fr;
+  justify-items: stretch;
 }
 
-.student-home__shell,
-.student-home__footer {
-  padding-left: 24rpx;
-  padding-right: 24rpx;
+.student-home__list-cover {
+  height: 220rpx;
 }
 
-.student-home__welcome,
-.student-home__timeline-head {
-  flex-direction: column;
+.student-home__list-side {
+  justify-self: start;
   align-items: flex-start;
-}
-
-.student-home__quick-grid,
-.student-home__lab-grid {
-  grid-template-columns: 1fr;
-}
-
-.student-home__timeline-row {
-  grid-template-columns: 1fr;
-}
-
-.student-home__timeline-state {
-  text-align: left;
 }
 /* #endif */
 
 /* #ifdef H5 */
-@media screen and (min-width: 1500px) {
-  .student-home__nav-inner {
-    padding-left: 56rpx;
-    padding-right: 56rpx;
-  }
-
-  .student-home__shell,
-  .student-home__footer {
-    padding-left: 56rpx;
-    padding-right: 56rpx;
-  }
-
-  .student-home__hero-grid {
-    grid-template-columns: minmax(0, 2.4fr) minmax(460rpx, 1fr);
-  }
-
-  .student-home__quick-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .student-home__lab-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-@media screen and (max-width: 1180px) {
-  .student-home__hero-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .student-home__lab-grid {
+@media screen and (max-width: 1120px) {
+  .student-home__entry-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .student-home__footer-inner {
-    flex-direction: column;
-    align-items: flex-start;
+  .student-home__list-item {
+    grid-template-columns: 170rpx minmax(0, 1fr);
+  }
+
+  .student-home__list-side {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
   }
 }
 
-@media screen and (max-width: 860px) {
-  .student-home__nav-links,
-  .student-home__profile-text {
-    display: none;
+@media screen and (max-width: 760px) {
+  .student-home__shell {
+    padding: 0 20rpx;
   }
 
-  .student-home__nav-main {
-    gap: 20rpx;
-  }
-
-  .student-home__welcome,
-  .student-home__timeline-head {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .student-home__quick-grid,
-  .student-home__lab-grid {
+  .student-home__entry-grid {
     grid-template-columns: 1fr;
   }
 
-  .student-home__timeline-row {
+  .student-home__list-item {
     grid-template-columns: 1fr;
   }
 
-  .student-home__timeline-state {
-    text-align: left;
+  .student-home__list-cover {
+    height: 210rpx;
+  }
+
+  .student-home__list-side {
+    justify-content: flex-start;
   }
 }
 /* #endif */
 </style>
-
-

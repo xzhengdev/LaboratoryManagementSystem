@@ -10,24 +10,23 @@ from app.services.reservation_service import get_lab_schedule
 
 
 def detect_date(message):
-    # 从自然语言中尽量识别出目标日期。
-    # 当前规则支持“今天”“明天”或显式 YYYY-MM-DD。
     if "今天" in message:
         return date.today()
     if "明天" in message:
         return date.today() + timedelta(days=1)
+
     matched = re.search(r"(20\d{2}-\d{2}-\d{2})", message)
     if matched:
         year, month, day = [int(part) for part in matched.group(1).split("-")]
         return date(year, month, day)
+
     return date.today()
 
 
 def build_help_reply():
-    # 当用户输入不明确时，返回可用问题示例和推荐跳转。
     return {
         "reply": (
-            "我是实验室预约助手，可以帮你用自然语言完成常见操作。"
+            "我是实验室预约助手，可以帮你查询预约、空闲实验室、实验室排期和统计信息。\n"
             "你可以试试：\n"
             "1. 帮我看看今天有哪些实验室还能预约\n"
             "2. 查看我的预约\n"
@@ -43,7 +42,6 @@ def build_help_reply():
 
 
 def summarize_reservations(user):
-    # 总结当前用户最近的预约记录，适合“查看我的预约”类问题。
     items = (
         Reservation.query.filter_by(user_id=user.id)
         .order_by(Reservation.reservation_date.desc(), Reservation.start_time.desc())
@@ -68,7 +66,6 @@ def summarize_reservations(user):
 
 
 def summarize_available_labs(target_date):
-    # 汇总某一天当前可关注的实验室及占用情况。
     labs = (
         Laboratory.query.filter_by(status="active")
         .order_by(Laboratory.campus_id.asc())
@@ -83,8 +80,9 @@ def summarize_available_labs(target_date):
         lines.append(
             f"{lab.lab_name}（{lab.campus.campus_name}）开放 "
             f"{schedule['open_time']}-{schedule['close_time']}，"
-            f"已占用 {len(schedule['reservations'])} 个时段"
+            f"已有 {len(schedule['reservations'])} 段预约"
         )
+
     return {
         "reply": f"{target_date.isoformat()} 可关注的实验室如下：\n" + "\n".join(lines),
         "actions": [{"label": "查看实验室", "path": "/pages/labs/index"}],
@@ -92,13 +90,13 @@ def summarize_available_labs(target_date):
 
 
 def summarize_single_lab(message, target_date):
-    # 如果自然语言里提到了某个实验室名称，则返回该实验室的专属排期摘要。
     labs = Laboratory.query.filter_by(status="active").all()
     matched_lab = None
     for lab in labs:
         if lab.lab_name in message:
             matched_lab = lab
             break
+
     if not matched_lab:
         return None
 
@@ -111,29 +109,32 @@ def summarize_single_lab(message, target_date):
         )
     else:
         lines = [
-            f"{item['start_time'][:5]}-{item['end_time'][:5]} | {item['status']} | {item['purpose']}"
+            f"{item['start_time'][:5]}-{item['end_time'][:5]} | "
+            f"{item['status']} | {item['purpose']}"
             for item in reservations
         ]
         reply = (
             f"{matched_lab.lab_name} 在 {target_date.isoformat()} 的排期如下：\n"
             + "\n".join(lines)
         )
+
     return {
         "reply": reply,
         "actions": [
             {
                 "label": "查看排期",
-                "path": f"/pages/schedule/index?labId={matched_lab.id}&date={target_date.isoformat()}",
+                "path": (
+                    f"/pages/schedule/index?labId={matched_lab.id}"
+                    f"&date={target_date.isoformat()}"
+                ),
             }
         ],
     }
 
 
-def call_openai_compatible(user, message):
-    # 兼容 OpenAI chat completions 接口：
-    # 如果配置了 OPENAI_API_KEY，就可以切换到真实大模型回复。
+def call_llm_compatible(user, message):
     headers = {
-        "Authorization": f"Bearer {Config.OPENAI_API_KEY}",
+        "Authorization": f"Bearer {Config.LLM_API_KEY}",
         "Content-Type": "application/json",
     }
     system_prompt = (
@@ -150,7 +151,10 @@ def call_openai_compatible(user, message):
         "temperature": 0.4,
     }
     response = requests.post(
-        Config.OPENAI_BASE_URL, headers=headers, data=json.dumps(payload), timeout=20
+        Config.LLM_BASE_URL,
+        headers=headers,
+        data=json.dumps(payload),
+        timeout=20,
     )
     response.raise_for_status()
     data = response.json()
@@ -159,26 +163,26 @@ def call_openai_compatible(user, message):
 
 
 def chat(user, message):
-    # Agent 总入口：
-    # 优先尝试大模型模式，失败后回退到本地规则模式。
-    if Config.AGENT_PROVIDER == "openai" and Config.OPENAI_API_KEY:
+    if Config.AGENT_PROVIDER in {"openai", "deepseek", "llm"} and Config.LLM_API_KEY:
         try:
-            return call_openai_compatible(user, message)
+            return call_llm_compatible(user, message)
         except Exception:
-            # 外部模型异常时静默降级，避免影响系统主流程。
             pass
 
     target_date = detect_date(message)
 
-    # 以下是本地规则分发逻辑。
     if "我的预约" in message or "查看预约" in message:
         return summarize_reservations(user)
+
     if "统计" in message:
         total = Reservation.query.count()
         approved = Reservation.query.filter_by(status="approved").count()
         pending = Reservation.query.filter_by(status="pending").count()
         return {
-            "reply": f"当前共有 {total} 条预约，其中已通过 {approved} 条，待审批 {pending} 条。",
+            "reply": (
+                f"当前共有 {total} 条预约，其中已通过 {approved} 条，"
+                f"待审批 {pending} 条。"
+            ),
             "actions": [{"label": "去统计页", "path": "/pages/statistics/index"}],
         }
 

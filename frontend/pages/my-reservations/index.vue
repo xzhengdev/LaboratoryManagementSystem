@@ -35,7 +35,7 @@
               查看预约详情
             </view>
           </view>
-<!-- 
+
           <view class="card my-res-side__status-card">
             <view class="my-res-side__status-title">状态概览</view>
             <view
@@ -49,7 +49,7 @@
               <view class="my-res-side__status-label">{{ item.label }}</view>
               <view class="my-res-side__status-count">{{ item.count }}</view>
             </view>
-          </view> -->
+          </view>
         </view>
 
         <view class="my-res-main">

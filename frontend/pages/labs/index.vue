@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <view class="labs-page">
     <!-- #ifdef H5 -->
     <student-top-nav active="labs" />
@@ -91,13 +91,10 @@
         </view>
       </view>
     </view>
-
-    <!-- <site-footer /> -->
   </view>
 </template>
 
 <script>
-import SiteFooter from '../../components/site-footer.vue'
 import StudentTopNav from '../../components/student-top-nav.vue'
 import UserTopNav from '../../components/user-top-nav.vue'
 import { api } from '../../api/index'
@@ -123,7 +120,7 @@ const TYPE_FILTERS = [
 ]
 
 export default {
-  components: { SiteFooter, StudentTopNav, UserTopNav },
+  components: { StudentTopNav, UserTopNav },
   data() {
     return {
       selectedType: 'all',
@@ -154,9 +151,7 @@ export default {
       })
     },
     filteredList() {
-      return this.normalizedList.filter((item) => {
-        return this.selectedType === 'all' || item.typeKey === this.selectedType
-      })
+      return this.normalizedList.filter((item) => this.selectedType === 'all' || item.typeKey === this.selectedType)
     }
   },
   onLoad(options) {
@@ -189,14 +184,14 @@ export default {
           this.currentCampusIndex = 0
           this.campusId = all[0] ? String(all[0].id) : ''
         }
-      } catch (error) {
+      } catch (_error) {
         this.campusOptions = []
       }
     },
     async loadData() {
       try {
         this.list = await api.labs(this.campusId ? { campus_id: this.campusId } : {})
-      } catch (error) {
+      } catch (_error) {
         this.list = []
       }
     },
@@ -308,6 +303,21 @@ export default {
   color: #3f5068;
   font-size: 22rpx;
   font-weight: 700;
+  transition:
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.labs-page__chip:hover {
+  transform: translateY(-2rpx);
+  box-shadow: 0 10rpx 20rpx rgba(8, 27, 58, 0.08);
+}
+
+.labs-page__chip:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 .labs-page__chip.active {
@@ -328,6 +338,21 @@ export default {
   font-weight: 700;
   border: 1rpx solid rgba(81, 103, 133, 0.2);
   white-space: nowrap;
+  transition:
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.labs-page__map-btn:hover {
+  transform: translateY(-2rpx);
+  border-color: rgba(41, 80, 134, 0.32);
+  box-shadow: 0 10rpx 22rpx rgba(8, 27, 58, 0.08);
+}
+
+.labs-page__map-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 .labs-page__picker {
@@ -434,7 +459,6 @@ export default {
 .labs-page__card-body {
   position: relative;
   padding: 22rpx;
-  border-radius: 0;
   background: #ffffff;
   transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -497,6 +521,11 @@ export default {
     border-color 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.labs-page__btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
 .labs-page__btn.light {
   background: #ffffff;
   border: 1rpx solid #bcbfc4;
@@ -540,10 +569,6 @@ export default {
   min-height: 340rpx;
 }
 
-.labs-page__card.featured .labs-page__card-body {
-  position: relative;
-}
-
 /* #ifndef H5 */
 .labs-page__shell {
   padding-left: 24rpx;
@@ -566,10 +591,10 @@ export default {
   grid-template-columns: 1fr;
 }
 
-  .labs-page__card.featured {
-    grid-column: auto;
-    min-height: 0;
-  }
+.labs-page__card.featured {
+  grid-column: auto;
+  min-height: 0;
+}
 
 .labs-page__card.featured .labs-page__cover {
   min-height: 0;
@@ -594,9 +619,9 @@ export default {
     min-height: 520rpx;
   }
 
-.labs-page__card.featured .labs-page__cover {
-  min-height: 340rpx;
-}
+  .labs-page__card.featured .labs-page__cover {
+    min-height: 340rpx;
+  }
 }
 
 @media screen and (max-width: 860px) {
