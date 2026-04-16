@@ -92,7 +92,7 @@
       </view>
     </view>
 
-    <site-footer />
+    <!-- <site-footer /> -->
   </view>
 </template>
 
@@ -356,6 +356,14 @@ export default {
   border-radius: 26rpx;
   background: #ffffff;
   box-shadow: 0 16rpx 34rpx rgba(8, 27, 58, 0.06);
+  transition:
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.labs-page__card:hover {
+  transform: translateY(-6rpx);
+  box-shadow: 0 28rpx 56rpx rgba(8, 27, 58, 0.12);
 }
 
 .labs-page__cover {
@@ -374,6 +382,12 @@ export default {
   display: block;
   object-fit: cover;
   object-position: center;
+  transform: scale(1);
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.labs-page__card:hover .labs-page__cover-img {
+  transform: scale(1.04);
 }
 
 .labs-page__cover-mask {
@@ -422,6 +436,11 @@ export default {
   padding: 22rpx;
   border-radius: 0;
   background: #ffffff;
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.labs-page__card:hover .labs-page__card-body {
+  transform: translateY(-2rpx);
 }
 
 .labs-page__card-title {
@@ -470,12 +489,24 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition:
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .labs-page__btn.light {
   background: #ffffff;
-  border: 2rpx solid #0b2652;
+  border: 1rpx solid #bcbfc4;
   color: #0b2652;
+}
+
+.labs-page__btn.light:hover {
+  transform: translateY(-2rpx);
+  background: #eff5ff;
+  box-shadow: 0 10rpx 24rpx rgba(11, 38, 82, 0.12);
 }
 
 .labs-page__btn.primary {
@@ -483,9 +514,21 @@ export default {
   color: #ecf4ff;
 }
 
+.labs-page__btn.primary:hover {
+  transform: translateY(-2rpx);
+  background: #0a2b63;
+  box-shadow: 0 14rpx 28rpx rgba(4, 28, 66, 0.2);
+}
+
 .labs-page__btn.primary.disabled {
   background: #cfd6df;
   color: #5d6c80;
+}
+
+.labs-page__btn.primary.disabled:hover {
+  transform: none;
+  box-shadow: none;
+  background: #cfd6df;
 }
 
 .labs-page__card.featured {

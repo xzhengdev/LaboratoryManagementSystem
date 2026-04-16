@@ -53,7 +53,7 @@
       </view>
     </view>
 
-    <site-footer />
+    <!-- <site-footer /> -->
   </view>
 </template>
 

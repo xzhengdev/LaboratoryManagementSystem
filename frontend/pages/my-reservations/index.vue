@@ -10,11 +10,9 @@
 
     <view class="my-res-page__shell">
       <view class="my-res-page__head">
-        <view>
+        <view class="my-res-page__head-copy">
           <view class="my-res-page__title">我的预约</view>
-          <view class="my-res-page__sub">
-            管理您在分布式校区网络中的实验室课程、设备预订和临床空间访问。
-          </view>
+          <view class="my-res-page__sub">集中查看实验室预约记录、当前状态与最近一场预约安排。</view>
         </view>
 
         <view class="my-res-page__head-actions">
@@ -25,15 +23,21 @@
       <view class="my-res-page__layout">
         <view class="my-res-side">
           <view class="my-res-side__next-card">
-            <view class="my-res-side__next-title">下一场次</view>
-            <view class="my-res-side__next-time">{{ nextCountdown }}</view>
-            <view class="my-res-side__next-lab">{{ nextItem.lab_name || '暂无进行中的预约' }}</view>
-            <view class="my-res-side__next-loc">{{ nextItem.locationLine }}</view>
-            <view class="my-res-side__next-btn" @click="goDetail(nextItem.id)">查看访问密钥</view>
+            <view class="my-res-side__eyebrow">最近一场</view>
+            <view class="my-res-side__countdown">{{ nextCountdown }}</view>
+            <view class="my-res-side__next-lab">{{ nextItem.lab_name || '暂无即将开始的预约' }}</view>
+            <view class="my-res-side__next-loc">{{ nextItem.locationLine || '请选择实验室并提交新的预约申请。' }}</view>
+            <view
+              class="my-res-side__next-btn"
+              :class="{ disabled: !nextItem.id }"
+              @click="goDetail(nextItem.id)"
+            >
+              查看预约详情
+            </view>
           </view>
-
-          <view class="my-res-side__status-card">
-            <view class="my-res-side__status-title">快捷状态</view>
+<!-- 
+          <view class="card my-res-side__status-card">
+            <view class="my-res-side__status-title">状态概览</view>
             <view
               v-for="item in statusSummary"
               :key="item.key"
@@ -41,55 +45,77 @@
               :class="{ active: activeStatus === item.key }"
               @click="setStatus(item.key)"
             >
-              <view class="my-res-side__dot" :style="{ background: item.color }"></view>
+              <view class="my-res-side__status-dot" :style="{ background: item.color }"></view>
               <view class="my-res-side__status-label">{{ item.label }}</view>
               <view class="my-res-side__status-count">{{ item.count }}</view>
             </view>
-          </view>
+          </view> -->
         </view>
 
         <view class="my-res-main">
-          <view class="my-res-main__thead">
-            <text>资源与地点</text>
-            <text>日期与时间</text>
-            <text>状态</text>
-            <text>操作</text>
-          </view>
-
-          <view v-if="!pagedList.length" class="my-res-main__empty">当前状态下没有预约记录。</view>
-
-          <view v-for="item in pagedList" :key="item.id" class="my-res-main__row" :class="item.rowClass">
-            <view class="my-res-main__resource">
-              <view class="my-res-main__icon">{{ item.iconText }}</view>
-              <view>
-                <view class="my-res-main__name">{{ item.lab_name }}</view>
-                <view class="my-res-main__loc">{{ item.locationLine }}</view>
+          <view class="card my-res-toolbar">
+            <view class="my-res-toolbar__chips">
+              <view
+                v-for="item in filterTabs"
+                :key="item.key"
+                class="my-res-toolbar__chip"
+                :class="{ active: activeStatus === item.key }"
+                @click="setStatus(item.key)"
+              >
+                {{ item.label }}
+                <text>{{ item.count }}</text>
               </view>
             </view>
+            <view class="my-res-toolbar__meta">{{ filteredList.length }} 条记录</view>
+          </view>
 
-            <view class="my-res-main__time">
-              <view class="my-res-main__date">{{ item.dateText }}</view>
-              <view class="my-res-main__range">{{ item.timeText }}</view>
+          <view class="card table-card">
+            <view class="table-header my-res-table-grid">
+              <text>资源与地点</text>
+              <text>预约日期</text>
+              <text>预约时间</text>
+              <text>状态</text>
+              <text>操作</text>
             </view>
 
-            <view class="my-res-main__status">
-              <view class="my-res-main__status-pill" :class="item.statusClass">{{ item.statusText }}</view>
+            <view v-if="!pagedList.length" class="empty-state my-res-main__empty">
+              当前筛选条件下没有预约记录，试试切换状态或新建一条预约。
             </view>
 
-            <view class="my-res-main__ops">
-              <view class="my-res-main__detail" @click="goDetail(item.id)">详情</view>
-              <view
-                v-if="item.canCancel"
-                class="my-res-main__cancel"
-                @click="cancel(item.id)"
-              >
-                取消
+            <view v-for="item in pagedList" :key="item.id" class="table-row my-res-table-grid">
+              <view class="my-res-resource">
+                <view class="my-res-resource__icon">{{ item.iconText }}</view>
+                <view class="my-res-resource__content">
+                  <view class="table-strong my-res-resource__name">{{ item.lab_name || '未命名实验室' }}</view>
+                  <view class="my-res-resource__meta">{{ item.locationLine }}</view>
+                  <view class="my-res-resource__purpose">{{ item.purpose || '未填写预约用途' }}</view>
+                </view>
+              </view>
+
+              <view class="my-res-time">
+                <view class="my-res-time__date">{{ item.dateText }}</view>
+                <view class="my-res-time__weekday">{{ item.weekdayText }}</view>
+              </view>
+
+              <view class="my-res-time">
+                <view class="my-res-time__date">{{ item.timeText }}</view>
+                <view class="my-res-time__weekday">{{ item.durationText }}</view>
+              </view>
+
+              <view class="my-res-status">
+                <view class="my-res-status__pill" :class="item.statusClass">{{ item.statusText }}</view>
+              </view>
+
+              <view class="actions my-res-actions">
+                <view class="pill" @click="goDetail(item.id)">查看详情</view>
+                <view v-if="item.canCancel" class="pill pill-danger" @click="cancel(item.id)">取消预约</view>
+                <view v-else class="my-res-actions__mute">不可取消</view>
               </view>
             </view>
           </view>
 
           <view v-if="totalPages > 1" class="my-res-main__pager">
-            <view class="my-res-main__page-btn" @click="prevPage">&lt;</view>
+            <view class="my-res-main__page-btn" :class="{ disabled: currentPage === 1 }" @click="prevPage">上一页</view>
             <view
               v-for="n in totalPages"
               :key="n"
@@ -99,19 +125,15 @@
             >
               {{ n }}
             </view>
-            <view class="my-res-main__page-btn" @click="nextPage">&gt;</view>
+            <view class="my-res-main__page-btn" :class="{ disabled: currentPage === totalPages }" @click="nextPage">下一页</view>
           </view>
         </view>
       </view>
-
     </view>
-
-    <site-footer />
   </view>
 </template>
 
 <script>
-import SiteFooter from '../../components/site-footer.vue'
 import StudentTopNav from '../../components/student-top-nav.vue'
 import UserTopNav from '../../components/user-top-nav.vue'
 import { api } from '../../api/index'
@@ -120,38 +142,65 @@ import { openPage } from '../../common/router'
 import { routes } from '../../config/navigation'
 
 function toDateObj(item) {
-  const d = item.reservation_date || ''
-  const t = item.start_time || '00:00'
-  return new Date(`${d}T${t}`)
+  const date = item.reservation_date || ''
+  const time = item.start_time || '00:00'
+  return new Date(`${date}T${time}`)
 }
 
 function toDateEndObj(item) {
-  const d = item.reservation_date || ''
-  const t = item.end_time || '00:00'
-  return new Date(`${d}T${t}`)
+  const date = item.reservation_date || ''
+  const time = item.end_time || '00:00'
+  return new Date(`${date}T${time}`)
+}
+
+function toMinuteValue(raw) {
+  if (!raw) return 0
+  const safe = String(raw).slice(0, 5)
+  const [hour = 0, minute = 0] = safe.split(':').map((item) => Number(item || 0))
+  return hour * 60 + minute
 }
 
 function formatDateText(dateStr) {
   if (!dateStr) return '--'
   const date = new Date(`${dateStr}T00:00`)
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${m}/${d}/${date.getFullYear()}`
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${month}/${day}/${date.getFullYear()}`
+}
+
+function formatWeekday(dateStr) {
+  if (!dateStr) return '日期待定'
+  const weekMap = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+  const date = new Date(`${dateStr}T00:00`)
+  return weekMap[date.getDay()] || '日期待定'
+}
+
+function formatDuration(startTime, endTime) {
+  const start = toMinuteValue(startTime)
+  const end = toMinuteValue(endTime)
+  if (end <= start) return '时长待定'
+  const total = end - start
+  const hours = Math.floor(total / 60)
+  const minutes = total % 60
+  if (hours && minutes) return `${hours}小时${minutes}分钟`
+  if (hours) return `${hours}小时`
+  return `${minutes}分钟`
 }
 
 export default {
-  components: { SiteFooter, StudentTopNav, UserTopNav },
+  components: { StudentTopNav, UserTopNav },
   data() {
     return {
       list: [],
       activeStatus: 'all',
       currentPage: 1,
-      pageSize: 4
+      pageSize: 6
     }
   },
   computed: {
     normalizedList() {
       const now = Date.now()
+      const iconPool = ['实', '约', '研', '课']
       return this.list
         .map((item, index) => {
           const endAt = toDateEndObj(item).getTime()
@@ -167,32 +216,24 @@ export default {
               statusKey = 'approved'
             }
           } else if (item.status === 'rejected') {
-            statusText = '已拒绝'
+            statusText = '已驳回'
             statusKey = 'rejected'
           } else if (item.status === 'cancelled') {
             statusText = '已取消'
             statusKey = 'cancelled'
           }
 
-          const paletteMap = {
-            pending: 'pending',
-            approved: 'approved',
-            completed: 'completed',
-            rejected: 'rejected',
-            cancelled: 'cancelled'
-          }
-
-          const iconPool = ['⚗', '▣', '⌬', '⚠']
           return {
             ...item,
             displayStatus: statusKey,
             statusText,
-            statusClass: paletteMap[statusKey],
+            statusClass: statusKey,
             canCancel: ['pending', 'approved'].includes(statusKey),
             dateText: formatDateText(item.reservation_date),
-            timeText: `${(item.start_time || '--').slice(0, 5)} - ${(item.end_time || '--').slice(0, 5)}`,
+            weekdayText: formatWeekday(item.reservation_date),
+            timeText: `${(item.start_time || '--:--').slice(0, 5)} - ${(item.end_time || '--:--').slice(0, 5)}`,
+            durationText: formatDuration(item.start_time, item.end_time),
             locationLine: `${item.campus_name || '校区待定'} · ${item.location || '位置待定'}`,
-            rowClass: paletteMap[statusKey],
             iconText: iconPool[index % iconPool.length]
           }
         })
@@ -210,16 +251,23 @@ export default {
       return this.filteredList.slice(start, start + this.pageSize)
     },
     statusSummary() {
-      const statusKeys = [
+      const items = [
         { key: 'approved', label: '已批准', color: '#3cc6ea' },
         { key: 'pending', label: '待处理', color: '#f3be2f' },
         { key: 'completed', label: '已完成', color: '#b9c5d6' },
-        { key: 'cancelled', label: '已取消', color: '#d13232' }
+        { key: 'cancelled', label: '已取消', color: '#d13232' },
+        { key: 'rejected', label: '已驳回', color: '#c75c5c' }
       ]
-      return statusKeys.map((item) => ({
+      return items.map((item) => ({
         ...item,
         count: this.normalizedList.filter((row) => row.displayStatus === item.key).length
       }))
+    },
+    filterTabs() {
+      return [
+        { key: 'all', label: '全部', count: this.normalizedList.length },
+        ...this.statusSummary
+      ]
     },
     nextItem() {
       const now = Date.now()
@@ -229,11 +277,11 @@ export default {
       return upcoming[0] || {}
     },
     nextCountdown() {
-      if (!this.nextItem.id) return '--'
+      if (!this.nextItem.id) return '暂无'
       const diff = Math.max(0, toDateObj(this.nextItem).getTime() - Date.now())
-      const h = Math.floor(diff / 3600000)
-      const m = Math.floor((diff % 3600000) / 60000)
-      return `${String(h).padStart(2, '0')} 小时 ${String(m).padStart(2, '0')} 分钟`
+      const hours = Math.floor(diff / 3600000)
+      const minutes = Math.floor((diff % 3600000) / 60000)
+      return `${String(hours).padStart(2, '0')} 小时 ${String(minutes).padStart(2, '0')} 分钟`
     }
   },
   async onShow() {
@@ -247,7 +295,7 @@ export default {
     async loadData() {
       try {
         this.list = await api.myReservations()
-      } catch (error) {
+      } catch (_error) {
         this.list = []
       }
       this.currentPage = 1
@@ -264,8 +312,9 @@ export default {
       openPage(routes.reservationDetail, { query: { id } })
     },
     async cancel(id) {
+      if (!id) return
       await api.cancelReservation(id)
-      uni.showToast({ title: '已取消预约', icon: 'success' })
+      uni.showToast({ title: '预约已取消', icon: 'success' })
       await this.loadData()
     },
     prevPage() {
@@ -290,107 +339,137 @@ export default {
 
 .my-res-page__shell {
   flex: 1;
-  padding: 30rpx 32rpx 40rpx;
+  padding: 30rpx 32rpx 44rpx;
 }
 
 .my-res-page__head {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 20rpx;
-  align-items: center;
+  gap: 24rpx;
+}
+
+.my-res-page__head-copy {
+  max-width: 980rpx;
 }
 
 .my-res-page__title {
+  color: #061f44;
   font-size: 76rpx;
   line-height: 1.04;
-  color: #061f44;
   font-weight: 800;
   letter-spacing: -1.4rpx;
 }
 
 .my-res-page__sub {
-  margin-top: 10rpx;
+  margin-top: 12rpx;
   color: #5d6f87;
   font-size: 28rpx;
-  line-height: 1.5;
-  max-width: 980rpx;
+  line-height: 1.6;
 }
 
 .my-res-page__head-actions {
   display: flex;
   align-items: center;
-  gap: 12rpx;
 }
 
 .my-res-page__new-btn {
-  min-width: 130rpx;
-  height: 70rpx;
-  border-radius: 16rpx;
-  padding: 0 22rpx;
+  min-width: 148rpx;
+  height: 72rpx;
+  border-radius: 18rpx;
+  padding: 0 24rpx;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 24rpx;
-  font-weight: 800;
-}
-
-.my-res-page__new-btn {
   background: #0a254c;
   color: #eef6ff;
+  font-size: 24rpx;
+  font-weight: 800;
   box-shadow: 0 10rpx 26rpx rgba(10, 37, 76, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.my-res-page__new-btn:hover {
+  transform: translateY(-2rpx);
+  box-shadow: 0 18rpx 38rpx rgba(10, 37, 76, 0.24);
 }
 
 .my-res-page__layout {
-  margin-top: 20rpx;
+  margin-top: 24rpx;
   display: grid;
   grid-template-columns: 320rpx minmax(0, 1fr);
-  gap: 20rpx;
+  gap: 24rpx;
+  align-items: start;
+}
+
+.card,
+.table-card,
+.my-res-side__next-card {
+  border-radius: 24rpx;
+  box-shadow: 0 12rpx 32rpx rgba(16, 42, 73, 0.08);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.card:hover,
+.table-card:hover,
+.my-res-side__next-card:hover {
+  transform: translateY(-4rpx);
+  box-shadow: 0 20rpx 48rpx rgba(16, 42, 73, 0.12);
+}
+
+.card {
+  border: 1rpx solid #dbe4f1;
+  background: #ffffff;
 }
 
 .my-res-side {
   display: grid;
-  gap: 16rpx;
+  gap: 18rpx;
   align-content: start;
 }
 
 .my-res-side__next-card {
-  background: linear-gradient(170deg, #0b2550, #081938);
+  padding: 24rpx;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.12), transparent 30%),
+    linear-gradient(165deg, #0b2550 0%, #081938 100%);
   color: #d8e7ff;
-  border-radius: 26rpx;
-  padding: 20rpx;
 }
 
-.my-res-side__next-title {
-  color: #94adcf;
+.my-res-side__eyebrow {
+  color: #96afd2;
   font-size: 21rpx;
-}
-
-.my-res-side__next-time {
-  margin-top: 8rpx;
-  color: #ffffff;
-  font-size: 56rpx;
-  line-height: 1.15;
-  font-weight: 800;
-}
-
-.my-res-side__next-lab {
-  margin-top: 10rpx;
-  color: #d5e5fb;
-  font-size: 24rpx;
   font-weight: 700;
 }
 
+.my-res-side__countdown {
+  margin-top: 10rpx;
+  color: #ffffff;
+  font-size: 56rpx;
+  line-height: 1.12;
+  font-weight: 800;
+  letter-spacing: -1rpx;
+}
+
+.my-res-side__next-lab {
+  margin-top: 14rpx;
+  color: #e6efff;
+  font-size: 27rpx;
+  line-height: 1.4;
+  font-weight: 800;
+}
+
 .my-res-side__next-loc {
-  margin-top: 6rpx;
-  color: #9db4d4;
+  margin-top: 8rpx;
+  color: #a7bbd7;
   font-size: 22rpx;
-  line-height: 1.5;
+  line-height: 1.65;
 }
 
 .my-res-side__next-btn {
-  margin-top: 20rpx;
+  margin-top: 22rpx;
   height: 64rpx;
-  border-radius: 14rpx;
+  border-radius: 16rpx;
   background: #3eb4ea;
   color: #032349;
   font-size: 24rpx;
@@ -398,13 +477,22 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.my-res-side__next-btn:hover {
+  transform: translateY(-2rpx);
+  box-shadow: 0 16rpx 28rpx rgba(62, 180, 234, 0.22);
+}
+
+.my-res-side__next-btn.disabled {
+  opacity: 0.58;
+  pointer-events: none;
+  box-shadow: none;
 }
 
 .my-res-side__status-card {
-  border-radius: 24rpx;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1rpx solid rgba(197, 198, 207, 0.28);
-  padding: 16rpx;
+  padding: 18rpx;
 }
 
 .my-res-side__status-title {
@@ -415,133 +503,228 @@ export default {
 
 .my-res-side__status-row {
   margin-top: 12rpx;
-  min-height: 58rpx;
-  border-radius: 14rpx;
-  padding: 0 12rpx;
+  min-height: 60rpx;
+  border-radius: 16rpx;
+  padding: 0 14rpx;
   display: flex;
   align-items: center;
-  gap: 10rpx;
+  gap: 12rpx;
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
 .my-res-side__status-row.active {
   background: #edf3fb;
 }
 
-.my-res-side__dot {
+.my-res-side__status-row:hover {
+  transform: translateX(2rpx);
+}
+
+.my-res-side__status-dot {
   width: 12rpx;
   height: 12rpx;
   border-radius: 999rpx;
+  flex-shrink: 0;
 }
 
 .my-res-side__status-label {
+  flex: 1;
   color: #344a65;
   font-size: 24rpx;
   font-weight: 700;
-  flex: 1;
 }
 
 .my-res-side__status-count {
   color: #73849a;
   font-size: 24rpx;
-  font-weight: 700;
+  font-weight: 800;
 }
 
-.my-res-main__thead {
-  min-height: 62rpx;
-  padding: 0 20rpx;
-  display: grid;
-  grid-template-columns: 2.1fr 1fr 0.8fr 0.7fr;
+.my-res-main {
+  min-width: 0;
+}
+
+.my-res-toolbar {
+  margin-bottom: 20rpx;
+  padding: 20rpx 24rpx;
+  display: flex;
   align-items: center;
-  color: #5f7088;
+  justify-content: space-between;
+  gap: 16rpx;
+  flex-wrap: wrap;
+  border-radius: 24rpx;
+  background: #f0f4fa;
+  border: 1rpx solid #dce7f4;
+  box-shadow: 0 10rpx 26rpx rgba(16, 42, 73, 0.06);
+}
+
+.my-res-toolbar__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.my-res-toolbar__chip {
+  min-height: 58rpx;
+  padding: 0 16rpx;
+  border-radius: 999rpx;
+  background: #ffffff;
+  border: 1rpx solid #dbe5f1;
+  color: #546982;
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.my-res-toolbar__chip text {
+  min-width: 30rpx;
+  height: 30rpx;
+  border-radius: 999rpx;
+  background: #edf3fb;
+  color: #5b6e86;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18rpx;
+  font-weight: 800;
+}
+
+.my-res-toolbar__chip.active {
+  background: #0a254c;
+  border-color: #0a254c;
+  color: #ffffff;
+}
+
+.my-res-toolbar__chip.active text {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.my-res-toolbar__meta {
+  min-height: 58rpx;
+  padding: 0 18rpx;
+  border-radius: 18rpx;
+  background: #edf3fb;
+  color: #46607f;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 23rpx;
+  font-weight: 800;
+}
+
+.table-card {
+  border: 1rpx solid #dbe4f1;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.my-res-table-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) 0.9fr 1fr 0.8fr 1fr;
+  gap: 20rpx;
+  align-items: center;
+}
+
+.table-header {
+  padding: 24rpx 28rpx;
+  background: #f4f7fb;
+  border-bottom: 1rpx solid #e5ecf5;
+  color: #6d7f95;
   font-size: 22rpx;
   font-weight: 700;
 }
 
-.my-res-main__empty {
-  border-radius: 18rpx;
-  background: rgba(255, 255, 255, 0.75);
-  border: 1rpx solid rgba(197, 198, 207, 0.28);
-  padding: 22rpx;
-  color: #6f8098;
-  font-size: 23rpx;
+.table-row {
+  padding: 26rpx 28rpx;
+  border-bottom: 1rpx solid #edf2f7;
+  transition: background 0.2s ease;
 }
 
-.my-res-main__row {
-  margin-bottom: 12rpx;
-  border-radius: 20rpx;
-  background: rgba(255, 255, 255, 0.78);
-  border-left: 5rpx solid #d9e2ed;
-  min-height: 124rpx;
-  padding: 0 18rpx;
-  display: grid;
-  grid-template-columns: 2.1fr 1fr 0.8fr 0.7fr;
-  align-items: center;
+.table-row:last-of-type {
+  border-bottom: none;
 }
 
-.my-res-main__row.pending {
-  border-left-color: #f3be2f;
+.table-row:hover {
+  background: #f7faff;
 }
 
-.my-res-main__row.approved {
-  border-left-color: #3cc6ea;
+.table-strong {
+  color: #0f2744;
+  font-weight: 800;
 }
 
-.my-res-main__row.completed {
-  border-left-color: #b9c5d6;
+.empty-state {
+  padding: 32rpx 28rpx;
+  color: #6d7f95;
+  font-size: 24rpx;
 }
 
-.my-res-main__row.cancelled,
-.my-res-main__row.rejected {
-  border-left-color: #d13232;
-}
-
-.my-res-main__resource {
+.my-res-resource {
   display: flex;
-  align-items: center;
-  gap: 14rpx;
+  align-items: flex-start;
+  gap: 16rpx;
+  min-width: 0;
 }
 
-.my-res-main__icon {
-  width: 62rpx;
-  height: 62rpx;
-  border-radius: 16rpx;
-  background: #edf2f8;
+.my-res-resource__icon {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 18rpx;
+  background: linear-gradient(135deg, #edf2f8, #f9fbff);
+  color: #213a5d;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #253b5b;
   font-size: 28rpx;
-}
-
-.my-res-main__name {
-  color: #082248;
-  font-size: 34rpx;
-  line-height: 1.2;
   font-weight: 800;
+  flex-shrink: 0;
 }
 
-.my-res-main__loc {
-  margin-top: 4rpx;
+.my-res-resource__content {
+  min-width: 0;
+}
+
+.my-res-resource__name {
+  font-size: 32rpx;
+  line-height: 1.24;
+}
+
+.my-res-resource__meta {
+  margin-top: 6rpx;
   color: #64778e;
   font-size: 22rpx;
+  line-height: 1.55;
 }
 
-.my-res-main__date {
+.my-res-resource__purpose {
+  margin-top: 6rpx;
+  color: #8a9aaf;
+  font-size: 21rpx;
+  line-height: 1.55;
+}
+
+.my-res-time__date {
   color: #112d53;
-  font-size: 34rpx;
+  font-size: 30rpx;
   font-weight: 800;
+  line-height: 1.2;
 }
 
-.my-res-main__range {
-  margin-top: 4rpx;
+.my-res-time__weekday {
+  margin-top: 6rpx;
   color: #6a7b92;
   font-size: 22rpx;
+  line-height: 1.5;
 }
 
-.my-res-main__status-pill {
-  min-height: 42rpx;
+.my-res-status__pill {
+  min-height: 44rpx;
   border-radius: 999rpx;
-  padding: 0 14rpx;
+  padding: 0 16rpx;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -549,68 +732,100 @@ export default {
   font-weight: 800;
 }
 
-.my-res-main__status-pill.pending {
+.my-res-status__pill.pending {
   background: #fdeac3;
   color: #a97712;
 }
 
-.my-res-main__status-pill.approved {
+.my-res-status__pill.approved {
   background: #d8f3fb;
   color: #0a7f9e;
 }
 
-.my-res-main__status-pill.completed {
+.my-res-status__pill.completed {
   background: #eef2f7;
   color: #73849a;
 }
 
-.my-res-main__status-pill.cancelled,
-.my-res-main__status-pill.rejected {
+.my-res-status__pill.cancelled,
+.my-res-status__pill.rejected {
   background: #fde0e0;
   color: #bf2a2a;
 }
 
-.my-res-main__ops {
+.actions {
   display: flex;
   align-items: center;
-  gap: 12rpx;
+  flex-wrap: wrap;
+  gap: 10rpx;
 }
 
-.my-res-main__detail {
-  color: #1572a8;
-  font-size: 24rpx;
-  font-weight: 800;
+.pill {
+  min-height: 52rpx;
+  padding: 0 16rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid #d9e4f2;
+  background: #ffffff;
+  color: #476183;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  font-weight: 700;
+  transition: all 0.2s ease;
 }
 
-.my-res-main__cancel {
+.pill:hover {
+  opacity: 0.92;
+  transform: translateY(-1rpx);
+  background: #f6f9fd;
+}
+
+.pill-danger {
+  border-color: #f1d3d3;
   color: #c43636;
+  background: #fff9f9;
+}
+
+.pill-danger:hover {
+  background: #fff1f1;
+}
+
+.my-res-actions__mute {
+  color: #97a6b9;
   font-size: 22rpx;
   font-weight: 700;
 }
 
 .my-res-main__pager {
-  margin-top: 18rpx;
+  margin-top: 20rpx;
   display: flex;
   justify-content: center;
   gap: 8rpx;
+  flex-wrap: wrap;
 }
 
 .my-res-main__page-btn {
-  width: 56rpx;
+  min-width: 60rpx;
   height: 56rpx;
+  padding: 0 18rpx;
   border-radius: 14rpx;
   background: #eef2f7;
   color: #61738b;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24rpx;
+  font-size: 22rpx;
   font-weight: 700;
 }
 
 .my-res-main__page-btn.active {
   background: #0a254c;
   color: #ffffff;
+}
+
+.my-res-main__page-btn.disabled {
+  opacity: 0.45;
 }
 
 /* #ifndef H5 */
@@ -628,14 +843,17 @@ export default {
   grid-template-columns: 1fr;
 }
 
-.my-res-main__thead {
+.my-res-table-grid {
+  grid-template-columns: 1fr;
+  gap: 12rpx;
+}
+
+.table-header {
   display: none;
 }
 
-.my-res-main__row {
-  grid-template-columns: 1fr;
-  gap: 10rpx;
-  padding: 14rpx;
+.table-row {
+  padding: 22rpx;
 }
 /* #endif */
 
@@ -647,19 +865,33 @@ export default {
   }
 }
 
-@media screen and (max-width: 1140px) {
+@media screen and (max-width: 1180px) {
   .my-res-page__layout {
     grid-template-columns: 1fr;
   }
 }
 
-@media screen and (max-width: 820px) {
+@media screen and (max-width: 920px) {
+  .my-res-page__head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .my-res-page__head-actions {
     width: 100%;
   }
 
   .my-res-page__new-btn {
-    flex: 1;
+    width: 100%;
+  }
+
+  .my-res-table-grid {
+    grid-template-columns: 1fr;
+    gap: 12rpx;
+  }
+
+  .table-header {
+    display: none;
   }
 }
 /* #endif */

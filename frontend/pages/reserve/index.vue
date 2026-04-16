@@ -12,167 +12,195 @@
       <view class="reserve-page__head">
         <view>
           <view class="reserve-page__title">实验室预约</view>
-          <view class="reserve-page__sub">预留您的研究空间和技术资源。</view>
+          <view class="reserve-page__sub">精简预约流程，快速锁定研究资源。</view>
         </view>
 
         <view class="reserve-page__steps">
-          <view class="reserve-page__step active"><text>1</text> 实验室与时间</view>
+          <view class="reserve-page__step active"><text>1</text> 填写申请</view>
           <view class="reserve-page__line"></view>
-          <view class="reserve-page__step"><text>2</text> 详情</view>
-          <view class="reserve-page__line"></view>
-          <view class="reserve-page__step"><text>3</text> 审核</view>
+          <view class="reserve-page__step"><text>2</text> 等待审核</view>
         </view>
       </view>
 
       <view class="reserve-page__layout">
         <view class="reserve-form">
-          <view class="reserve-form__block">
-            <view class="reserve-form__block-title">设施选择</view>
+          <view class="reserve-form__section">
+            <view class="reserve-form__section-title">设施选择</view>
             <view class="reserve-form__grid two">
               <view class="reserve-form__field">
-                <view class="reserve-form__label">选择实验室</view>
+                <view class="reserve-form__label">实验室</view>
                 <picker :range="labOptions" range-key="lab_name" :value="labIndex" @change="changeLab">
-                  <view class="reserve-form__input">{{ currentLabName }}</view>
+                  <view class="reserve-form__input reserve-form__input--picker">
+                    <text>{{ currentLabName }}</text>
+                    <text class="reserve-form__caret">▼</text>
+                  </view>
                 </picker>
               </view>
+
               <view class="reserve-form__field">
                 <view class="reserve-form__label">参与人数</view>
                 <input
                   v-model="form.participant_count"
                   class="reserve-form__input"
                   type="number"
-                  :placeholder="`最大：${maxParticipants}`"
+                  :placeholder="participantPlaceholder"
                 />
               </view>
             </view>
           </view>
 
-          <view class="reserve-form__block">
-            <view class="reserve-form__block-title">时间安排</view>
+          <view class="reserve-form__section">
+            <view class="reserve-form__section-title">时间安排</view>
             <view class="reserve-form__grid three">
               <view class="reserve-form__field">
                 <view class="reserve-form__label">预约日期</view>
-                <picker mode="date" :value="form.reservation_date" @change="setField('reservation_date', $event.detail.value)">
-                  <view class="reserve-form__input">{{ form.reservation_date }}</view>
+                <picker
+                  mode="date"
+                  :value="form.reservation_date"
+                  :start="todayDate"
+                  @change="setField('reservation_date', $event.detail.value)"
+                >
+                  <view class="reserve-form__input reserve-form__input--picker">
+                    <text>{{ form.reservation_date }}</text>
+                    <text class="reserve-form__icon">日</text>
+                  </view>
                 </picker>
               </view>
+
               <view class="reserve-form__field">
                 <view class="reserve-form__label">开始时间</view>
                 <picker mode="time" :value="form.start_time" @change="setField('start_time', $event.detail.value)">
-                  <view class="reserve-form__input">{{ form.start_time }}</view>
+                  <view class="reserve-form__input reserve-form__input--picker">
+                    <text>{{ form.start_time }}</text>
+                    <text class="reserve-form__icon">时</text>
+                  </view>
                 </picker>
               </view>
+
               <view class="reserve-form__field">
                 <view class="reserve-form__label">结束时间</view>
                 <picker mode="time" :value="form.end_time" @change="setField('end_time', $event.detail.value)">
-                  <view class="reserve-form__input">{{ form.end_time }}</view>
+                  <view class="reserve-form__input reserve-form__input--picker">
+                    <text>{{ form.end_time }}</text>
+                    <text class="reserve-form__icon">时</text>
+                  </view>
                 </picker>
               </view>
             </view>
 
-            <view class="reserve-form__availability">
-              <view class="reserve-form__availability-title">{{ form.reservation_date }} 的可用性</view>
-              <view class="reserve-form__bar">
-                <view
-                  v-for="(seg, index) in availabilitySegments"
-                  :key="index"
-                  class="reserve-form__bar-seg"
-                  :class="seg.type"
-                  :style="{ width: seg.width }"
-                ></view>
+            <view class="reserve-form__occupancy">
+              <view class="reserve-form__occupancy-title">当日占用情况</view>
+              <view class="reserve-form__occupancy-legend">
+                <view class="reserve-form__legend-item">
+                  <view class="reserve-form__legend-swatch busy"></view>
+                  <text>已占用</text>
+                </view>
+                <view class="reserve-form__legend-item">
+                  <view class="reserve-form__legend-swatch idle"></view>
+                  <text>空闲可用</text>
+                </view>
+                <view class="reserve-form__legend-item">
+                  <view class="reserve-form__legend-swatch focus"></view>
+                  <text>当前选择</text>
+                </view>
               </view>
+
+              <view class="reserve-form__timeline-wrap">
+                <view class="reserve-form__timeline">
+                  <view
+                    v-for="(seg, index) in availabilitySegments"
+                    :key="index"
+                    class="reserve-form__timeline-seg"
+                    :class="seg.type"
+                    :style="{ width: seg.width }"
+                  >
+                    <text v-if="seg.type === 'focus'" class="reserve-form__timeline-label">选中</text>
+                  </view>
+                </view>
+
+                <view class="reserve-form__timeline-ticks">
+                  <view
+                    v-for="(mark, index) in timeMarkItems"
+                    :key="`tick-${index}`"
+                    class="reserve-form__timeline-tick"
+                    :class="{ start: index === 0, end: index === timeMarkItems.length - 1 }"
+                    :style="{ left: `${mark.offset}%` }"
+                  ></view>
+                </view>
+              </view>
+
               <view class="reserve-form__marks">
-                <text>08:00</text><text>10:00</text><text>12:00</text><text>14:00</text><text>16:00</text><text>18:00</text><text>20:00</text>
+                <text
+                  v-for="(mark, index) in timeMarkItems"
+                  :key="index"
+                  class="reserve-form__mark"
+                  :class="{ start: index === 0, end: index === timeMarkItems.length - 1 }"
+                  :style="{ left: `${mark.offset}%` }"
+                >{{ mark.label }}</text>
               </view>
             </view>
           </view>
 
-          <view class="reserve-form__block">
-            <view class="reserve-form__block-title">研究目的与设备</view>
+          <view class="reserve-form__section">
+            <view class="reserve-form__section-title">预约用途</view>
             <view class="reserve-form__field">
-              <view class="reserve-form__label">用途描述</view>
               <textarea
                 v-model="form.purpose"
                 class="reserve-form__textarea"
                 maxlength="200"
-                placeholder="描述您此次实验的重点..."
+                placeholder="请简述本次实验室使用的目的与研究项目名称..."
               />
-            </view>
-
-            <view class="reserve-form__field">
-              <view class="reserve-form__label">所需设备</view>
-              <view class="reserve-form__equip-grid">
-                <view
-                  v-for="eq in equipmentOptions"
-                  :key="eq.id"
-                  class="reserve-form__equip-chip"
-                  :class="{ active: selectedEquipment.includes(eq.id) }"
-                  @click="toggleEquipment(eq.id)"
-                >
-                  {{ eq.equipment_name }}
-                </view>
-              </view>
-            </view>
-          </view>
-
-          <view class="reserve-form__block">
-            <view class="reserve-form__grid two">
-              <view class="reserve-form__field">
-                <view class="reserve-form__block-title">审批</view>
-                <picker :range="approverOptions" @change="changeApprover">
-                  <view class="reserve-form__input">{{ approverText }}</view>
-                </picker>
-              </view>
-              <view class="reserve-form__field">
-                <view class="reserve-form__block-title">文档</view>
-                <view class="reserve-form__upload">上传规程 (PDF/DOC)</view>
-              </view>
             </view>
           </view>
 
           <view class="reserve-form__actions">
-            <view class="reserve-form__btn light" @click="saveDraft">保存草稿</view>
-            <view class="reserve-form__btn light" @click="goBack">上一步</view>
-            <view class="reserve-form__btn primary" @click="submit">提交预约</view>
+            <view class="reserve-form__btn primary" @click="submit">提交预约申请</view>
           </view>
         </view>
 
         <view class="reserve-side">
           <view class="reserve-side__summary">
-            <view class="reserve-side__title">预约摘要</view>
-            <view class="reserve-side__item">
-              <view class="reserve-side__label">LOCATION</view>
-              <view class="reserve-side__value">{{ summaryLocation }}</view>
+            <view class="reserve-side__summary-title">预约摘要</view>
+
+            <view class="reserve-side__summary-item">
+              <view class="reserve-side__summary-icon">地</view>
+              <view class="reserve-side__summary-content">
+                <view class="reserve-side__summary-label">地点</view>
+                <view class="reserve-side__summary-value">{{ summaryLocation }}</view>
+              </view>
             </view>
-            <view class="reserve-side__item">
-              <view class="reserve-side__label">TIME WINDOW</view>
-              <view class="reserve-side__value">{{ summaryTime }}</view>
+
+            <view class="reserve-side__summary-item">
+              <view class="reserve-side__summary-icon">时</view>
+              <view class="reserve-side__summary-content">
+                <view class="reserve-side__summary-label">时间</view>
+                <view class="reserve-side__summary-value">{{ summaryTime }}</view>
+              </view>
             </view>
-            <view class="reserve-side__item">
-              <view class="reserve-side__label">RESOURCES</view>
-              <view class="reserve-side__value">{{ summaryResource }}</view>
-            </view>
-            <view class="reserve-side__status">
-              <text>STATUS</text>
-              <text class="pill">NEW ENTRY</text>
+
+            <view class="reserve-side__summary-item">
+              <view class="reserve-side__summary-icon">人</view>
+              <view class="reserve-side__summary-content">
+                <view class="reserve-side__summary-label">资源概览</view>
+                <view class="reserve-side__summary-value">{{ summaryResource }}</view>
+              </view>
             </view>
           </view>
 
-          <view class="reserve-side__guide">
-            <view class="reserve-side__guide-title">实验室指南</view>
-            <view class="reserve-side__guide-item" v-for="(item, idx) in guideItems" :key="idx">{{ item }}</view>
-            <view class="reserve-side__guide-cover"></view>
+          <view class="reserve-side__notice">
+            <view class="reserve-side__notice-title">预约须知</view>
+            <view v-for="(item, index) in noticeItems" :key="index" class="reserve-side__notice-item">
+              <view class="reserve-side__notice-dot"></view>
+              <view class="reserve-side__notice-text">{{ item }}</view>
+            </view>
           </view>
         </view>
       </view>
     </view>
-
-    <site-footer />
   </view>
 </template>
 
 <script>
-import SiteFooter from '../../components/site-footer.vue'
 import StudentTopNav from '../../components/student-top-nav.vue'
 import UserTopNav from '../../components/user-top-nav.vue'
 import { api } from '../../api/index'
@@ -185,15 +213,119 @@ function todayString() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
 
+function currentMinuteValue() {
+  const now = new Date()
+  return now.getHours() * 60 + now.getMinutes()
+}
+
+function toMinuteValue(raw) {
+  if (!raw) return 0
+  const safe = String(raw).slice(0, 5)
+  const [h = 0, m = 0] = safe.split(':').map((item) => Number(item || 0))
+  return h * 60 + m
+}
+
+function toTimeLabel(minutes) {
+  const safe = Math.max(0, minutes)
+  const h = Math.floor(safe / 60)
+  const m = safe % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+function mergeBusyRanges(ranges) {
+  if (!ranges.length) return []
+  const sorted = ranges
+    .filter((item) => item.end > item.start)
+    .sort((a, b) => a.start - b.start)
+
+  const merged = [sorted[0]]
+  for (let index = 1; index < sorted.length; index += 1) {
+    const current = sorted[index]
+    const last = merged[merged.length - 1]
+    if (current.start <= last.end) {
+      last.end = Math.max(last.end, current.end)
+    } else {
+      merged.push({ start: current.start, end: current.end, type: 'busy' })
+    }
+  }
+  return merged
+}
+
+function buildSegments(openMinute, closeMinute, reservations, selectedStart, selectedEnd, blockedBefore = null) {
+  const total = Math.max(1, closeMinute - openMinute)
+  const busyRanges = (reservations || [])
+    .filter((item) => !['cancelled', 'rejected'].includes(item.status))
+    .map((item) => ({
+      start: Math.max(openMinute, toMinuteValue(item.start_time)),
+      end: Math.min(closeMinute, toMinuteValue(item.end_time)),
+      type: 'busy'
+    }))
+
+  if (typeof blockedBefore === 'number') {
+    const disabledEnd = Math.min(closeMinute, Math.max(openMinute, blockedBefore))
+    if (disabledEnd > openMinute) {
+      busyRanges.push({ start: openMinute, end: disabledEnd, type: 'busy' })
+    }
+  }
+
+  const mergedBusyRanges = mergeBusyRanges(busyRanges)
+  const baseSegments = []
+  let cursor = openMinute
+
+  mergedBusyRanges.forEach((item) => {
+    if (item.start > cursor) {
+      baseSegments.push({ start: cursor, end: item.start, type: 'idle' })
+    }
+    baseSegments.push(item)
+    cursor = Math.max(cursor, item.end)
+  })
+
+  if (cursor < closeMinute) {
+    baseSegments.push({ start: cursor, end: closeMinute, type: 'idle' })
+  }
+
+  if (!baseSegments.length) {
+    baseSegments.push({ start: openMinute, end: closeMinute, type: 'idle' })
+  }
+
+  const selectedValid = selectedEnd > selectedStart
+  const result = []
+
+  baseSegments.forEach((seg) => {
+    if (!selectedValid || seg.type !== 'idle' || seg.end <= selectedStart || seg.start >= selectedEnd) {
+      result.push(seg)
+      return
+    }
+
+    if (seg.start < selectedStart) {
+      result.push({ start: seg.start, end: selectedStart, type: 'idle' })
+    }
+
+    result.push({
+      start: Math.max(seg.start, selectedStart),
+      end: Math.min(seg.end, selectedEnd),
+      type: 'focus'
+    })
+
+    if (seg.end > selectedEnd) {
+      result.push({ start: selectedEnd, end: seg.end, type: 'idle' })
+    }
+  })
+
+  return result
+    .filter((seg) => seg.end > seg.start)
+    .map((seg) => ({
+      type: seg.type,
+      width: `${((seg.end - seg.start) / total) * 100}%`
+    }))
+}
+
 export default {
-  components: { SiteFooter, StudentTopNav, UserTopNav },
+  components: { StudentTopNav, UserTopNav },
   data() {
     return {
       labIndex: 0,
       labOptions: [],
-      selectedEquipment: [],
-      approverOptions: ['系统自动分配', '实验室管理员', '系统管理员'],
-      approverText: '系统自动分配',
       schedule: {},
       form: {
         campus_id: '',
@@ -210,43 +342,84 @@ export default {
     currentLab() {
       return this.labOptions[this.labIndex] || {}
     },
+    todayDate() {
+      return todayString()
+    },
+    participantPlaceholder() {
+      return this.maxParticipants ? `请输入人数（上限 ${this.maxParticipants} 人）` : '请输入人数'
+    },
     currentLabName() {
       return this.currentLab.lab_name || '请选择实验室'
     },
     maxParticipants() {
-      return this.currentLab.capacity || 0
-    },
-    equipmentOptions() {
-      return this.currentLab.equipment || []
+      return Number(this.currentLab.capacity || 0)
     },
     summaryLocation() {
-      return `${this.currentLab.campus_name || '校区待定'} · ${this.currentLab.location || '位置待定'}`
+      const campus = this.currentLab.campus_name || '校区待定'
+      const location = this.currentLab.location || '位置待定'
+      return `${campus} · ${location}`
     },
     summaryTime() {
-      return `${this.form.reservation_date} ${this.form.start_time} - ${this.form.end_time}`
+      const start = this.form.start_time || '--:--'
+      const end = this.form.end_time || '--:--'
+      const duration = this.durationText ? ` (${this.durationText})` : ''
+      return `${this.form.reservation_date} ${start} - ${end}${duration}`
+    },
+    durationText() {
+      const start = toMinuteValue(this.form.start_time)
+      const end = toMinuteValue(this.form.end_time)
+      if (end <= start) return ''
+      const total = end - start
+      const hours = Math.floor(total / 60)
+      const mins = total % 60
+      if (hours && mins) return `${hours}小时${mins}分钟`
+      if (hours) return `${hours}小时`
+      return `${mins}分钟`
     },
     summaryResource() {
-      const deviceCount = this.selectedEquipment.length
-      return `${Number(this.form.participant_count || 0)} 名参与者 · ${deviceCount} 台设备`
+      return `预计参与人数：${Number(this.form.participant_count || 0)} 名`
     },
-    guideItems() {
+    noticeItems() {
       return [
-        `${this.form.reservation_date} 的可用性会在提交时二次校验`,
-        '请确保参与人数不超过实验室容量',
-        '特殊设备请提前在用途描述中说明'
+        '请提前 15 分钟到达实验室进行安全签到。',
+        '实验室严禁携带食物和饮料进入，请放在储物区。',
+        '如需取消预约，请至少提前 2 小时通过系统撤回。',
+        '使用过程中请务必穿戴好必要的防护装备。'
       ]
     },
     availabilitySegments() {
-      const base = [
-        { type: 'busy', width: '20%' },
-        { type: 'idle', width: '10%' },
-        { type: 'busy', width: '15%' },
-        { type: 'focus', width: '15%' },
-        { type: 'idle', width: '40%' }
-      ]
-      const list = this.schedule?.reservations || []
-      if (!list.length) return base
-      return base.map((item, index) => (index % 2 === 0 ? item : { ...item, type: 'idle' }))
+      const openMinute = toMinuteValue(this.schedule?.open_time || this.currentLab.open_time || '08:00')
+      const closeMinute = toMinuteValue(this.schedule?.close_time || this.currentLab.close_time || '21:00')
+      const selectedStart = toMinuteValue(this.form.start_time)
+      const selectedEnd = toMinuteValue(this.form.end_time)
+      const reservations = Array.isArray(this.schedule?.reservations) ? this.schedule.reservations : []
+      const blockedBefore = this.form.reservation_date === todayString() ? currentMinuteValue() + 1 : null
+      return buildSegments(openMinute, closeMinute, reservations, selectedStart, selectedEnd, blockedBefore)
+    },
+    timeMarkItems() {
+      const openMinute = toMinuteValue(this.schedule?.open_time || this.currentLab.open_time || '08:00')
+      const closeMinute = toMinuteValue(this.schedule?.close_time || this.currentLab.close_time || '21:00')
+      const marks = [openMinute]
+      let cursor = Math.ceil(openMinute / 60) * 60
+
+      if (cursor === openMinute) {
+        cursor += 60
+      }
+
+      while (cursor < closeMinute) {
+        marks.push(cursor)
+        cursor += 60
+      }
+
+      if (marks[marks.length - 1] !== closeMinute) {
+        marks.push(closeMinute)
+      }
+
+      const total = Math.max(1, closeMinute - openMinute)
+      return marks.map((value, index) => ({
+        label: toTimeLabel(value),
+        offset: index === 0 ? 0 : index === marks.length - 1 ? 100 : ((value - openMinute) / total) * 100
+      }))
     }
   },
   onLoad(options) {
@@ -262,11 +435,84 @@ export default {
     await this.loadLabs()
   },
   methods: {
+    getTimeBounds() {
+      const openMinute = toMinuteValue(this.schedule?.open_time || this.currentLab.open_time || '08:00')
+      const closeMinute = toMinuteValue(this.schedule?.close_time || this.currentLab.close_time || '21:00')
+      const isToday = this.form.reservation_date === todayString()
+      const earliestStart = isToday ? Math.max(openMinute, currentMinuteValue() + 1) : openMinute
+      return { openMinute, closeMinute, isToday, earliestStart }
+    },
+    ensureValidTimeRange(showMessage = false) {
+      const today = todayString()
+      let message = ''
+
+      if (this.form.reservation_date < today) {
+        this.form.reservation_date = today
+        message = '不能选择今天之前的日期'
+      }
+
+      const { openMinute, closeMinute, isToday, earliestStart } = this.getTimeBounds()
+      const defaultDuration = 90
+      const maxStart = Math.max(openMinute, closeMinute - 1)
+      let start = toMinuteValue(this.form.start_time || '00:00')
+      let end = toMinuteValue(this.form.end_time || '00:00')
+      const originalDuration = end > start ? end - start : defaultDuration
+
+      if (isToday && earliestStart >= closeMinute) {
+        this.form.start_time = toTimeLabel(maxStart)
+        this.form.end_time = toTimeLabel(closeMinute)
+        if (!message) message = '当前时间之后已没有可预约时段'
+        if (showMessage) {
+          uni.showToast({ title: message, icon: 'none' })
+        }
+        return
+      }
+
+      if (isToday && start < earliestStart) {
+        start = Math.min(Math.max(earliestStart, openMinute), maxStart)
+        this.form.start_time = toTimeLabel(start)
+        if (!message) {
+          message = '今天只能预约当前时间之后的时段'
+        }
+      }
+
+      if (start < openMinute) {
+        start = openMinute
+        this.form.start_time = toTimeLabel(start)
+      }
+
+      if (start >= closeMinute) {
+        start = Math.max(openMinute, closeMinute - Math.min(defaultDuration, Math.max(30, closeMinute - openMinute)))
+        end = closeMinute
+        this.form.start_time = toTimeLabel(start)
+        this.form.end_time = toTimeLabel(end)
+        if (!message) {
+          message = '当前时间之后已没有可预约时段'
+        }
+      } else {
+        if (end <= start) {
+          end = Math.min(closeMinute, start + originalDuration)
+        }
+        if (end <= start) {
+          end = Math.min(closeMinute, start + 30)
+        }
+        if (end > closeMinute) {
+          end = closeMinute
+        }
+        if (end <= start) {
+          end = Math.min(closeMinute, start + 1)
+        }
+        this.form.end_time = toTimeLabel(end)
+      }
+
+      if (showMessage && message) {
+        uni.showToast({ title: message, icon: 'none' })
+      }
+    },
     async loadLabs() {
       try {
         const list = await api.labs(this.form.campus_id ? { campus_id: this.form.campus_id } : {})
         this.labOptions = Array.isArray(list) ? list : []
-
         if (!this.labOptions.length) return
 
         const targetIndex = this.form.lab_id
@@ -276,7 +522,8 @@ export default {
         this.labIndex = targetIndex >= 0 ? targetIndex : 0
         this.syncLabToForm()
         await this.loadSchedule()
-      } catch (error) {
+        this.ensureValidTimeRange(false)
+      } catch (_error) {
         this.labOptions = []
       }
     },
@@ -284,7 +531,7 @@ export default {
       if (!this.form.lab_id) return
       try {
         this.schedule = await api.labSchedule(this.form.lab_id, this.form.reservation_date)
-      } catch (error) {
+      } catch (_error) {
         this.schedule = {}
       }
     },
@@ -296,50 +543,76 @@ export default {
       if (!this.form.participant_count || Number(this.form.participant_count) <= 0) {
         this.form.participant_count = '1'
       }
-      this.selectedEquipment = []
     },
     async changeLab(event) {
       this.labIndex = Number(event.detail.value || 0)
       this.syncLabToForm()
       await this.loadSchedule()
+      this.ensureValidTimeRange(true)
     },
     async setField(key, value) {
       this.form[key] = value
       if (key === 'reservation_date' && this.form.lab_id) {
         await this.loadSchedule()
       }
-    },
-    toggleEquipment(id) {
-      if (this.selectedEquipment.includes(id)) {
-        this.selectedEquipment = this.selectedEquipment.filter((item) => item !== id)
-      } else {
-        this.selectedEquipment = this.selectedEquipment.concat(id)
-      }
-    },
-    changeApprover(event) {
-      this.approverText = this.approverOptions[event.detail.value] || this.approverOptions[0]
-    },
-    saveDraft() {
-      uni.showToast({ title: '草稿已保存', icon: 'none' })
+      this.ensureValidTimeRange(true)
     },
     async submit() {
       if (!this.form.lab_id) {
         uni.showToast({ title: '请选择实验室', icon: 'none' })
         return
       }
+
       if (!this.form.purpose) {
         uni.showToast({ title: '请填写预约用途', icon: 'none' })
         return
       }
-      await api.createReservation({
+
+      const participantCount = Number(this.form.participant_count || 0)
+      if (participantCount <= 0) {
+        uni.showToast({ title: '请输入有效的参与人数', icon: 'none' })
+        return
+      }
+
+      if (this.maxParticipants && participantCount > this.maxParticipants) {
+        uni.showToast({ title: `参与人数不能超过 ${this.maxParticipants} 人`, icon: 'none' })
+        return
+      }
+
+      const today = todayString()
+      const startMinute = toMinuteValue(this.form.start_time)
+      const endMinute = toMinuteValue(this.form.end_time)
+      const { openMinute, closeMinute, isToday, earliestStart } = this.getTimeBounds()
+
+      if (this.form.reservation_date < today) {
+        uni.showToast({ title: '不能预约今天之前的日期', icon: 'none' })
+        return
+      }
+
+      if (startMinute < openMinute || endMinute > closeMinute || endMinute <= startMinute) {
+        uni.showToast({ title: '请选择有效的预约时间段', icon: 'none' })
+        return
+      }
+
+      if (isToday && startMinute < earliestStart) {
+        uni.showToast({ title: '今天只能预约当前时间之后的时段', icon: 'none' })
+        return
+      }
+
+      const createdReservation = await api.createReservation({
         ...this.form,
-        participant_count: Number(this.form.participant_count)
+        participant_count: participantCount
       })
+
       uni.showToast({ title: '预约已提交', icon: 'success' })
-      setTimeout(() => openPage(routes.myReservations, { replace: true }), 500)
-    },
-    goBack() {
-      uni.navigateBack()
+      setTimeout(
+        () =>
+          openPage(
+            createdReservation?.id ? routes.reservationDetail : routes.myReservations,
+            createdReservation?.id ? { query: { id: createdReservation.id }, replace: true } : { replace: true }
+          ),
+        500
+      )
     }
   }
 }
@@ -348,106 +621,119 @@ export default {
 <style lang="scss">
 .reserve-page {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
   background:
-    radial-gradient(circle at top right, rgba(65, 190, 253, 0.13), transparent 24%),
-    linear-gradient(180deg, #f7f9fc 0%, #eef2f7 100%);
+    radial-gradient(circle at top right, rgba(100, 184, 232, 0.16), transparent 24%),
+    linear-gradient(180deg, #f7f9fc 0%, #eef3f9 100%);
 }
 
 .reserve-page__shell {
-  flex: 1;
-  padding: 30rpx 32rpx 48rpx;
+  padding: 28rpx 32rpx 54rpx;
 }
 
 .reserve-page__head {
   display: flex;
-  justify-content: space-between;
   align-items: flex-start;
-  gap: 20rpx;
+  justify-content: space-between;
+  gap: 24rpx;
 }
 
 .reserve-page__title {
+  color: #082247;
   font-size: 68rpx;
-  color: #061f44;
+  line-height: 1.04;
   font-weight: 800;
+  letter-spacing: -1.2rpx;
 }
 
 .reserve-page__sub {
-  margin-top: 8rpx;
-  color: #697a91;
-  font-size: 26rpx;
+  margin-top: 10rpx;
+  color: #5d6f88;
+  font-size: 27rpx;
 }
 
 .reserve-page__steps {
-  margin-top: 8rpx;
+  margin-top: 10rpx;
+  padding: 12rpx 18rpx;
+  border-radius: 22rpx;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1rpx solid rgba(200, 210, 224, 0.55);
   display: flex;
   align-items: center;
-  gap: 12rpx;
+  gap: 14rpx;
 }
 
 .reserve-page__step {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 10rpx;
-  color: #5e6e86;
-  font-size: 22rpx;
+  color: #7a8aa2;
+  font-size: 24rpx;
   font-weight: 700;
 }
 
 .reserve-page__step text {
   width: 42rpx;
   height: 42rpx;
-  border-radius: 999rpx;
+  border-radius: 50%;
+  background: #eef3f9;
+  color: #667a99;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #e3e9f2;
+  font-size: 22rpx;
+  font-weight: 800;
 }
 
 .reserve-page__step.active {
-  color: #0c2851;
+  color: #082247;
 }
 
 .reserve-page__step.active text {
-  background: #0c2851;
-  color: #fff;
+  background: #082b63;
+  color: #ffffff;
 }
 
 .reserve-page__line {
-  width: 52rpx;
+  width: 70rpx;
   height: 2rpx;
-  background: #ccd4e0;
+  background: #d1dae6;
 }
 
 .reserve-page__layout {
-  margin-top: 20rpx;
+  margin-top: 28rpx;
   display: grid;
-  grid-template-columns: minmax(0, 1.9fr) minmax(300rpx, 0.9fr);
+  grid-template-columns: minmax(0, 1fr) 800rpx;
   gap: 24rpx;
+  align-items: start;
+}
+
+.reserve-form,
+.reserve-side__summary,
+.reserve-side__notice {
+  border-radius: 30rpx;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1rpx solid rgba(223, 231, 242, 0.92);
+  box-shadow: 0 18rpx 42rpx rgba(16, 43, 79, 0.06);
 }
 
 .reserve-form {
-  border-radius: 28rpx;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1rpx solid rgba(197, 198, 207, 0.3);
-  padding: 22rpx;
+  padding: 30rpx;
 }
 
-.reserve-form__block {
-  margin-bottom: 20rpx;
+.reserve-form__section + .reserve-form__section {
+  margin-top: 30rpx;
 }
 
-.reserve-form__block-title {
-  color: #0b284f;
-  font-size: 40rpx;
+.reserve-form__section-title {
+  color: #102b4f;
+  font-size: 28rpx;
   font-weight: 800;
 }
 
 .reserve-form__grid {
-  margin-top: 12rpx;
+  margin-top: 18rpx;
   display: grid;
-  gap: 12rpx;
+  gap: 16rpx;
 }
 
 .reserve-form__grid.two {
@@ -455,280 +741,306 @@ export default {
 }
 
 .reserve-form__grid.three {
-  grid-template-columns: 1.2fr 0.8fr 0.8fr;
+  grid-template-columns: 1.1fr 0.75fr 0.75fr;
+}
+
+.reserve-form__field {
+  min-width: 0;
 }
 
 .reserve-form__label {
-  color: #6a7b92;
+  margin-bottom: 10rpx;
+  color: #667b96;
   font-size: 21rpx;
-  margin-bottom: 8rpx;
+  font-weight: 700;
 }
 
 .reserve-form__input {
-  min-height: 68rpx;
-  border-radius: 14rpx;
-  background: #eff3f8;
+  width: 100%;
+  height: 72rpx;
   padding: 0 18rpx;
+  border-radius: 18rpx;
+  background: #f1f5fa;
+  color: #233857;
+  font-size: 25rpx;
+  box-sizing: border-box;
+}
+
+.reserve-form__input--picker {
   display: flex;
   align-items: center;
-  color: #20324e;
-  font-size: 24rpx;
+  justify-content: space-between;
 }
 
-.reserve-form__textarea {
-  min-height: 120rpx;
-  border-radius: 14rpx;
-  background: #eff3f8;
-  padding: 16rpx 18rpx;
-  width: 100%;
-  box-sizing: border-box;
-  color: #20324e;
-  font-size: 24rpx;
-}
-
-.reserve-form__availability {
-  margin-top: 12rpx;
-  border-radius: 14rpx;
-  background: #f0f4f9;
-  padding: 14rpx;
-}
-
-.reserve-form__availability-title {
-  color: #4d5f79;
+.reserve-form__caret,
+.reserve-form__icon {
+  color: #6e8099;
   font-size: 22rpx;
   font-weight: 700;
 }
 
-.reserve-form__bar {
-  margin-top: 10rpx;
-  height: 48rpx;
+.reserve-form__textarea {
+  width: 100%;
+  min-height: 180rpx;
+  border-radius: 18rpx;
+  padding: 20rpx;
+  background: #f1f5fa;
+  color: #273a57;
+  font-size: 24rpx;
+  box-sizing: border-box;
+}
+
+.reserve-form__occupancy {
+  margin-top: 18rpx;
+  border-radius: 22rpx;
+  padding: 18rpx;
+  background: #fbfdff;
+  border: 1rpx solid #e3ebf4;
+}
+
+.reserve-form__occupancy-title {
+  color: #102b4f;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.reserve-form__occupancy-legend {
+  margin-top: 12rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18rpx;
+}
+
+.reserve-form__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  color: #60728d;
+  font-size: 19rpx;
+  font-weight: 700;
+}
+
+.reserve-form__legend-swatch {
+  width: 22rpx;
+  height: 22rpx;
   border-radius: 999rpx;
+  flex-shrink: 0;
+}
+
+.reserve-form__legend-swatch.busy {
+  background: #93a1b6;
+}
+
+.reserve-form__legend-swatch.idle {
+  background: #e6f6ec;
+}
+
+.reserve-form__legend-swatch.focus {
+  background: linear-gradient(135deg, #2f7ea5, #3f96bf);
+}
+
+.reserve-form__timeline-wrap {
+  position: relative;
+  margin-top: 16rpx;
+}
+
+.reserve-form__timeline {
+  height: 66rpx;
+  border-radius: 18rpx;
   overflow: hidden;
   display: flex;
+  background: #dfe6ef;
 }
 
-.reserve-form__bar-seg {
+.reserve-form__timeline-ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.reserve-form__timeline-tick {
+  position: absolute;
+  top: 0;
+  width: 2rpx;
+  height: 66rpx;
+  background: rgba(255, 255, 255, 0.72);
+  transform: translateX(-50%);
+}
+
+.reserve-form__timeline-tick.start {
+  transform: none;
+}
+
+.reserve-form__timeline-tick.end {
+  transform: translateX(-100%);
+}
+
+.reserve-form__timeline-seg {
   height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.reserve-form__bar-seg.busy {
-  background: #b9c1cc;
+.reserve-form__timeline-seg.busy {
+  background: #93a1b6;
 }
 
-.reserve-form__bar-seg.idle {
-  background: #d8dee7;
+.reserve-form__timeline-seg.idle {
+  background: #e6f6ec;
 }
 
-.reserve-form__bar-seg.focus {
-  background: #45b3ef;
+.reserve-form__timeline-seg.focus {
+  background: linear-gradient(135deg, #2f7ea5, #3f96bf);
+}
+
+.reserve-form__timeline-label {
+  color: #ffffff;
+  font-size: 19rpx;
+  font-weight: 800;
 }
 
 .reserve-form__marks {
-  margin-top: 8rpx;
-  display: flex;
-  justify-content: space-between;
-  color: #5f7088;
+  position: relative;
+  margin-top: 12rpx;
+  min-height: 26rpx;
+}
+
+.reserve-form__mark {
+  position: absolute;
+  top: 0;
+  color: #61738f;
   font-size: 18rpx;
+  line-height: 1;
+  transform: translateX(-50%);
+  white-space: nowrap;
 }
 
-.reserve-form__equip-grid {
-  margin-top: 8rpx;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10rpx;
+.reserve-form__mark.start {
+  transform: none;
 }
 
-.reserve-form__equip-chip {
-  min-height: 58rpx;
-  border-radius: 12rpx;
-  border: 1rpx solid #d8e1ec;
-  background: #f2f6fb;
-  color: #314965;
-  font-size: 22rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.reserve-form__equip-chip.active {
-  background: #dfefff;
-  border-color: #90c5ef;
-  color: #0f3869;
-}
-
-.reserve-form__upload {
-  min-height: 110rpx;
-  border-radius: 14rpx;
-  border: 2rpx dashed #c8d3e2;
-  color: #6d7f97;
-  font-size: 23rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f5f8fc;
+.reserve-form__mark.end {
+  transform: translateX(-100%);
 }
 
 .reserve-form__actions {
-  margin-top: 10rpx;
-  border-top: 1rpx solid rgba(197, 198, 207, 0.35);
-  padding-top: 16rpx;
+  margin-top: 34rpx;
   display: flex;
   justify-content: flex-end;
-  gap: 12rpx;
 }
 
 .reserve-form__btn {
-  min-width: 138rpx;
-  height: 70rpx;
-  border-radius: 16rpx;
-  padding: 0 22rpx;
+  min-width: 210rpx;
+  height: 76rpx;
+  border-radius: 20rpx;
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 27rpx;
+  font-weight: 800;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.reserve-form__btn.primary {
+  background: linear-gradient(135deg, #082b63, #123f83);
+  color: #ffffff;
+  box-shadow: 0 16rpx 34rpx rgba(8, 43, 99, 0.18);
+}
+
+.reserve-side {
+  display: grid;
+  gap: 22rpx;
+}
+
+.reserve-side__summary {
+  padding: 28rpx;
+  background: linear-gradient(180deg, #082555 0%, #0b2c63 100%);
+  color: #ffffff;
+}
+
+.reserve-side__summary-title {
+  font-size: 30rpx;
+  font-weight: 800;
+}
+
+.reserve-side__summary-item {
+  margin-top: 22rpx;
+  display: grid;
+  grid-template-columns: 52rpx minmax(0, 1fr);
+  gap: 14rpx;
+  align-items: start;
+}
+
+.reserve-side__summary-icon {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 16rpx;
+  background: rgba(255, 255, 255, 0.12);
+  display: flex;
   align-items: center;
   justify-content: center;
   font-size: 24rpx;
   font-weight: 800;
 }
 
-.reserve-form__btn.light {
-  background: #edf2f8;
-  color: #3e4f67;
+.reserve-side__summary-label {
+  color: rgba(194, 214, 243, 0.86);
+  font-size: 19rpx;
+  font-weight: 700;
 }
 
-.reserve-form__btn.primary {
-  background: #0a254c;
-  color: #edf5ff;
-}
-
-.reserve-side {
-  display: grid;
-  gap: 16rpx;
-  align-content: start;
-}
-
-.reserve-side__summary {
-  border-radius: 24rpx;
-  background: linear-gradient(170deg, #07214a, #041636);
-  color: #d4e5ff;
-  padding: 18rpx;
-}
-
-.reserve-side__title {
-  font-size: 44rpx;
-  color: #ffffff;
-  font-weight: 800;
-}
-
-.reserve-side__item {
-  margin-top: 14rpx;
-}
-
-.reserve-side__label {
-  color: #46c6ff;
-  font-size: 20rpx;
-  letter-spacing: 1rpx;
-}
-
-.reserve-side__value {
+.reserve-side__summary-value {
   margin-top: 6rpx;
-  color: #d7e6fb;
   font-size: 23rpx;
-  line-height: 1.5;
+  line-height: 1.55;
+  font-weight: 700;
 }
 
-.reserve-side__status {
+.reserve-side__notice {
+  padding: 28rpx;
+}
+
+.reserve-side__notice-title {
+  color: #102b4f;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.reserve-side__notice-item {
   margin-top: 18rpx;
-  padding-top: 12rpx;
-  border-top: 1rpx solid rgba(108, 146, 197, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: #8ba6ca;
-  font-size: 21rpx;
+  display: grid;
+  grid-template-columns: 12rpx minmax(0, 1fr);
+  gap: 12rpx;
+  align-items: start;
 }
 
-.reserve-side__status .pill {
-  min-height: 34rpx;
+.reserve-side__notice-dot {
+  width: 12rpx;
+  height: 12rpx;
   border-radius: 999rpx;
-  padding: 0 12rpx;
-  display: inline-flex;
-  align-items: center;
-  background: #35c8ff;
-  color: #0a254c;
-  font-size: 18rpx;
-  font-weight: 800;
-}
-
-.reserve-side__guide {
-  border-radius: 22rpx;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1rpx solid rgba(197, 198, 207, 0.28);
-  padding: 16rpx;
-}
-
-.reserve-side__guide-title {
-  color: #0b274d;
-  font-size: 38rpx;
-  font-weight: 800;
-}
-
-.reserve-side__guide-item {
+  background: #3f96bf;
   margin-top: 10rpx;
-  color: #5d6f87;
+}
+
+.reserve-side__notice-text {
+  color: #5d6f88;
   font-size: 22rpx;
-  line-height: 1.6;
+  line-height: 1.7;
 }
 
-.reserve-side__guide-cover {
-  margin-top: 14rpx;
-  height: 142rpx;
-  border-radius: 14rpx;
-  background: linear-gradient(135deg, #74c2df, #3f6e90);
-}
-
-/* #ifndef H5 */
-.reserve-page__shell {
-  padding-left: 24rpx;
-  padding-right: 24rpx;
-}
-
-.reserve-page__head {
-  flex-direction: column;
-}
-
-.reserve-page__layout {
-  grid-template-columns: 1fr;
-}
-
-.reserve-form__grid.two,
-.reserve-form__grid.three,
-.reserve-form__equip-grid {
-  grid-template-columns: 1fr;
-}
-
-.reserve-form__actions {
-  flex-wrap: wrap;
-  justify-content: flex-start;
-}
-/* #endif */
-
-/* #ifdef H5 */
-@media screen and (min-width: 1500px) {
-  .reserve-page__shell {
-    padding-left: 56rpx;
-    padding-right: 56rpx;
+@media (max-width: 960px) {
+  .reserve-page__head {
+    flex-direction: column;
   }
-}
 
-@media screen and (max-width: 1100px) {
   .reserve-page__layout {
     grid-template-columns: 1fr;
   }
-}
 
-@media screen and (max-width: 820px) {
-  .reserve-page__steps {
-    display: none;
+  .reserve-form__grid.two,
+  .reserve-form__grid.three {
+    grid-template-columns: 1fr;
   }
 }
-/* #endif */
 </style>
