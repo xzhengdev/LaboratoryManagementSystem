@@ -8,43 +8,43 @@
     <user-top-nav active="campuses" />
     <!-- #endif -->
 
-    <view class="campus-page__body">
-      <view class="campus-page__shell">
-        <view class="campus-page__hero">
-          <view class="campus-page__hero-title">我们的校区</view>
-          <view class="campus-page__hero-sub">
-            探索三个校区的实验室资源与开放状态，选择目标校区后可快速进入预约流程。
-          </view>
+    <view class="campus-page__shell">
+      <view class="campus-page__hero">
+        <view class="campus-page__hero-glow campus-page__hero-glow--left"></view>
+        <view class="campus-page__hero-glow campus-page__hero-glow--right"></view>
+        <view class="campus-page__hero-title">探索我们的校区</view>
+        <view class="campus-page__hero-sub">
+          浏览各校区实验室资源与开放状态，选择目标校区快速进入预约流程
         </view>
+      </view>
 
-        <view class="campus-page__grid">
-          <view
-            v-for="(item, index) in campuses"
-            :key="item.id || item.name"
-            class="campus-page__card"
-            :class="`campus-page__card--${index + 1}`"
-          >
-            <view class="campus-page__cover" :style="{ background: item.cover }">
-              <image v-if="item.cover_url" class="campus-page__cover-img" :src="item.cover_url" mode="aspectFill" />
-              <view class="campus-page__cover-mask"></view>
+      <view class="campus-page__grid">
+        <view
+          v-for="(item, index) in campuses"
+          :key="item.id || item.name"
+          class="campus-page__card"
+          :class="`campus-page__card--${index + 1}`"
+        >
+          <view class="campus-page__cover" :style="{ background: item.cover }">
+            <image v-if="item.cover_url" class="campus-page__cover-img" :src="item.cover_url" mode="widthFix" />
+            <view class="campus-page__cover-mask"></view>
+          </view>
+
+          <view class="campus-page__card-body">
+            <view class="campus-page__card-main">
+              <view class="campus-page__card-left">
+                <view class="campus-page__pill">{{ item.badge }}</view>
+                <view class="campus-page__card-title">{{ item.name }}</view>
+                <view class="campus-page__card-desc">{{ item.desc }}</view>
+              </view>
+              <view class="campus-page__card-right">
+                <view class="campus-page__count">{{ item.labCount }}</view>
+                <view class="campus-page__count-label">可用实验室</view>
+              </view>
             </view>
+            <view class="campus-page__card-actions">
+              <view class="campus-page__enter-btn" @tap="enterCampus(item)">进入此校区</view>
 
-            <view class="campus-page__card-body">
-              <view class="campus-page__card-main">
-                <view class="campus-page__card-left">
-                  <view class="campus-page__pill">{{ item.badge }}</view>
-                  <view class="campus-page__card-title">{{ item.name }}</view>
-                  <view class="campus-page__card-desc">{{ item.desc }}</view>
-                </view>
-                <view class="campus-page__card-right">
-                  <view class="campus-page__count">{{ item.labCount }}</view>
-                  <view class="campus-page__count-label">可用实验室</view>
-                </view>
-              </view>
-              <view class="campus-page__card-actions">
-                <view class="campus-page__enter-btn" @tap="enterCampus(item)">进入此校区</view>
-
-              </view>
             </view>
           </view>
         </view>
@@ -153,77 +153,103 @@ export default {
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(circle at top right, rgba(65, 190, 253, 0.14), transparent 26%),
-    linear-gradient(180deg, #f7f9fc 0%, #eef2f7 100%);
+    radial-gradient(circle at 12% 14%, rgba(109, 179, 230, 0.25), transparent 26%),
+    radial-gradient(circle at 88% 18%, rgba(173, 208, 240, 0.26), transparent 24%),
+    linear-gradient(180deg, #edf5fc 0%, #dceaf7 100%);
 }
 
-.campus-page__body {
-  flex: 1;
-  padding: 36rpx 0 80rpx;
-}
 
 .campus-page__shell {
   width: 100%;
-  padding: 0 32rpx;
   box-sizing: border-box;
 }
 
+.campus-page__hero {
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  border-radius: 24rpx;
+  padding: 100rpx 24rpx 32rpx;
+  background: linear-gradient(180deg, rgba(229, 240, 250, 0.85), rgba(226, 238, 250, 0.58));
+}
+
+.campus-page__hero-glow {
+  position: absolute;
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: 999rpx;
+  filter: blur(18rpx);
+  pointer-events: none;
+}
+
+.campus-page__hero-glow--left {
+  left: 180rpx;
+  top: 42rpx;
+  background: rgba(150, 206, 244, 0.56);
+}
+
+.campus-page__hero-glow--right {
+  right: 180rpx;
+  top: 40rpx;
+  background: rgba(184, 199, 236, 0.5);
+}
+
 .campus-page__hero-title {
-  font-size: 74rpx;
+  position: relative;
+  z-index: 1;
+  font-size: 72rpx;
   line-height: 1.02;
   font-weight: 800;
-  letter-spacing: -1.4rpx;
-  color: #031635;
+  letter-spacing: -1rpx;
+  color: #020b1a;
 }
 
 .campus-page__hero-sub {
-  margin-top: 14rpx;
-  max-width: 980rpx;
-  color: #55647a;
-  font-size: 30rpx;
-  line-height: 1.55;
+  position: relative;
+  z-index: 1;
+  margin-top: 16rpx;
+  max-width: 1140rpx;
+  margin-left: auto;
+  margin-right: auto;
+  color: #4b4949;
+  font-size: 35rpx;
+  line-height: 1.5;
+  font-weight: bold; /* 加粗 */
 }
 
 .campus-page__grid {
-  margin-top: 34rpx;
+  margin-top: 70rpx;
   display: grid;
-  grid-template-columns: 1.3fr 1fr;
-  grid-template-rows: 520rpx 520rpx;
-  gap: 24rpx;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28rpx;
 }
 
 .campus-page__card {
   overflow: hidden;
   position: relative;
-  min-height: 420rpx;
-  border-radius: 36rpx;
+  min-height: 1100rpx;
+  border-radius: 24rpx;
   background: rgba(255, 255, 255, 0.06);
-  border: 1rpx solid rgba(255, 255, 255, 0.35);
-  box-shadow: 0 24rpx 64rpx rgba(8, 27, 58, 0.1);
+  border: 1rpx solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 16rpx 42rpx rgba(22, 49, 86, 0.16);
   transition: all 0.28s ease;
 }
 
 .campus-page__card:hover {
-  transform: translateY(-6rpx);
-  box-shadow: 0 30rpx 72rpx rgba(8, 27, 58, 0.15);
+  transform: translateY(-4rpx);
+  box-shadow: 0 22rpx 56rpx rgba(22, 49, 86, 0.18);
 }
 
 .campus-page__card--1 {
-  grid-column: 1 / span 1;
-  grid-row: 1 / span 2;
-  min-height: 864rpx;
+  min-height: 1100rpx;
 }
 
 .campus-page__card--2 {
-  grid-column: 2 / span 1;
-  grid-row: 1 / span 1;
-  min-height: 420rpx;
+  min-height: 1100rpx;
 }
 
 .campus-page__card--3 {
-  grid-column: 2 / span 1;
-  grid-row: 2 / span 1;
-  min-height: 420rpx;
+  min-height: 1100rpx;
 }
 
 .campus-page__cover {
@@ -242,19 +268,19 @@ export default {
 .campus-page__cover-mask {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(8, 20, 40, 0.1) 0%, rgba(8, 20, 40, 0.55) 100%);
+  background: linear-gradient(180deg, rgba(6, 18, 38, 0.06) 0%, rgba(9, 25, 49, 0.42) 78%, rgba(9, 25, 49, 0.48) 100%);
 }
 
 .campus-page__card-body {
   position: absolute;
-  left: 40rpx;
-  right: 40rpx;
+  left: 30rpx;
+  right: 30rpx;
   bottom: 30rpx;
-  padding: 26rpx;
-  border-radius: 20rpx;
-  /* 使用更透明的背景 + 白色/浅色底色 */
-  background: rgba(255, 255, 255, 0.7);
-  border: 1rpx solid rgba(255, 255, 255, 0.4);
+  padding: 30rpx 30rpx 24rpx;
+  border-radius: 18rpx;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.83), rgba(246, 248, 252, 0.7));
+  border: 1rpx solid rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(8rpx);
 }
 
 .campus-page__card-main {
@@ -271,11 +297,11 @@ export default {
 
 .campus-page__pill {
   width: fit-content;
-  min-height: 42rpx;
-  padding: 0 18rpx;
+  min-height: 40rpx;
+  padding: 0 14rpx;
   border-radius: 999rpx;
-  background: rgba(44, 125, 160, 0.16);
-  color: #0f4b6f;
+  background: rgba(94, 162, 205, 0.2);
+  color: #2f6f95;
   font-size: 20rpx;
   font-weight: 800;
   display: inline-flex;
@@ -283,66 +309,71 @@ export default {
 }
 
 .campus-page__card-title {
-  margin-top: 14rpx;
-  font-size: 34rpx;
+  margin-top: 16rpx;
+  font-size: 38rpx;
   line-height: 1.22;
   font-weight: 800;
-  color: #031635;
+  color: #000000;
 }
 
 .campus-page__card-right {
-  width: 132rpx;
+  width: 140rpx;
+  border-left: 1rpx solid rgba(0, 0, 0, 0.2);
+  padding-left: 24rpx;
   flex-shrink: 0;
-  text-align: right;
+  text-align: center;
+  align-self: center;
 }
 
 .campus-page__count {
-  color: #031635;
-  font-size: 64rpx;
+  color: #080d18;
+  font-size: 68rpx;
   font-weight: 800;
   line-height: 1;
 }
 
 .campus-page__count-label {
   margin-top: 6rpx;
-  color: #55647a;
+  color: #26384f;
   font-size: 21rpx;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .campus-page__card-desc {
-  margin-top: 12rpx;
-  min-height: 92rpx;
-  color: #66758a;
+  margin-top: 10rpx;
+  min-height: 128rpx;
+  color: #24344a;
   font-size: 23rpx;
-  line-height: 1.55;
+  line-height: 1.52;
 }
 
 .campus-page__card-actions {
-  margin-top: 14rpx;
+  margin-top: 12rpx;
   display: flex;
   gap: 14rpx;
   align-items: center;
 }
 
 .campus-page__enter-btn {
-  flex: 1;
-  height: 74rpx;
-  border-radius: 20rpx;
-  background: #041c42;
-  color: #eaf3ff;
+  width: 170rpx;
+  height: 66rpx;
+  border-radius: 16rpx;
+  background: linear-gradient(180deg, #eaf4ff 0%, #d9e9fa 100%);
+  border: 1rpx solid rgba(130, 176, 215, 0.7);
+  color: #3f6d96;
   font-size: 26rpx;
   font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  box-shadow: 0 4rpx 12rpx rgba(66, 104, 145, 0.15);
 }
 
 
 .campus-page__enter-btn:hover {
   transform: translateY(-1rpx);
-  opacity: 0.95;
+  opacity: 0.92;
 }
 
 
@@ -396,20 +427,7 @@ export default {
 @media screen and (max-width: 1180px) {
   .campus-page__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: auto;
-  }
-
-  .campus-page__card--1 {
-    grid-column: 1 / span 2;
-    grid-row: auto;
-    min-height: 560rpx;
-  }
-
-  .campus-page__card--2,
-  .campus-page__card--3 {
-    grid-column: auto;
-    grid-row: auto;
-    min-height: 420rpx;
+    gap: 24rpx;
   }
 
   .campus-page__card-body,
@@ -421,6 +439,48 @@ export default {
 }
 
 @media screen and (max-width: 860px) {
+  .campus-page__hero {
+    text-align: left;
+    padding: 26rpx 22rpx 18rpx;
+  }
+
+  .campus-page__hero-title {
+    font-size: 52rpx;
+  }
+
+  .campus-page__hero-sub {
+    font-size: 26rpx;
+  }
+
+  .campus-page__card,
+  .campus-page__card--1,
+  .campus-page__card--2,
+  .campus-page__card--3 {
+    min-height: 620rpx;
+  }
+
+  .campus-page__card-title {
+    font-size: 32rpx;
+  }
+
+  .campus-page__card-desc {
+    font-size: 23rpx;
+    min-height: 92rpx;
+  }
+
+  .campus-page__count-label {
+    font-size: 21rpx;
+  }
+
+  .campus-page__pill {
+    font-size: 20rpx;
+  }
+
+  .campus-page__enter-btn {
+    width: 160rpx;
+    font-size: 24rpx;
+  }
+
   .campus-page__grid {
     grid-template-columns: 1fr;
   }
@@ -433,3 +493,4 @@ export default {
 }
 /* #endif */
 </style>
+

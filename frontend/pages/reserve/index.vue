@@ -622,8 +622,9 @@ export default {
 .reserve-page {
   min-height: 100vh;
   background:
-    radial-gradient(circle at top right, rgba(100, 184, 232, 0.16), transparent 24%),
-    linear-gradient(180deg, #f7f9fc 0%, #eef3f9 100%);
+    radial-gradient(circle at 12% 14%, rgba(109, 179, 230, 0.25), transparent 26%),
+    radial-gradient(circle at 88% 18%, rgba(173, 208, 240, 0.26), transparent 24%),
+    linear-gradient(180deg, #edf5fc 0%, #dceaf7 100%);
 }
 
 .reserve-page__shell {

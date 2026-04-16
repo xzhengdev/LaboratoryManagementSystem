@@ -1,23 +1,20 @@
 <template>
-  <view class="login-page" :style="pageStyle">
-    <view class="login-page__overlay"></view>
+  <view class="login-page">
+    <view class="login-page__glow login-page__glow--left"></view>
+    <view class="login-page__glow login-page__glow--right"></view>
 
     <view class="login-page__content">
       <view class="login-card">
         <view class="login-hero">
-         <view class="login-hero__badge">
-          <image 
-            class="login-hero__badge-img" 
-            src="/static/logo.png" 
-            mode="aspectFill"
-          />
-        </view>
+          <view class="login-hero__badge">
+            <image class="login-hero__badge-img" src="/static/logo.png" mode="aspectFill" />
+          </view>
           <view class="login-title">登录</view>
-          <view class="login-subtitle">分布式实验室预约管理系统</view>
+          <view class="login-subtitle">跨校区实验室预约管理系统</view>
         </view>
 
         <view class="login-section">
-          <view class="login-section__label">身份角色选择</view>
+          <view class="login-section__label">选择身份</view>
           <view class="role-grid">
             <view
               v-for="(item, index) in roleOptions"
@@ -26,7 +23,7 @@
               :class="{ 'role-card--active': roleIndex === index }"
               @click="selectRole(index)"
             >
-              <view class="role-card__icon">
+              <view class="role-card__icon" :class="item.tone">
                 <image class="role-card__icon-image" :src="item.icon" mode="aspectFit" />
               </view>
               <text class="role-card__text">{{ item.label }}</text>
@@ -36,17 +33,17 @@
 
         <view class="login-form">
           <view class="input-wrap">
-            <text class="input-wrap__icon">👤</text>
+            <text class="input-wrap__icon">账号</text>
             <input
               v-model="form.username"
               class="login-input"
-              placeholder="用户名 / 学工号"
+              placeholder="请输入用户名或工号"
               placeholder-class="login-placeholder"
             />
           </view>
 
           <view class="input-wrap">
-            <text class="input-wrap__icon">🔒</text>
+            <text class="input-wrap__icon">密码</text>
             <input
               v-model="form.password"
               class="login-input login-input--password"
@@ -54,33 +51,28 @@
               placeholder="请输入密码"
               placeholder-class="login-placeholder"
             />
-            <text class="password-toggle" @click="togglePassword">
-              {{ showPassword ? '◉' : '◎' }}
-            </text>
+            <text class="password-toggle" @click="togglePassword">{{ showPassword ? '隐藏' : '显示' }}</text>
           </view>
         </view>
 
         <view class="login-tools">
           <view class="remember-box" @click="rememberMe = !rememberMe">
             <view class="remember-box__check" :class="{ 'remember-box__check--active': rememberMe }">
-              <text v-if="rememberMe" class="remember-box__tick">✓</text>
+              <text v-if="rememberMe" class="remember-box__tick">√</text>
             </view>
-            <text class="remember-box__label">记住我</text>
+            <text class="remember-box__label">记住账号</text>
           </view>
-          <text class="forgot-link">忘记密码？</text>
+          <text class="forgot-link">忘记密码</text>
         </view>
 
         <view class="login-button" :class="{ 'login-button--loading': loading }" @click="submit">
           {{ loading ? '登录中...' : '立即登录' }}
         </view>
+      </view>
 
-        <view class="login-footer">
-          <view class="login-footer__line"></view>
-          <text class="login-footer__text">仅限校内访问 · 内网安全区域</text>
-          <view class="login-footer__badge-row">
-            <view class="login-footer__badge">校</view>
-          </view>
-        </view>
+      <view class="login-footer">
+        <view class="login-footer__line"></view>
+        <text class="login-footer__text">仅限校内访问 · 内网安全区域</text>
       </view>
 
       <view class="page-footer">LABORATORY MANAGEMENT PLATFORM</view>
@@ -100,10 +92,10 @@ import systemAdminIcon from '../../static/icons/system-admin.png'
 export default {
   data() {
     const roleOptions = [
-      { value: 'student', label: roleTextMap.student, icon: studentIcon },
-      { value: 'teacher', label: roleTextMap.teacher, icon: teacherIcon },
-      { value: 'lab_admin', label: roleTextMap.lab_admin, icon: labAdminIcon },
-      { value: 'system_admin', label: roleTextMap.system_admin, icon: systemAdminIcon }
+      { value: 'student', label: roleTextMap.student, icon: studentIcon, tone: 'role-card__icon--tone-1' },
+      { value: 'teacher', label: roleTextMap.teacher, icon: teacherIcon, tone: 'role-card__icon--tone-2' },
+      { value: 'lab_admin', label: roleTextMap.lab_admin, icon: labAdminIcon, tone: 'role-card__icon--tone-3' },
+      { value: 'system_admin', label: roleTextMap.system_admin, icon: systemAdminIcon, tone: 'role-card__icon--tone-4' }
     ]
 
     return {
@@ -116,17 +108,7 @@ export default {
       roleIndex: 0,
       rememberMe: true,
       showPassword: false,
-      loading: false,
-      backgroundUrl: '/static/login-bg.svg'
-    }
-  },
-  computed: {
-    pageStyle() {
-      return this.backgroundUrl
-        ? {
-            backgroundImage: `url(${this.backgroundUrl})`
-          }
-        : {}
+      loading: false
     }
   },
   methods: {
@@ -161,17 +143,32 @@ export default {
 .login-page {
   position: relative;
   min-height: 100vh;
-  background-color: #031635;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: cover;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 12% 14%, rgba(109, 179, 230, 0.24), transparent 28%),
+    radial-gradient(circle at 88% 18%, rgba(173, 208, 240, 0.24), transparent 24%),
+    linear-gradient(180deg, #edf5fc 0%, #dceaf7 100%);
 }
 
-.login-page__overlay {
+.login-page__glow {
   position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(135deg, rgba(3, 22, 53, 0.9) 0%, rgba(26, 43, 75, 0.68) 44%, rgba(0, 101, 141, 0.24) 100%);
+  width: 320rpx;
+  height: 320rpx;
+  border-radius: 999rpx;
+  filter: blur(18rpx);
+  pointer-events: none;
+}
+
+.login-page__glow--left {
+  left: -80rpx;
+  top: 120rpx;
+  background: rgba(150, 206, 244, 0.36);
+}
+
+.login-page__glow--right {
+  right: -70rpx;
+  top: 260rpx;
+  background: rgba(184, 199, 236, 0.32);
 }
 
 .login-page__content {
@@ -182,19 +179,18 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 28rpx 24rpx 40rpx;
+  padding: 36rpx 24rpx 44rpx;
   box-sizing: border-box;
 }
 
 .login-card {
-  width: 48%;
-  max-width: 720rpx;
-  padding: 44rpx 34rpx 32rpx;
-  border-radius: 32rpx;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(247, 249, 252, 0.68));
-  border: 1rpx solid rgba(255, 255, 255, 0.34);
-  backdrop-filter: blur(28rpx);
-  box-shadow: 0 30rpx 80rpx rgba(0, 0, 0, 0.26);
+  width: 100%;
+  max-width: 780rpx;
+  padding: 40rpx 34rpx 30rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(243, 248, 253, 0.86));
+  border: 1rpx solid rgba(169, 198, 225, 0.55);
+  box-shadow: 0 26rpx 60rpx rgba(33, 76, 118, 0.16);
   box-sizing: border-box;
 }
 
@@ -203,49 +199,52 @@ export default {
   margin-bottom: 30rpx;
 }
 
+.login-hero__badge {
+  width: 112rpx;
+  height: 112rpx;
+  margin: 0 auto 14rpx;
+  border-radius: 28rpx;
+  padding: 10rpx;
+  background: linear-gradient(145deg, rgba(240, 247, 255, 0.96), rgba(221, 236, 250, 0.8));
+  border: 1rpx solid rgba(148, 184, 216, 0.46);
+  box-sizing: border-box;
+}
+
 .login-hero__badge-img {
   width: 100%;
   height: 100%;
-  border-radius: 50%;
-  /* 外阴影 + 内阴影 = 凸起感 */
-  box-shadow: 0 10rpx 20rpx rgba(0, 0, 0, 0.5),
-              inset 0 2rpx 4rpx rgba(255, 255, 255, 0.4),
-              inset 0 -2rpx 2rpx rgba(0, 0, 0, 0.3);
+  border-radius: 20rpx;
 }
 
 .login-title {
-  color: #031635;
-  font-size: 54rpx;
+  color: #12243d;
+  font-size: 56rpx;
   line-height: 1.1;
   font-weight: 800;
-  letter-spacing: 0.6rpx;
 }
 
 .login-subtitle {
   margin-top: 10rpx;
-  color: #44474e;
+  color: #3a5674;
   font-size: 24rpx;
   font-weight: 600;
-  letter-spacing: 0.4rpx;
 }
 
 .login-section__label {
-  margin-bottom: 14rpx;
-  padding-left: 6rpx;
-  color: #44474e;
-  font-size: 20rpx;
+  margin-bottom: 12rpx;
+  color: #35526f;
+  font-size: 22rpx;
   font-weight: 700;
-  letter-spacing: 2rpx;
 }
 
 .role-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14rpx;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12rpx;
   padding: 12rpx;
-  border-radius: 24rpx;
-  background: rgba(236, 238, 241, 0.9);
-  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.56);
+  border-radius: 20rpx;
+  background: rgba(232, 242, 251, 0.72);
+  border: 1rpx solid rgba(170, 197, 224, 0.45);
 }
 
 .role-card {
@@ -255,40 +254,53 @@ export default {
   justify-content: center;
   gap: 8rpx;
   min-height: 108rpx;
-  border-radius: 18rpx;
-  color: #44474e;
+  border-radius: 16rpx;
+  color: #385673;
   border: 1rpx solid transparent;
   transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .role-card--active {
   background: rgba(255, 255, 255, 0.96);
-  color: #031635;
-  border-color: rgba(182, 198, 239, 0.8);
-  box-shadow: 0 10rpx 24rpx rgba(0, 0, 0, 0.08);
+  color: #153455;
+  border-color: rgba(140, 182, 218, 0.78);
+  box-shadow: 0 10rpx 20rpx rgba(68, 120, 165, 0.16);
 }
 
 .role-card__icon {
-  width: 44rpx;
-  height: 44rpx;
+  width: 52rpx;
+  height: 52rpx;
   border-radius: 14rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
-  overflow: hidden;
+  border: 1rpx solid rgba(131, 174, 211, 0.42);
+}
+
+.role-card__icon--tone-1 {
+  background: linear-gradient(145deg, #eaf6ff, #d6ecfd);
+}
+
+.role-card__icon--tone-2 {
+  background: linear-gradient(145deg, #e7f8ff, #d3f0fa);
+}
+
+.role-card__icon--tone-3 {
+  background: linear-gradient(145deg, #ebf3ff, #dce7fd);
+}
+
+.role-card__icon--tone-4 {
+  background: linear-gradient(145deg, #eef5ff, #dbe7f9);
 }
 
 .role-card__icon-image {
-  width: 28rpx;
-  height: 28rpx;
+  width: 30rpx;
+  height: 30rpx;
 }
 
 .role-card__text {
   font-size: 20rpx;
   font-weight: 700;
-  text-align: center;
-  line-height: 1.35;
 }
 
 .login-form {
@@ -306,31 +318,29 @@ export default {
   top: 50%;
   left: 22rpx;
   transform: translateY(-50%);
-  color: #44474e;
-  font-size: 26rpx;
+  color: #466888;
+  font-size: 22rpx;
   font-weight: 700;
 }
 
 .login-input {
   width: 100%;
-  min-height: 82rpx;
-  padding: 0 22rpx 0 66rpx;
-  border: none;
-  border-radius: 20rpx;
-  background: rgba(236, 238, 241, 0.92);
-  color: #031635;
+  min-height: 84rpx;
+  padding: 0 22rpx 0 86rpx;
+  border-radius: 18rpx;
+  background: rgba(239, 247, 255, 0.96);
+  color: #15314f;
   font-size: 26rpx;
   box-sizing: border-box;
-  border: 1rpx solid rgba(197, 198, 207, 0.5);
-  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.54);
+  border: 1rpx solid rgba(163, 194, 223, 0.68);
 }
 
 .login-input--password {
-  padding-right: 66rpx;
+  padding-right: 88rpx;
 }
 
 .login-placeholder {
-  color: rgba(117, 119, 127, 0.88);
+  color: rgba(92, 121, 148, 0.8);
 }
 
 .password-toggle {
@@ -338,9 +348,9 @@ export default {
   top: 50%;
   right: 24rpx;
   transform: translateY(-50%);
-  color: #4e5e81;
-  font-size: 24rpx;
-  line-height: 1;
+  color: #3d6690;
+  font-size: 22rpx;
+  font-weight: 700;
 }
 
 .login-tools {
@@ -348,7 +358,6 @@ export default {
   align-items: center;
   justify-content: space-between;
   margin-top: 18rpx;
-  padding: 0 6rpx;
 }
 
 .remember-box {
@@ -361,50 +370,43 @@ export default {
   width: 32rpx;
   height: 32rpx;
   border-radius: 8rpx;
-  border: 2rpx solid #c5c6cf;
+  border: 2rpx solid rgba(124, 169, 208, 0.82);
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2rpx solid #ccc;
-  background-color: #f5f7fa;
-  transition: all 0.3s ease;
+  background-color: #eff6fd;
+  transition: all 0.2s ease;
 }
 
 .remember-box__check--active {
-  background: #00658d;
-  border-color: #00658d;
+  background: #2f6f95;
+  border-color: #2f6f95;
 }
 
 .remember-box__tick {
   color: #ffffff;
   font-size: 18rpx;
-  font-weight: 700;
+  font-weight: 800;
 }
 
-.remember-box__label {
-  color: #44474e;
-  font-size: 22rpx;
-  font-weight: 600;
-}
-
+.remember-box__label,
 .forgot-link {
-  color: #00658d;
+  color: #3e5d7c;
   font-size: 22rpx;
   font-weight: 600;
 }
 
 .login-button {
   margin-top: 22rpx;
-  min-height: 78rpx;
+  min-height: 80rpx;
   border-radius: 20rpx;
-  background: linear-gradient(135deg, #031635 0%, #1a2b4b 100%);
+  background: linear-gradient(135deg, #1a3150 0%, #2c6f9a 52%, #6ec3d8 100%);
   color: #ffffff;
   font-size: 28rpx;
   font-weight: 800;
-  line-height: 78rpx;
+  line-height: 80rpx;
   text-align: center;
-  box-shadow: 0 24rpx 44rpx rgba(3, 22, 53, 0.24);
-  border: 1rpx solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 18rpx 34rpx rgba(41, 97, 146, 0.24);
 }
 
 .login-button--loading {
@@ -412,125 +414,94 @@ export default {
 }
 
 .login-footer {
-  margin-top: 24rpx;
-  padding-top: 20rpx;
-  border-top: 1rpx solid rgba(0, 0, 0, 0.06);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14rpx;
+  margin-top: 16rpx;
+  text-align: center;
 }
 
 .login-footer__line {
   width: 64rpx;
   height: 6rpx;
   border-radius: 999rpx;
-  background: rgba(3, 22, 53, 0.12);
+  margin: 0 auto 12rpx;
+  background: rgba(78, 125, 167, 0.22);
 }
 
 .login-footer__text {
-  color: #44474e;
-  font-size: 18rpx;
-  font-weight: 700;
-  letter-spacing: 2rpx;
-}
-
-.login-footer__badge-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.login-footer__badge {
-  width: 48rpx;
-  height: 48rpx;
-  border-radius: 999rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1rpx solid rgba(255, 255, 255, 0.36);
-  color: rgba(68, 71, 78, 0.72);
-  font-size: 20rpx;
+  color: #4f7092;
+  font-size: 19rpx;
   font-weight: 700;
 }
 
 .page-footer {
-  margin-top: 18rpx;
-  color: rgba(255, 255, 255, 0.56);
+  margin-top: 16rpx;
+  color: rgba(53, 87, 121, 0.66);
   font-size: 16rpx;
-  letter-spacing: 3rpx;
+  letter-spacing: 2rpx;
 }
 
 /* #ifdef H5 */
 @media screen and (min-width: 1024px) {
   .login-page__content {
-    padding: 20px 24px 28px;
+    padding: 28px 24px 32px;
   }
 
   .login-card {
-    max-width: 840px;
-    padding: 38px 32px 24px;
-    border-radius: 28px;
+    max-width: 520px;
+    padding: 28px 24px 20px;
+    border-radius: 20px;
   }
 
   .login-hero {
-    margin-bottom: 22px;
+    margin-bottom: 18px;
   }
 
   .login-hero__badge {
-    width: 72px;
-    height: 72px;
-    margin-bottom: 16px;
-    border-radius: 22px;
-  }
-
-  .login-hero__badge-ring {
-    inset: 7px;
+    width: 64px;
+    height: 64px;
+    margin-bottom: 10px;
     border-radius: 16px;
+    padding: 7px;
   }
 
-  .login-hero__badge-icon {
-    font-size: 34px;
+  .login-hero__badge-img {
+    border-radius: 11px;
   }
 
   .login-title {
-    font-size: 34px;
-    letter-spacing: -0.4px;
+    font-size: 32px;
   }
 
   .login-subtitle {
-    margin-top: 8px;
-    font-size: 14px;
+    margin-top: 6px;
+    font-size: 13px;
   }
 
   .login-section__label {
     margin-bottom: 8px;
-    font-size: 10px;
-    letter-spacing: 2px;
+    font-size: 12px;
   }
 
   .role-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
-    padding: 10px;
-    border-radius: 18px;
-  }
-
-  .role-card {
-    min-height: 78px;
+    padding: 8px;
     border-radius: 14px;
   }
 
+  .role-card {
+    min-height: 70px;
+    border-radius: 11px;
+    gap: 6px;
+  }
+
   .role-card__icon {
-    width: 30px;
-    height: 30px;
-    border-radius: 10px;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
   }
 
   .role-card__icon-image {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
   }
 
   .role-card__text {
@@ -538,49 +509,44 @@ export default {
   }
 
   .login-form {
-    gap: 12px;
-    margin-top: 16px;
+    gap: 10px;
+    margin-top: 14px;
   }
 
   .input-wrap__icon {
-    left: 16px;
-    font-size: 16px;
+    left: 14px;
+    font-size: 12px;
   }
 
   .login-input {
-    min-height: 44px;
-    padding: 0 16px 0 46px;
-    border-radius: 14px;
-    font-size: 15px;
-  }
-
-  .login-input--password {
-    padding-right: 46px;
-  }
-
-  .password-toggle {
-    right: 16px;
+    min-height: 42px;
+    padding: 0 14px 0 52px;
+    border-radius: 12px;
     font-size: 14px;
   }
 
-  .login-tools {
-    margin-top: 14px;
-    padding: 0 2px;
+  .login-input--password {
+    padding-right: 56px;
   }
 
-  .remember-box {
-    gap: 8px;
+  .password-toggle {
+    right: 14px;
+    font-size: 12px;
+  }
+
+  .login-tools {
+    margin-top: 12px;
   }
 
   .remember-box__check {
-    width: 16px;
-    height: 16px;
-    border-radius: 5px;
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
     border-width: 1.5px;
   }
 
   .remember-box__tick {
-    font-size: 10px;
+    font-size: 9px;
   }
 
   .remember-box__label,
@@ -589,39 +555,31 @@ export default {
   }
 
   .login-button {
-    margin-top: 16px;
-    min-height: 52px;
-    border-radius: 16px;
-    font-size: 16px;
-    line-height: 52px;
+    margin-top: 14px;
+    min-height: 44px;
+    border-radius: 12px;
+    font-size: 15px;
+    line-height: 44px;
   }
 
   .login-footer {
-    margin-top: 18px;
-    padding-top: 16px;
-    gap: 10px;
+    margin-top: 10px;
   }
 
   .login-footer__line {
-    width: 36px;
+    width: 32px;
     height: 4px;
+    margin-bottom: 8px;
   }
 
   .login-footer__text {
-    font-size: 10px;
-    letter-spacing: 1.8px;
-  }
-
-  .login-footer__badge {
-    width: 30px;
-    height: 30px;
-    font-size: 12px;
+    font-size: 11px;
   }
 
   .page-footer {
-    margin-top: 14px;
+    margin-top: 10px;
     font-size: 10px;
-    letter-spacing: 3px;
+    letter-spacing: 2px;
   }
 }
 /* #endif */
