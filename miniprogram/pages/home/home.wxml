@@ -38,8 +38,14 @@
     bindtap="goLabDetail" data-id="{{item.id}}"
   >
     <view class="lab-card-inner">
-      <view class="lab-cover" style="background:#4A90E2">
-        <text class="lab-cover-text">{{item.lab_name[0]}}</text>
+      <view class="lab-cover">
+        <image
+          wx:if="{{item.photos && item.photos.length}}"
+          class="lab-cover-image"
+          src="{{item.photos[0]}}"
+          mode="aspectFill"
+        />
+        <text wx:else class="lab-cover-text">{{item.lab_name[0]}}</text>
       </view>
       <view class="lab-info">
         <text class="lab-name">{{item.lab_name}}</text>
