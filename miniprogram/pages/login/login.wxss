@@ -61,12 +61,12 @@ page {
 .login-card {
   background: rgba(255, 255, 255, 0.97);
   border-radius: 34rpx;
-  padding: 44rpx 36rpx 40rpx;
+  padding: 56rpx 38rpx 52rpx;
   box-shadow: 0 10rpx 24rpx rgba(74, 86, 105, 0.09);
 }
 
 .card-title-wrap {
-  margin-bottom: 36rpx;
+  margin-bottom: 46rpx;
   text-align: center;
 }
 
@@ -81,11 +81,11 @@ page {
 .card-fields {
   display: flex;
   flex-direction: column;
-  gap: 26rpx;
+  gap: 34rpx;
 }
 
 .card-actions {
-  margin-top: 24rpx;
+  margin-top: 34rpx;
 }
 
 .form-group {
@@ -140,7 +140,7 @@ page {
 
 .assist-row {
   margin-top: 2rpx;
-  margin-bottom: 32rpx;
+  margin-bottom: 40rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -157,6 +157,11 @@ page {
   height: 34rpx;
   border-radius: 50%;
   background: #d6dde6;
+}
+
+.remember-dot.active {
+  background: #2a67b6;
+  box-shadow: 0 0 0 6rpx rgba(42, 103, 182, 0.18);
 }
 
 .remember-text {
@@ -200,11 +205,11 @@ page {
 
 .login-footer {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;  /* 新增：改为垂直方向 */
+  align-items: center;     /* 水平居中对齐（垂直方向下，这个是控制横轴） */
+  justify-content: center; /* 垂直方向居中（主轴居中） */
   gap: 18rpx;
 }
-
 .login-footer__line {
   width: 84rpx;
   height: 2rpx;
@@ -214,12 +219,4 @@ page {
 .login-footer__text {
   color: #6d7888;
   font-size: 24rpx;
-}
-
-.page-footer {
-  margin-top: 18rpx;
-  text-align: center;
-  color: #8a93a2;
-  font-size: 20rpx;
-  letter-spacing: 2rpx;
 }

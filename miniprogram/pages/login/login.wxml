@@ -28,11 +28,11 @@
         </view>
         <view class="card-actions">
           <view class="assist-row">
-            <view class="remember-wrap">
-              <view class="remember-dot"></view>
+            <view class="remember-wrap" bindtap="toggleRemember">
+              <view class="remember-dot {{rememberPassword ? 'active' : ''}}"></view>
               <text class="remember-text">{{ui.remember}}</text>
             </view>
-            <text class="forgot">{{ui.forgot}}</text>
+            <text class="forgot" bindtap="onForgotPassword">{{ui.forgot}}</text>
           </view>
           <button class="submit" loading="{{loading}}" disabled="{{loading}}" bindtap="doLogin">
             {{loading ? ui.loggingIn : ui.login}}
@@ -45,7 +45,6 @@
         <view class="login-footer__line"></view>
         <text class="login-footer__text">{{ui.secureText}}</text>
       </view>
-      <view class="page-footer">{{ui.platformText}}</view>
     </view>
   </view>
 </view>
