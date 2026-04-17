@@ -11,15 +11,44 @@
     <view class="student-home__body">
       <view class="student-home__shell">
         <view class="student-home__hero">
-          <view class="student-home__hero-title">
-            欢迎回来，<text class="student-home__hero-title-accent">{{ displayName }}</text>
-          </view>
-          <view class="student-home__hero-sub">
-            今天想预约哪间实验室？我们已为您准备好最新的科研资源。
-          </view>
-          <view class="student-home__hero-btn" @click="go(routes.labs)">
-            <text>立即开始预约</text>
-            <text class="student-home__hero-arrow">→</text>
+          <swiper
+            class="student-home__hero-swiper"
+            circular
+            autoplay
+            :interval="4200"
+            :duration="650"
+            indicator-dots
+            indicator-color="rgba(255,255,255,0.35)"
+            indicator-active-color="#ffffff"
+          >
+            <swiper-item
+              v-for="(banner, index) in heroBanners"
+              :key="banner.image + '-' + index"
+            >
+              <view class="student-home__hero-slide" :style="{ background: banner.gradient }">
+                <image
+                  v-if="banner.image"
+                  class="student-home__hero-slide-image"
+                  :src="banner.image"
+                  mode="aspectFill"
+                />
+              </view>
+            </swiper-item>
+          </swiper>
+          <view class="student-home__hero-overlay"></view>
+          <view class="student-home__hero-content">
+            <view class="student-home__hero-copy">
+              <view class="student-home__hero-title">
+                欢迎回来，<text class="student-home__hero-title-accent">{{ displayName }}</text>
+              </view>
+              <view class="student-home__hero-sub">
+                今天想预约哪间实验室？我们已为您准备好最新的科研资源。
+              </view>
+            </view>
+            <view class="student-home__hero-btn" @click="go(routes.labs)">
+              <text>立即开始预约</text>
+              <text class="student-home__hero-arrow">→</text>
+            </view>
           </view>
         </view>
 
@@ -104,6 +133,24 @@ const LAB_COVERS = [
   'linear-gradient(135deg, #214235 0%, #3f7f68 48%, #b8e9d2 100%)',
   'linear-gradient(135deg, #32231f 0%, #725043 50%, #f3d2b1 100%)'
 ]
+const HERO_BANNERS = [
+  {
+    image: '/static/wallhaven-gpg5wl.png',
+    gradient: 'linear-gradient(125deg, #132e4e 0%, #29608f 58%, #8ac4ea 100%)'
+  },
+  {
+    image: '/static/campuses/haidian.png',
+    gradient: 'linear-gradient(125deg, #1f3d63 0%, #2b5f8f 56%, #9dcff3 100%)'
+  },
+  {
+    image: '/static/campuses/fengtai.png',
+    gradient: 'linear-gradient(125deg, #1a3757 0%, #3a628a 55%, #b1daf8 100%)'
+  },
+  {
+    image: '/static/campuses/hainan.png',
+    gradient: 'linear-gradient(125deg, #204066 0%, #3f6990 52%, #aed9fb 100%)'
+  }
+]
 
 export default {
   components: { StudentTopNav, UserTopNav },
@@ -111,7 +158,8 @@ export default {
     return {
       routes,
       profile: {},
-      featuredLabs: []
+      featuredLabs: [],
+      heroBanners: HERO_BANNERS
     }
   },
   computed: {
@@ -220,10 +268,59 @@ export default {
 .student-home__hero {
   position: relative;
   overflow: hidden;
-  padding: 58rpx 60rpx;
+  min-height: 58vh;
+  padding: 72rpx 60rpx 64rpx;
+  box-sizing: border-box;
   border-radius: 32rpx;
   background: linear-gradient(112deg, #021b4c 0%, #052f72 56%, #1362a6 100%);
   box-shadow: 0 22rpx 52rpx rgba(5, 36, 83, 0.26);
+}
+
+.student-home__hero-swiper {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.student-home__hero-swiper swiper-item {
+  width: 100%;
+  height: 100%;
+}
+
+.student-home__hero-slide {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.student-home__hero-slide-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.student-home__hero-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(110deg, rgba(3, 24, 48, 0.65) 0%, rgba(11, 47, 82, 0.38) 60%, rgba(19, 66, 102, 0.2) 100%);
+}
+
+.student-home__hero-content {
+  position: relative;
+  z-index: 3;
+  min-height: calc(58vh - 136rpx);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.student-home__hero-copy {
+  max-width: 90%;
 }
 
 .student-home__hero::after {
@@ -235,6 +332,7 @@ export default {
   height: 380rpx;
   border-radius: 999rpx;
   background: radial-gradient(circle, rgba(95, 192, 255, 0.42), rgba(95, 192, 255, 0));
+  z-index: 2;
 }
 
 .student-home__hero-title {
@@ -261,7 +359,7 @@ export default {
 .student-home__hero-btn {
   position: relative;
   z-index: 1;
-  margin-top: 34rpx;
+  margin-top: 0;
   width: 260rpx;
   height: 84rpx;
   border-radius: 22rpx;
@@ -272,7 +370,7 @@ export default {
   font-size: 28rpx;
   font-weight: 700;
   color: #f5f9ff;
-  background: linear-gradient(90deg, #163f87 0%, #45bfff 100%);
+  background: linear-gradient(90deg, #5b90ea 0%, #45bfff 100%);
   transition:
     transform 180ms ease,
     box-shadow 180ms ease,
@@ -552,7 +650,11 @@ export default {
 }
 
 .student-home__hero {
-  padding: 44rpx 34rpx;
+  padding: 52rpx 34rpx 44rpx;
+}
+
+.student-home__hero-content {
+  min-height: calc(58vh - 96rpx);
 }
 
 .student-home__hero-title {

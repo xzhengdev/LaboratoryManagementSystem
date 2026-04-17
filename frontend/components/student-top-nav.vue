@@ -172,14 +172,10 @@ export default {
 .student-top-nav__avatar {
   width: 66rpx;
   height: 66rpx;
-  border-radius: 18rpx;
+  border-radius: 50rpx;
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #1a2b4b, #7ecfff);
-  color: #ffffff;
-  font-size: 26rpx;
-  font-weight: 700;
+  justify-content: center;  
 }
 .student-top-nav__avatar-img {
   border: 1rpx solid rgba(16, 42, 73, 0.12);
@@ -188,7 +184,7 @@ export default {
 }
 
 .student-top-nav__profile-text {
-  font-size: 22rpx;
+  font-size: 28rpx;
   font-weight: 700;
   color: #031635;
   max-width: 160rpx;
