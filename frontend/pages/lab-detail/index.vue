@@ -97,7 +97,7 @@
             <view v-for="item in scheduleItems" :key="item.id" class="lab-detail-page__agenda-card">
               <view class="lab-detail-page__agenda-top">
                 <view class="lab-detail-page__agenda-time">{{ item.timeLabel }}</view>
-                <view class="lab-detail-page__agenda-status" :class="`is-${item.status}`">{{ item.statusText }}</view>
+                <view class="lab-detail-page__agenda-status" :class="'is-' + item.status">{{ item.statusText }}</view>
               </view>
               <view class="lab-detail-page__agenda-purpose">{{ item.purpose || '未填写用途说明' }}</view>
               <view class="lab-detail-page__agenda-meta">{{ item.ownerText }} · {{ item.participantText }}</view>
@@ -114,7 +114,7 @@
           </view>
 
           <view v-if="fullAvailableSlots.length" class="lab-detail-page__availability-list">
-            <view v-for="(slot, index) in fullAvailableSlots" :key="`${slot}-${index}`" class="lab-detail-page__availability-item">
+            <view v-for="(slot, index) in fullAvailableSlots" :key="slot + '-' + index" class="lab-detail-page__availability-item">
               <view class="lab-detail-page__availability-index">{{ String(index + 1).padStart(2, '0') }}</view>
               <view class="lab-detail-page__availability-time">{{ slot }}</view>
               <view

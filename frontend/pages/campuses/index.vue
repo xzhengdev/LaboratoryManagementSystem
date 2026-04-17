@@ -23,7 +23,7 @@
           v-for="(item, index) in campuses"
           :key="item.id || item.name"
           class="campus-page__card"
-          :class="`campus-page__card--${index + 1}`"
+          :class="'campus-page__card--' + (index + 1)"
         >
           <view class="campus-page__cover" :style="{ background: item.cover }">
             <image v-if="item.cover_url" class="campus-page__cover-img" :src="item.cover_url" mode="widthFix" />
@@ -493,4 +493,3 @@ export default {
 }
 /* #endif */
 </style>
-

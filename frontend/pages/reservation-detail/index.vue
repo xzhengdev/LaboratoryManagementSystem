@@ -11,7 +11,7 @@
     <view class="reservation-detail-page__shell">
       <view class="reservation-detail-page__head">
         <view>
-          <view class="reservation-detail-page__id">预约 ID: #{{ detail.reservation_code || `LBS-${id || '--'}` }}</view>
+          <view class="reservation-detail-page__id">预约 ID: #{{ detail.reservation_code || ('LBS-' + (id || '--')) }}</view>
           <view class="reservation-detail-page__title">{{ detail.lab_name || '预约详情' }}</view>
           <view class="reservation-detail-page__sub">{{ detail.campus_name || '校区待定' }} · {{ detail.location || '楼宇待补充' }}</view>
         </view>

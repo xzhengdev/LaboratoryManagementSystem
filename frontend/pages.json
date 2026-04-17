@@ -107,10 +107,6 @@
             "style" : {
                 "navigationStyle" : "custom"
             }
-        },
-        {
-            "path" : "App",
-            "style" : {}
         }
     ],
     "globalStyle" : {

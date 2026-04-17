@@ -121,10 +121,10 @@
                 <view class="reserve-form__timeline-ticks">
                   <view
                     v-for="(mark, index) in timeMarkItems"
-                    :key="`tick-${index}`"
+                    :key="'tick-' + index"
                     class="reserve-form__timeline-tick"
                     :class="{ start: index === 0, end: index === timeMarkItems.length - 1 }"
-                    :style="{ left: `${mark.offset}%` }"
+                    :style="{ left: mark.offset + '%' }"
                   ></view>
                 </view>
               </view>
@@ -135,7 +135,7 @@
                   :key="index"
                   class="reserve-form__mark"
                   :class="{ start: index === 0, end: index === timeMarkItems.length - 1 }"
-                  :style="{ left: `${mark.offset}%` }"
+                  :style="{ left: mark.offset + '%' }"
                 >{{ mark.label }}</text>
               </view>
             </view>

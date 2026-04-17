@@ -23,7 +23,7 @@
               <view v-if="item.role === 'assistant' && item.actions && item.actions.length" class="agent-page__actions">
                 <view
                   v-for="(action, i) in item.actions"
-                  :key="`${index}-${i}`"
+                  :key="index + '-' + i"
                   class="agent-page__action"
                   @click="go(action.path)"
                 >
