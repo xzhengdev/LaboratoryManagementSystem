@@ -10,8 +10,8 @@
             <view class="login-hero__badge">
               <image class="login-hero__badge-img" src="/static/logo.png" mode="aspectFill" />
             </view>
-            <view class="login-title">登录</view>
-            <view class="login-subtitle">跨校区实验室预约管理系统</view>
+            <view class="login-title">实验室管理系统</view>
+            <view class="login-subtitle">统一身份认证·安全访问实验资源</view>
           </view>
 
           <view class="login-section">
@@ -37,7 +37,7 @@
               <input
                 v-model="form.username"
                 class="login-input"
-                placeholder="请输入用户名或工号"
+                placeholder="用户名/工号"
                 placeholder-class="login-placeholder"
               />
             </view>
@@ -48,7 +48,7 @@
                 v-model="form.password"
                 class="login-input login-input--password"
                 :password="!showPassword"
-                placeholder="请输入密码"
+                placeholder="密码"
                 placeholder-class="login-placeholder"
               />
               <text class="password-toggle" @click="togglePassword">{{ showPassword ? '隐藏' : '显示' }}</text>
@@ -197,14 +197,12 @@ export default {
 }
 
 .login-card {
-  width: 100%;
-  max-width: 729rpx;
-  // min-height: 720rpx;
-  // padding: 46rpx 34rpx 36rpx;
+  width: 30%;
+  max-width: 720rpx;
   border-radius: 28rpx;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(243, 248, 253, 0.86));
+  background: linear-gradient(180deg, rgba(249, 254, 255, 0.92), rgba(239, 252, 255, 0.86));
   border: 1rpx solid rgba(169, 198, 225, 0.55);
-  box-shadow: 0 26rpx 60rpx rgba(33, 76, 118, 0.16);
+  box-shadow: 0 26rpx 60rpx rgba(0, 0, 0, 0.26);
   box-sizing: border-box;
 }
 
@@ -223,8 +221,7 @@ export default {
   margin: 0 auto 14rpx;
   border-radius: 28rpx;
   padding: 10rpx;
-  background: linear-gradient(145deg, rgba(240, 247, 255, 0.96), rgba(221, 236, 250, 0.8));
-  border: 1rpx solid rgba(148, 184, 216, 0.46);
+  // border: 1rpx solid rgba(0, 0, 0, 0.15);
   box-sizing: border-box;
 }
 
@@ -254,8 +251,6 @@ export default {
   gap: 12rpx;
   padding: 12rpx;
   border-radius: 20rpx;
-  background: rgba(232, 242, 251, 0.72);
-  border: 1rpx solid rgba(170, 197, 224, 0.45);
 }
 
 .role-card {
@@ -272,10 +267,8 @@ export default {
 }
 
 .role-card--active {
-  background: rgba(255, 255, 255, 0.96);
-  color: #153455;
-  border-color: rgba(140, 182, 218, 0.78);
-  box-shadow: 0 10rpx 20rpx rgba(68, 120, 165, 0.16);
+  background: rgba(241, 252, 255, 0.96);
+  box-shadow: 0 10rpx 20rpx rgba(117, 117, 117, 0.3);
 }
 
 .role-card__icon {
@@ -285,24 +278,9 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1rpx solid rgba(131, 174, 211, 0.42);
+  border: 1rpx solid rgba(0, 0, 0, 0.18);
 }
 
-.role-card__icon--tone-1 {
-  background: linear-gradient(145deg, #eaf6ff, #d6ecfd);
-}
-
-.role-card__icon--tone-2 {
-  background: linear-gradient(145deg, #e7f8ff, #d3f0fa);
-}
-
-.role-card__icon--tone-3 {
-  background: linear-gradient(145deg, #ebf3ff, #dce7fd);
-}
-
-.role-card__icon--tone-4 {
-  background: linear-gradient(145deg, #eef5ff, #dbe7f9);
-}
 
 .role-card__icon-image {
   width: 28rpx;
@@ -329,7 +307,7 @@ export default {
   top: 50%;
   left: 22rpx;
   transform: translateY(-50%);
-  color: #466888;
+  color: #000000;
   font-size: 22rpx;
   font-weight: 700;
 }
@@ -339,20 +317,20 @@ export default {
   min-height: 84rpx;
   padding: 0 22rpx 0 86rpx;
   border-radius: 18rpx;
-  background: rgba(239, 247, 255, 0.96);
-  color: #15314f;
-  font-size: 26rpx;
+  // background: rgba(255, 255, 255, 0.96);
+  // color: #15314f;
+  font-size: 22rpx;
   box-sizing: border-box;
-  border: 1rpx solid rgba(163, 194, 223, 0.68);
+  border: 1rpx solid rgba(0, 0, 0, 0.38);
 }
 
 .login-input--password {
   padding-right: 88rpx;
 }
 
-.login-placeholder {
-  color: rgba(92, 121, 148, 0.8);
-}
+// .login-placeholder {
+//   color: rgba(92, 121, 148, 0.8);
+// }
 
 .password-toggle {
   position: absolute;
@@ -411,7 +389,7 @@ export default {
   margin-top: 30rpx;
   min-height: 80rpx;
   border-radius: 20rpx;
-  background: linear-gradient(135deg, #1a3150 0%, #2c6f9a 52%, #6ec3d8 100%);
+  background: linear-gradient(135deg, #8fb4e5 0%, #38a3e7 52%, #79c2d4 100%);
   color: #ffffff;
   font-size: 28rpx;
   font-weight: 800;
