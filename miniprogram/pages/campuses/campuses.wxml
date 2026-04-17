@@ -6,7 +6,13 @@
     bindtap="goLabs" data-id="{{item.id}}"
   >
     <view class="campus-cover" style="background:{{item.color}}">
-      <text class="campus-char">{{item.campus_name[0]}}</text>
+      <image
+        wx:if="{{item.cover_url}}"
+        class="campus-cover-image"
+        src="{{item.cover_url}}"
+        mode="aspectFill"
+      />
+      <text wx:else class="campus-char">{{item.campus_name[0]}}</text>
     </view>
     <view class="campus-body">
       <text class="campus-name">{{item.campus_name}}</text>
