@@ -20,7 +20,7 @@
   },
   "tabBar": {
     "color": "#999999",
-    "selectedColor": "#4A90E2",
+    "selectedColor": "#050505",
     "backgroundColor": "#FFFFFF",
     "borderStyle": "black",
     "list": [
@@ -33,20 +33,20 @@
       {
         "pagePath": "pages/labs/labs",
         "text": "实验室",
-        "iconPath": "assets/tabbar/home.png",
-        "selectedIconPath": "assets/tabbar/home-active.png"
+        "iconPath": "assets/tabbar/labs.png",
+        "selectedIconPath": "assets/tabbar/labs-active.png"
       },
       {
         "pagePath": "pages/my-reservations/my-reservations",
         "text": "我的预约",
-        "iconPath": "assets/tabbar/home.png",
-        "selectedIconPath": "assets/tabbar/home-active.png"
+        "iconPath": "assets/tabbar/reserve.png",
+        "selectedIconPath": "assets/tabbar/reserve-active.png"
       },
       {
         "pagePath": "pages/profile/profile",
         "text": "我的",
-        "iconPath": "assets/tabbar/home.png",
-        "selectedIconPath": "assets/tabbar/home-active.png"
+        "iconPath": "assets/tabbar/mine.png",
+        "selectedIconPath": "assets/tabbar/mine-active.png"
       }
     ]
   },

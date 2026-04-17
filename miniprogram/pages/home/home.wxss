@@ -164,7 +164,7 @@
 /* 校区 */
 .lab-campus {
   font-size: 22rpx;
-  color: #0071e3;
+  color: #303030;
 }
 
 /* 箭头 */
