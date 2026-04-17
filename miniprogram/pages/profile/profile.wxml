@@ -1,0 +1,45 @@
+<view class="profile-page">
+  <!-- Avatar & name -->
+  <view class="profile-hero">
+    <view class="avatar-wrap" bindtap="{{editing ? 'changeAvatar' : ''}}">
+      <image wx:if="{{profile.avatar_url}}" class="avatar" src="{{profile.avatar_url}}" mode="aspectFill" />
+      <view wx:else class="avatar-placeholder">{{profile.username ? profile.username[0].toUpperCase() : '?'}}</view>
+      <view class="avatar-edit-badge" wx:if="{{editing}}">换</view>
+    </view>
+    <text class="profile-name">{{profile.real_name || profile.username}}</text>
+    <view class="role-badge">{{roleText[profile.role]}}</view>
+  </view>
+
+  <!-- Info / Edit form -->
+  <view class="card info-card">
+    <view class="info-row">
+      <text class="info-k">用户名</text>
+      <text class="info-v">{{profile.username}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-k">姓名</text>
+      <input wx:if="{{editing}}" class="edit-input" value="{{editForm.real_name}}" bindinput="onRealName" placeholder="请输入姓名" />
+      <text wx:else class="info-v">{{profile.real_name || '—'}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-k">邮箱</text>
+      <input wx:if="{{editing}}" class="edit-input" value="{{editForm.email}}" bindinput="onEmail" placeholder="请输入邮箱" />
+      <text wx:else class="info-v">{{profile.email || '—'}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-k">手机</text>
+      <input wx:if="{{editing}}" class="edit-input" value="{{editForm.phone}}" bindinput="onPhone" placeholder="请输入手机号" />
+      <text wx:else class="info-v">{{profile.phone || '—'}}</text>
+    </view>
+  </view>
+
+  <!-- Actions -->
+  <view class="action-group">
+    <button wx:if="{{!editing}}" class="btn-primary action-btn" bindtap="startEdit">编辑资料</button>
+    <view wx:else class="edit-actions">
+      <button class="btn-primary action-btn" bindtap="saveEdit" loading="{{loading}}">保存</button>
+      <button class="btn-outline action-btn" bindtap="cancelEdit">取消</button>
+    </view>
+    <button class="btn-logout" bindtap="doLogout">退出登录</button>
+  </view>
+</view>

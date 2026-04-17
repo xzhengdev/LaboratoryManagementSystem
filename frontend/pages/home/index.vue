@@ -1,12 +1,6 @@
 <template>
   <view class="student-home">
-    <!-- #ifdef H5 -->
     <student-top-nav active="home" />
-    <!-- #endif -->
-
-    <!-- #ifndef H5 -->
-    <user-top-nav active="home" />
-    <!-- #endif -->
 
     <view class="student-home__body">
       <view class="student-home__shell">
@@ -120,7 +114,6 @@
 
 <script>
 import StudentTopNav from '../../components/student-top-nav.vue'
-import UserTopNav from '../../components/user-top-nav.vue'
 import { api } from '../../api/index'
 import { requireLogin } from '../../common/guard'
 import { openPage } from '../../common/router'
@@ -153,7 +146,7 @@ const HERO_BANNERS = [
 ]
 
 export default {
-  components: { StudentTopNav, UserTopNav },
+  components: { StudentTopNav },
   data() {
     return {
       routes,
@@ -201,9 +194,6 @@ export default {
   },
   async onShow() {
     if (!requireLogin()) return
-    // #ifdef H5
-    uni.hideTabBar()
-    // #endif
     this.profile = getProfile()
     await this.loadData()
   },
@@ -644,47 +634,6 @@ export default {
   color: #0d3a77;
 }
 
-/* #ifndef H5 */
-.student-home__shell {
-  padding: 0 24rpx;
-}
-
-.student-home__hero {
-  padding: 52rpx 34rpx 44rpx;
-}
-
-.student-home__hero-content {
-  min-height: calc(58vh - 96rpx);
-}
-
-.student-home__hero-title {
-  font-size: 52rpx;
-}
-
-.student-home__hero-sub {
-  font-size: 26rpx;
-}
-
-.student-home__entry-grid {
-  grid-template-columns: 1fr;
-}
-
-.student-home__list-item {
-  grid-template-columns: 1fr;
-  justify-items: stretch;
-}
-
-.student-home__list-cover {
-  height: 220rpx;
-}
-
-.student-home__list-side {
-  justify-self: start;
-  align-items: flex-start;
-}
-/* #endif */
-
-/* #ifdef H5 */
 @media screen and (max-width: 1120px) {
   .student-home__entry-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -723,5 +672,4 @@ export default {
     justify-content: flex-start;
   }
 }
-/* #endif */
 </style>

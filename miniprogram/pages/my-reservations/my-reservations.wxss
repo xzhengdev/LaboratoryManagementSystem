@@ -1,0 +1,27 @@
+.reservations-page { padding-bottom: 40rpx; }
+
+.filter-scroll { background: #fff; border-bottom: 1rpx solid #F0F4FA; }
+.filter-tabs { display: flex; padding: 16rpx 24rpx; gap: 16rpx; white-space: nowrap; }
+
+.filter-tab {
+  padding: 10rpx 28rpx;
+  border-radius: 40rpx;
+  font-size: 26rpx;
+  color: #666;
+  background: #F0F4FA;
+  flex-shrink: 0;
+}
+.filter-tab.active { background: #4A90E2; color: #fff; font-weight: 600; }
+
+.res-card { display: flex; flex-direction: column; gap: 12rpx; }
+
+.res-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4rpx; }
+.res-lab { font-size: 30rpx; font-weight: 600; color: #222; }
+
+.res-row { display: flex; align-items: center; gap: 12rpx; }
+.res-icon { font-size: 26rpx; }
+.res-text { font-size: 26rpx; color: #555; }
+
+.res-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 4rpx; }
+.res-purpose { font-size: 24rpx; color: #aaa; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.res-arrow { font-size: 36rpx; color: #ccc; margin-left: 12rpx; }

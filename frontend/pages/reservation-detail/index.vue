@@ -1,12 +1,6 @@
-<template>
+﻿<template>
   <view class="reservation-detail-page">
-    <!-- #ifdef H5 -->
     <student-top-nav active="reservations" />
-    <!-- #endif -->
-
-    <!-- #ifndef H5 -->
-    <user-top-nav active="reservations" />
-    <!-- #endif -->
 
     <view class="reservation-detail-page__shell">
       <view class="reservation-detail-page__head">
@@ -111,7 +105,6 @@
 <script>
 import SiteFooter from '../../components/site-footer.vue'
 import StudentTopNav from '../../components/student-top-nav.vue'
-import UserTopNav from '../../components/user-top-nav.vue'
 import { api } from '../../api/index'
 import { requireLogin } from '../../common/guard'
 import { openPage } from '../../common/router'
@@ -138,7 +131,7 @@ function hoursBetween(start, end) {
 }
 
 export default {
-  components: { SiteFooter, StudentTopNav, UserTopNav },
+  components: { SiteFooter, StudentTopNav },
   data() {
     return {
       id: '',
@@ -218,9 +211,6 @@ export default {
   },
   async onShow() {
     if (!requireLogin()) return
-    // #ifdef H5
-    uni.hideTabBar()
-    // #endif
     await this.loadData()
   },
   methods: {
@@ -547,24 +537,9 @@ export default {
   line-height: 1.6;
 }
 
-/* #ifndef H5 */
-.reservation-detail-page__shell {
-  padding-left: 24rpx;
-  padding-right: 24rpx;
-}
 
-.reservation-detail-page__head {
-  flex-direction: column;
-  align-items: flex-start;
-}
 
-.reservation-detail-page__layout,
-.reservation-detail-page__tips {
-  grid-template-columns: 1fr;
-}
-/* #endif */
 
-/* #ifdef H5 */
 @media screen and (min-width: 1500px) {
   .reservation-detail-page__shell {
     padding-left: 56rpx;
@@ -578,5 +553,5 @@ export default {
     grid-template-columns: 1fr;
   }
 }
-/* #endif */
+
 </style>

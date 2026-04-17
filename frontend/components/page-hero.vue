@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <view class="card hero-card page-hero">
     <view class="page-hero__main">
       <view v-if="kicker" class="hero-kicker">{{ kicker }}</view>
@@ -43,7 +43,7 @@ export default {
   gap: 16rpx;
 }
 
-/* #ifdef H5 */
+
 @media screen and (max-width: 959px) {
   .page-hero {
     flex-direction: column;
@@ -53,5 +53,5 @@ export default {
     justify-content: flex-start;
   }
 }
-/* #endif */
+
 </style>

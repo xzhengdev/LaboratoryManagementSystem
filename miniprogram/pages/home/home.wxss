@@ -1,0 +1,109 @@
+.home-page { padding-bottom: 40rpx; }
+
+.banner {
+  height: 320rpx;
+  width: 100%;
+}
+
+.banner-slide {
+  height: 320rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 48rpx;
+}
+
+.banner-title {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 12rpx;
+}
+
+.banner-sub {
+  font-size: 26rpx;
+  color: rgba(255,255,255,0.85);
+}
+
+.entries {
+  display: flex;
+  justify-content: space-around;
+  background: #fff;
+  padding: 32rpx 16rpx;
+  margin-bottom: 8rpx;
+}
+
+.entry-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.entry-icon {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44rpx;
+}
+
+.entry-label {
+  font-size: 24rpx;
+  color: #555;
+}
+
+.lab-card { padding: 0; overflow: hidden; }
+
+.lab-card-inner {
+  display: flex;
+  align-items: center;
+  padding: 24rpx;
+  gap: 20rpx;
+}
+
+.lab-cover {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 12rpx;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lab-cover-text {
+  font-size: 40rpx;
+  color: #fff;
+  font-weight: 700;
+}
+
+.lab-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.lab-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #222;
+}
+
+.lab-meta {
+  font-size: 24rpx;
+  color: #888;
+}
+
+.lab-campus {
+  font-size: 22rpx;
+  color: #4A90E2;
+}
+
+.lab-arrow {
+  font-size: 40rpx;
+  color: #ccc;
+}

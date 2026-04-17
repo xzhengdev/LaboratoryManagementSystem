@@ -1,12 +1,6 @@
-<template>
+﻿<template>
   <view class="agent-page">
-    <!-- #ifdef H5 -->
     <student-top-nav active="agent" />
-    <!-- #endif -->
-
-    <!-- #ifndef H5 -->
-    <user-top-nav active="agent" />
-    <!-- #endif -->
 
     <view class="agent-page__shell">
       <view class="agent-page__head">
@@ -60,13 +54,12 @@
 <script>
 import SiteFooter from '../../components/site-footer.vue'
 import StudentTopNav from '../../components/student-top-nav.vue'
-import UserTopNav from '../../components/user-top-nav.vue'
 import { api } from '../../api/index'
 import { requireLogin } from '../../common/guard'
 import { openPage } from '../../common/router'
 
 export default {
-  components: { SiteFooter, StudentTopNav, UserTopNav },
+  components: { SiteFooter, StudentTopNav },
   data() {
     return {
       draft: '',
@@ -80,9 +73,6 @@ export default {
   },
   onShow() {
     if (!requireLogin()) return
-    // #ifdef H5
-    uni.hideTabBar()
-    // #endif
   },
   methods: {
     usePrompt(text) {
@@ -281,22 +271,9 @@ export default {
   font-weight: 800;
 }
 
-/* #ifndef H5 */
-.agent-page__shell {
-  padding-left: 24rpx;
-  padding-right: 24rpx;
-}
 
-.agent-page__messages {
-  height: 620rpx;
-}
 
-.agent-page__bubble {
-  max-width: 86%;
-}
-/* #endif */
 
-/* #ifdef H5 */
 @media screen and (min-width: 1500px) {
   .agent-page__shell {
     padding-left: 56rpx;
@@ -313,5 +290,5 @@ export default {
     max-width: 86%;
   }
 }
-/* #endif */
+
 </style>

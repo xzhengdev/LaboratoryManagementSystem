@@ -1,12 +1,6 @@
-﻿<template>
+﻿﻿<template>
   <view class="lab-detail-page">
-    <!-- #ifdef H5 -->
     <student-top-nav active="labs" />
-    <!-- #endif -->
-
-    <!-- #ifndef H5 -->
-    <user-top-nav active="labs" />
-    <!-- #endif -->
 
     <view class="lab-detail-page__hero" :style="heroStyle">
       <view class="lab-detail-page__hero-overlay">
@@ -194,7 +188,6 @@
 <script>
 import SiteFooter from '../../components/site-footer.vue'
 import StudentTopNav from '../../components/student-top-nav.vue'
-import UserTopNav from '../../components/user-top-nav.vue'
 import { api } from '../../api/index'
 import { requireLogin } from '../../common/guard'
 import { openPage } from '../../common/router'
@@ -279,7 +272,7 @@ function buildAvailableSlots(openMinute, closeMinute, reservations) {
 }
 
 export default {
-  components: { SiteFooter, StudentTopNav, UserTopNav },
+  components: { SiteFooter, StudentTopNav },
   data() {
     return {
       id: '',
@@ -484,9 +477,6 @@ export default {
   },
   async onShow() {
     if (!requireLogin()) return
-    // #ifdef H5
-    uni.hideTabBar()
-    // #endif
     await this.loadData()
   },
   methods: {
@@ -1188,29 +1178,9 @@ export default {
   line-height: 1.55;
 }
 
-/* #ifndef H5 */
-.lab-detail-page__hero,
-.lab-detail-page__tabs,
-.lab-detail-page__body {
-  margin-left: 24rpx;
-  margin-right: 24rpx;
-}
 
-.lab-detail-page__hero-title {
-  font-size: 52rpx;
-}
 
-.lab-detail-page__body,
-.lab-detail-page__intro-grid,
-.lab-detail-page__equip-grid,
-.lab-detail-page__metric-grid,
-.lab-detail-page__flow-grid,
-.lab-detail-page__rule-grid {
-  grid-template-columns: 1fr;
-}
-/* #endif */
 
-/* #ifdef H5 */
 @media screen and (min-width: 1500px) {
   .lab-detail-page__hero,
   .lab-detail-page__tabs,
@@ -1271,5 +1241,5 @@ export default {
   }
 
 }
-/* #endif */
+
 </style>

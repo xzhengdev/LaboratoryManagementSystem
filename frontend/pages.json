@@ -1,153 +1,28 @@
 {
-    "pages" : [
-        {
-            "path" : "pages/login/index",
-            "style" : {
-                "navigationStyle" : "custom"
-            }
-        },
-        {
-            "path" : "pages/home/index",
-            "style" : {
-                "navigationStyle" : "custom"
-            }
-        },
-        {
-            "path" : "pages/campuses/index",
-            "style" : {
-                "navigationStyle" : "custom"
-            }
-        },
-        {
-            "path" : "pages/labs/index",
-            "style" : {
-                "navigationStyle" : "custom"
-            }
-        },
-        {
-            "path" : "pages/lab-detail/index",
-            "style" : {
-                "navigationStyle" : "custom"
-            }
-        },
-        {
-            "path" : "pages/schedule/index",
-            "style" : {
-                "navigationStyle" : "custom"
-            }
-        },
-        {
-            "path" : "pages/reserve/index",
-            "style" : {
-                "navigationStyle" : "custom"
-            }
-        },
-        {
-            "path" : "pages/my-reservations/index",
-            "style" : {
-                "navigationStyle" : "custom"
-            }
-        },
-        {
-            "path" : "pages/reservation-detail/index",
-            "style" : {
-                "navigationStyle" : "custom"
-            }
-        },
-        {
-            "path" : "pages/profile/index",
-            "style" : {
-                "navigationStyle" : "custom"
-            }
-        },
-        {
-            "path" : "pages/admin-campuses/index",
-            "style" : {
-                "navigationStyle" : "custom"
-            }
-        },
-        {
-            "path" : "pages/admin-labs/index",
-            "style" : {
-                "navigationStyle" : "custom"
-            }
-        },
-        {
-            "path" : "pages/admin-equipment/index",
-            "style" : {
-                "navigationStyle" : "custom"
-            }
-        },
-        {
-            "path" : "pages/admin-approvals/index",
-            "style" : {
-                "navigationStyle" : "custom"
-            }
-        },
-        {
-            "path" : "pages/admin-users/index",
-            "style" : {
-                "navigationStyle" : "custom"
-            }
-        },
-        {
-            "path" : "pages/admin-profile/index",
-            "style" : {
-                "navigationStyle" : "custom"
-            }
-        },
-        {
-            "path" : "pages/statistics/index",
-            "style" : {
-                "navigationStyle" : "custom"
-            }
-        },
-        {
-            "path" : "pages/agent/index",
-            "style" : {
-                "navigationStyle" : "custom"
-            }
-        }
-    ],
-    "globalStyle" : {
-        "navigationBarTextStyle" : "black",
-        "navigationBarTitleText" : "分布式实验室管理系统",
-        "navigationBarBackgroundColor" : "#F7F9FC",
-        "backgroundColor" : "#F7F9FC"
-    },
-    "tabBar" : {
-        "color" : "#7A8796",
-        "selectedColor" : "#2F80ED",
-        "backgroundColor" : "#FFFFFF",
-        "borderStyle" : "black",
-        "list" : [
-            {
-                "pagePath" : "pages/home/index",
-                "text" : "首页"
-            },
-            {
-                "pagePath" : "pages/labs/index",
-                "text" : "实验室"
-            },
-            {
-                "pagePath" : "pages/my-reservations/index",
-                "text" : "我的预约"
-            },
-            {
-                "pagePath" : "pages/profile/index",
-                "text" : "我的"
-            }
-        ]
-    },
-    "condition" : {
-        //模式配置，仅开发期间生效
-        "current" : 0, //当前激活的模式(list 的索引项)
-        "list" : [
-            {
-                "name" : "", //模式名称
-                "path" : "", //启动页面，必选
-                "query" : "" //启动参数，在页面的onLoad函数里面得到
-            }
-        ]
-    }
+  "pages": [
+    { "path": "pages/login/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/home/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/campuses/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/labs/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/lab-detail/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/schedule/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/reserve/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/my-reservations/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/reservation-detail/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/profile/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/admin-campuses/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/admin-labs/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/admin-equipment/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/admin-approvals/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/admin-users/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/admin-profile/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/statistics/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/agent/index", "style": { "navigationStyle": "custom" } }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "\u5206\u5e03\u5f0f\u5b9e\u9a8c\u5ba4\u7ba1\u7406\u7cfb\u7edf",
+    "navigationBarBackgroundColor": "#F7F9FC",
+    "backgroundColor": "#F7F9FC"
+  }
 }

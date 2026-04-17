@@ -1,12 +1,6 @@
-<template>
+﻿<template>
   <view class="my-res-page">
-    <!-- #ifdef H5 -->
     <student-top-nav active="reservations" />
-    <!-- #endif -->
-
-    <!-- #ifndef H5 -->
-    <user-top-nav active="reservations" />
-    <!-- #endif -->
 
     <view class="my-res-page__shell">
       <view class="my-res-page__head">
@@ -135,7 +129,6 @@
 
 <script>
 import StudentTopNav from '../../components/student-top-nav.vue'
-import UserTopNav from '../../components/user-top-nav.vue'
 import { api } from '../../api/index'
 import { requireLogin } from '../../common/guard'
 import { openPage } from '../../common/router'
@@ -188,7 +181,7 @@ function formatDuration(startTime, endTime) {
 }
 
 export default {
-  components: { StudentTopNav, UserTopNav },
+  components: { StudentTopNav },
   data() {
     return {
       list: [],
@@ -286,9 +279,6 @@ export default {
   },
   async onShow() {
     if (!requireLogin()) return
-    // #ifdef H5
-    uni.hideTabBar()
-    // #endif
     await this.loadData()
   },
   methods: {
@@ -829,36 +819,9 @@ export default {
   opacity: 0.45;
 }
 
-/* #ifndef H5 */
-.my-res-page__shell {
-  padding-left: 24rpx;
-  padding-right: 24rpx;
-}
 
-.my-res-page__head {
-  flex-direction: column;
-  align-items: flex-start;
-}
 
-.my-res-page__layout {
-  grid-template-columns: 1fr;
-}
 
-.my-res-table-grid {
-  grid-template-columns: 1fr;
-  gap: 12rpx;
-}
-
-.table-header {
-  display: none;
-}
-
-.table-row {
-  padding: 22rpx;
-}
-/* #endif */
-
-/* #ifdef H5 */
 @media screen and (min-width: 1500px) {
   .my-res-page__shell {
     padding-left: 56rpx;
@@ -895,5 +858,5 @@ export default {
     display: none;
   }
 }
-/* #endif */
+
 </style>

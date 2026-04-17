@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <view class="agent-root">
     <view v-if="!visible" class="agent-toggle" @click="toggleWindow">
       智能助手
@@ -197,7 +197,7 @@ export default {
   border-radius: 18rpx;
 }
 
-/* #ifdef H5 */
+
 @media screen and (min-width: 960px) {
   .agent-root {
     right: 32rpx;
@@ -209,5 +209,5 @@ export default {
     height: 620px;
   }
 }
-/* #endif */
+
 </style>

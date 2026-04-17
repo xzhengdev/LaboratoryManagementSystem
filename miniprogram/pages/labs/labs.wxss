@@ -1,0 +1,89 @@
+.labs-page { padding-bottom: 40rpx; }
+
+.campus-scroll, .type-scroll { width: 100%; background: #fff; }
+
+.campus-tabs, .type-tabs {
+  display: flex;
+  padding: 16rpx 24rpx;
+  gap: 16rpx;
+  white-space: nowrap;
+}
+
+.campus-tab, .type-tab {
+  padding: 10rpx 28rpx;
+  border-radius: 40rpx;
+  font-size: 26rpx;
+  color: #666;
+  background: #F0F4FA;
+  flex-shrink: 0;
+}
+
+.campus-tab.active, .type-tab.active {
+  background: #4A90E2;
+  color: #fff;
+  font-weight: 600;
+}
+
+.type-scroll { border-bottom: 1rpx solid #F0F4FA; }
+
+.lab-item {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 20rpx 24rpx;
+}
+
+.lab-cover-wrap { flex-shrink: 0; }
+
+.lab-cover-bg {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lab-cover-char {
+  font-size: 44rpx;
+  color: #fff;
+  font-weight: 700;
+}
+
+.lab-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.lab-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #222;
+}
+
+.lab-loc {
+  font-size: 24rpx;
+  color: #888;
+}
+
+.lab-row {
+  display: flex;
+  gap: 20rpx;
+}
+
+.lab-cap, .lab-time {
+  font-size: 22rpx;
+  color: #aaa;
+}
+
+.lab-status {
+  font-size: 22rpx;
+  padding: 6rpx 16rpx;
+  border-radius: 20rpx;
+  flex-shrink: 0;
+}
+
+.lab-status.open { color: #27AE60; background: #EAFAF1; }
+.lab-status.closed { color: #999; background: #F5F5F5; }

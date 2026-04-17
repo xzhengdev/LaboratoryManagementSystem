@@ -1,0 +1,69 @@
+.reserve-page { padding-bottom: 140rpx; }
+
+.lab-summary { display: flex; flex-direction: column; gap: 8rpx; }
+.lab-summary-name { font-size: 32rpx; font-weight: 600; color: #222; }
+.lab-summary-loc  { font-size: 24rpx; color: #888; }
+
+.form-card { display: flex; flex-direction: column; gap: 0; padding: 0; }
+
+.form-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28rpx 24rpx;
+  border-bottom: 1rpx solid #F5F7FA;
+}
+
+.form-col {
+  padding: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.form-label { font-size: 28rpx; color: #444; }
+.form-val   { font-size: 28rpx; color: #4A90E2; }
+
+.count-ctrl { display: flex; align-items: center; gap: 24rpx; }
+.count-btn  {
+  width: 56rpx; height: 56rpx;
+  border-radius: 50%;
+  background: #F0F4FA;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36rpx; color: #4A90E2; font-weight: 700;
+}
+.count-val { font-size: 32rpx; font-weight: 600; color: #222; min-width: 40rpx; text-align: center; }
+
+.purpose-input {
+  width: 100%;
+  height: 160rpx;
+  background: #F7F9FC;
+  border-radius: 12rpx;
+  padding: 16rpx;
+  font-size: 26rpx;
+  color: #333;
+  box-sizing: border-box;
+  border: 2rpx solid #E8EDF5;
+}
+
+.char-count { font-size: 22rpx; color: #bbb; text-align: right; }
+
+.card-title { font-size: 28rpx; font-weight: 600; color: #333; display: block; margin-bottom: 16rpx; }
+
+.sched-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12rpx 0;
+  border-bottom: 1rpx solid #F5F7FA;
+}
+.sched-time { font-size: 26rpx; color: #555; }
+
+.submit-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: #fff;
+  padding: 20rpx 32rpx;
+  box-shadow: 0 -2rpx 12rpx rgba(0,0,0,0.08);
+}
+.submit-btn { width: 100%; }

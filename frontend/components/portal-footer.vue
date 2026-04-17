@@ -1,5 +1,5 @@
-<template>
-  <!-- #ifdef H5 -->
+﻿<template>
+  
   <view class="portal-footer">
     <view class="portal-footer__inner">
       <view>
@@ -14,7 +14,7 @@
       </view>
     </view>
   </view>
-  <!-- #endif -->
+  
 </template>
 
 <script>

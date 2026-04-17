@@ -1,0 +1,52 @@
+<view class="labs-page">
+  <!-- Campus filter -->
+  <scroll-view scroll-x class="campus-scroll">
+    <view class="campus-tabs">
+      <view
+        class="campus-tab {{selectedCampus === '' ? 'active' : ''}}"
+        bindtap="selectCampus" data-id=""
+      >全部</view>
+      <view
+        wx:for="{{campuses}}" wx:key="id"
+        class="campus-tab {{selectedCampus === item.id ? 'active' : ''}}"
+        bindtap="selectCampus" data-id="{{item.id}}"
+      >{{item.campus_name}}</view>
+    </view>
+  </scroll-view>
+
+  <!-- Type filter -->
+  <scroll-view scroll-x class="type-scroll">
+    <view class="type-tabs">
+      <view
+        wx:for="{{types}}" wx:key="value"
+        class="type-tab {{selectedType === item.value ? 'active' : ''}}"
+        bindtap="selectType" data-value="{{item.value}}"
+      >{{item.label}}</view>
+    </view>
+  </scroll-view>
+
+  <!-- Lab list -->
+  <view wx:if="{{labs.length === 0}}" class="empty-tip">暂无实验室</view>
+  <view
+    wx:for="{{labs}}" wx:key="id"
+    class="lab-item card"
+    bindtap="goDetail" data-id="{{item.id}}"
+  >
+    <view class="lab-cover-wrap">
+      <view class="lab-cover-bg" style="background:{{item.color}}">
+        <text class="lab-cover-char">{{item.lab_name[0]}}</text>
+      </view>
+    </view>
+    <view class="lab-body">
+      <text class="lab-name">{{item.lab_name}}</text>
+      <text class="lab-loc">📍 {{item.location || '暂无位置'}}</text>
+      <view class="lab-row">
+        <text class="lab-cap">容纳 {{item.capacity}} 人</text>
+        <text class="lab-time">{{item.open_time}}–{{item.close_time}}</text>
+      </view>
+    </view>
+    <view class="lab-status {{item.status === 'open' ? 'open' : 'closed'}}">
+      {{item.status === 'open' ? '开放' : '关闭'}}
+    </view>
+  </view>
+</view>

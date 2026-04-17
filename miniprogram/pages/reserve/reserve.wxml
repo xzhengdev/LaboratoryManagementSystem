@@ -1,0 +1,68 @@
+<view class="reserve-page">
+  <view class="card lab-summary">
+    <text class="lab-summary-name">{{lab.lab_name}}</text>
+    <text class="lab-summary-loc">📍 {{lab.location || ''}}</text>
+  </view>
+
+  <view class="card form-card">
+    <!-- Date -->
+    <view class="form-row">
+      <text class="form-label">预约日期</text>
+      <picker mode="date" value="{{form.date}}" bindchange="onDate">
+        <view class="form-val">{{form.date}} ›</view>
+      </picker>
+    </view>
+
+    <!-- Start time -->
+    <view class="form-row">
+      <text class="form-label">开始时间</text>
+      <picker mode="time" value="{{form.start_time}}" bindchange="onStartTime">
+        <view class="form-val">{{form.start_time}} ›</view>
+      </picker>
+    </view>
+
+    <!-- End time -->
+    <view class="form-row">
+      <text class="form-label">结束时间</text>
+      <picker mode="time" value="{{form.end_time}}" bindchange="onEndTime">
+        <view class="form-val">{{form.end_time}} ›</view>
+      </picker>
+    </view>
+
+    <!-- Participants -->
+    <view class="form-row">
+      <text class="form-label">参与人数</text>
+      <view class="count-ctrl">
+        <view class="count-btn" bindtap="decCount">−</view>
+        <text class="count-val">{{form.participant_count}}</text>
+        <view class="count-btn" bindtap="incCount">+</view>
+      </view>
+    </view>
+
+    <!-- Purpose -->
+    <view class="form-col">
+      <text class="form-label">使用目的</text>
+      <textarea
+        class="purpose-input"
+        placeholder="请简要描述使用目的（必填）"
+        value="{{form.purpose}}"
+        bindinput="onPurpose"
+        maxlength="200"
+      />
+      <text class="char-count">{{form.purpose.length}}/200</text>
+    </view>
+  </view>
+
+  <!-- Timeline preview -->
+  <view class="card" wx:if="{{schedule.length > 0}}">
+    <text class="card-title">当日排期</text>
+    <view wx:for="{{schedule}}" wx:key="id" class="sched-row">
+      <text class="sched-time">{{item.start_time}}–{{item.end_time}}</text>
+      <text class="sched-status status-tag status-{{item.status}}">{{statusText[item.status]}}</text>
+    </view>
+  </view>
+
+  <view class="submit-bar">
+    <button class="btn-primary submit-btn" bindtap="doSubmit" loading="{{loading}}">提交预约</button>
+  </view>
+</view>

@@ -1,0 +1,29 @@
+<view class="login-page">
+  <view class="login-hero">
+    <view class="hero-icon">🔬</view>
+    <text class="hero-title">实验室预约系统</text>
+    <text class="hero-sub">分布式跨校区管理平台</text>
+  </view>
+
+  <view class="login-form card">
+    <view class="role-row">
+      <view
+        wx:for="{{roles}}" wx:key="value"
+        class="role-chip {{form.role === item.value ? 'active' : ''}}"
+        bindtap="selectRole" data-value="{{item.value}}"
+      >{{item.label}}</view>
+    </view>
+
+    <view class="field">
+      <text class="field-label">用户名</text>
+      <input class="field-input" placeholder="请输入用户名" value="{{form.username}}" bindinput="onUsername" />
+    </view>
+
+    <view class="field">
+      <text class="field-label">密码</text>
+      <input class="field-input" placeholder="请输入密码" password value="{{form.password}}" bindinput="onPassword" />
+    </view>
+
+    <button class="btn-primary login-btn" bindtap="doLogin" loading="{{loading}}">登 录</button>
+  </view>
+</view>

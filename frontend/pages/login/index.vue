@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <view class="login-page">
     <view class="login-page__glow login-page__glow--left"></view>
     <view class="login-page__glow login-page__glow--right"></view>
@@ -429,7 +429,7 @@ export default {
   letter-spacing: 2rpx;
 }
 
-/* #ifdef H5 */
+
 @media screen and (min-width: 1024px) {
   .login-page__content {
     padding: 24px 24px 18px;
@@ -572,5 +572,5 @@ export default {
     letter-spacing: 2px;
   }
 }
-/* #endif */
+
 </style>

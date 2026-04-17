@@ -1,12 +1,6 @@
-<template>
+﻿<template>
   <view class="reserve-page">
-    <!-- #ifdef H5 -->
     <student-top-nav active="labs" />
-    <!-- #endif -->
-
-    <!-- #ifndef H5 -->
-    <user-top-nav active="labs" />
-    <!-- #endif -->
 
     <view class="reserve-page__shell">
       <view class="reserve-page__head">
@@ -202,7 +196,6 @@
 
 <script>
 import StudentTopNav from '../../components/student-top-nav.vue'
-import UserTopNav from '../../components/user-top-nav.vue'
 import { api } from '../../api/index'
 import { requireLogin } from '../../common/guard'
 import { openPage } from '../../common/router'
@@ -321,7 +314,7 @@ function buildSegments(openMinute, closeMinute, reservations, selectedStart, sel
 }
 
 export default {
-  components: { StudentTopNav, UserTopNav },
+  components: { StudentTopNav },
   data() {
     return {
       labIndex: 0,
@@ -429,9 +422,6 @@ export default {
   },
   async onShow() {
     if (!requireLogin()) return
-    // #ifdef H5
-    uni.hideTabBar()
-    // #endif
     await this.loadLabs()
   },
   methods: {

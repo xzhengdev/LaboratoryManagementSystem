@@ -1,12 +1,6 @@
-﻿<template>
+﻿﻿<template>
   <view class="profile-page">
-    <!-- #ifdef H5 -->
     <student-top-nav active="profile" />
-    <!-- #endif -->
-
-    <!-- #ifndef H5 -->
-    <user-top-nav active="profile" />
-    <!-- #endif -->
 
     <view class="profile-page__shell">
       <view class="profile-page__hero">
@@ -74,7 +68,6 @@
 <script>
 import SiteFooter from '../../components/site-footer.vue'
 import StudentTopNav from '../../components/student-top-nav.vue'
-import UserTopNav from '../../components/user-top-nav.vue'
 import { api } from '../../api/index'
 import { requireLogin } from '../../common/guard'
 import { openPage } from '../../common/router'
@@ -82,7 +75,7 @@ import { clearSession, getProfile, updateProfile } from '../../common/session'
 import { getRoleText, routes } from '../../config/navigation'
 
 export default {
-  components: { SiteFooter, StudentTopNav, UserTopNav },
+  components: { SiteFooter, StudentTopNav },
   data() {
     return {
       routes,
@@ -108,9 +101,6 @@ export default {
   },
   async onShow() {
     if (!requireLogin()) return
-    // #ifdef H5
-    uni.hideTabBar()
-    // #endif
     this.profile = getProfile()
     await this.refreshProfile()
     this.syncFormFromProfile()
@@ -484,23 +474,9 @@ export default {
   box-sizing: border-box;
 }
 
-/* #ifndef H5 */
-.profile-page__shell {
-  padding-left: 24rpx;
-  padding-right: 24rpx;
-}
 
-.profile-page__layout,
-.profile-page__form-grid {
-  grid-template-columns: 1fr;
-}
 
-.profile-page__name {
-  font-size: 48rpx;
-}
-/* #endif */
 
-/* #ifdef H5 */
 @media screen and (min-width: 1500px) {
   .profile-page__shell {
     padding-left: 56rpx;
@@ -524,6 +500,6 @@ export default {
     grid-template-columns: 1fr;
   }
 }
-/* #endif */
+
 </style>
 

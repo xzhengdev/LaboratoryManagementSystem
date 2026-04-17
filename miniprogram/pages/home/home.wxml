@@ -1,0 +1,52 @@
+<view class="home-page">
+  <!-- Banner -->
+  <swiper class="banner" autoplay interval="3000" circular indicator-dots indicator-color="rgba(255,255,255,0.5)" indicator-active-color="#fff">
+    <swiper-item wx:for="{{banners}}" wx:key="index">
+      <view class="banner-slide" style="background:{{item.bg}}">
+        <text class="banner-title">{{item.title}}</text>
+        <text class="banner-sub">{{item.sub}}</text>
+      </view>
+    </swiper-item>
+  </swiper>
+
+  <!-- Quick entries -->
+  <view class="entries">
+    <view class="entry-item" bindtap="goCampuses">
+      <view class="entry-icon" style="background:#EBF4FF">🏫</view>
+      <text class="entry-label">校区</text>
+    </view>
+    <view class="entry-item" bindtap="goLabs">
+      <view class="entry-icon" style="background:#FFF3E0">🔬</view>
+      <text class="entry-label">实验室</text>
+    </view>
+    <view class="entry-item" bindtap="goReservations">
+      <view class="entry-icon" style="background:#E8F5E9">📋</view>
+      <text class="entry-label">我的预约</text>
+    </view>
+    <view class="entry-item" bindtap="goAgent">
+      <view class="entry-icon" style="background:#F3E5F5">🤖</view>
+      <text class="entry-label">AI助手</text>
+    </view>
+  </view>
+
+  <!-- Featured labs -->
+  <text class="section-title">推荐实验室</text>
+  <view wx:if="{{labs.length === 0}}" class="empty-tip">暂无数据</view>
+  <view
+    wx:for="{{labs}}" wx:key="id"
+    class="lab-card card"
+    bindtap="goLabDetail" data-id="{{item.id}}"
+  >
+    <view class="lab-card-inner">
+      <view class="lab-cover" style="background:#4A90E2">
+        <text class="lab-cover-text">{{item.lab_name[0]}}</text>
+      </view>
+      <view class="lab-info">
+        <text class="lab-name">{{item.lab_name}}</text>
+        <text class="lab-meta">容纳 {{item.capacity}} 人 · {{item.open_time}}–{{item.close_time}}</text>
+        <text class="lab-campus">{{item.campus_name || ''}}</text>
+      </view>
+      <text class="lab-arrow">›</text>
+    </view>
+  </view>
+</view>

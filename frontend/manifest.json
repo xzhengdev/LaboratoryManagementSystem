@@ -10,11 +10,5 @@
     "router": {
       "mode": "hash"
     }
-  },
-  "mp-weixin": {
-    "appid": "touristappid",
-    "setting": {
-      "urlCheck": false
-    }
   }
 }

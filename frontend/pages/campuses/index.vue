@@ -1,12 +1,6 @@
 ﻿<template>
   <view class="campus-page">
-    <!-- #ifdef H5 -->
     <student-top-nav active="campuses" />
-    <!-- #endif -->
-
-    <!-- #ifndef H5 -->
-    <user-top-nav active="campuses" />
-    <!-- #endif -->
 
     <view class="campus-page__shell">
       <view class="campus-page__hero">
@@ -58,7 +52,6 @@
 <script>
 import SiteFooter from '../../components/site-footer.vue'
 import StudentTopNav from '../../components/student-top-nav.vue'
-import UserTopNav from '../../components/user-top-nav.vue'
 import { api } from '../../api/index'
 import { requireLogin } from '../../common/guard'
 import { openPage } from '../../common/router'
@@ -78,7 +71,7 @@ function getCampusBadge(name) {
 }
 
 export default {
-  components: { SiteFooter, StudentTopNav, UserTopNav },
+  components: { SiteFooter, StudentTopNav },
   data() {
     return {
       routes,
@@ -104,9 +97,6 @@ export default {
   },
   async onShow() {
     if (!requireLogin()) return
-    // #ifdef H5
-    uni.hideTabBar()
-    // #endif
     await this.loadData()
   },
   methods: {
@@ -377,46 +367,6 @@ export default {
 }
 
 
-/* #ifndef H5 */
-.campus-page__body {
-  padding-top: 24rpx;
-}
-
-.campus-page__shell {
-  padding-left: 24rpx;
-  padding-right: 24rpx;
-}
-
-.campus-page__grid {
-  grid-template-columns: 1fr;
-}
-
-.campus-page__card,
-.campus-page__card--1,
-.campus-page__card--2,
-.campus-page__card--3 {
-  grid-column: auto;
-}
-
-.campus-page__card--3 {
-  display: block;
-}
-
-.campus-page__card--3 .campus-page__cover,
-.campus-page__card--1 .campus-page__cover,
-.campus-page__card--2 .campus-page__cover {
-  height: 100%;
-}
-
-.campus-page__card-body,
-.campus-page__card--3 .campus-page__card-body {
-  left: 14rpx;
-  right: 14rpx;
-  bottom: 14rpx;
-}
-/* #endif */
-
-/* #ifdef H5 */
 @media screen and (min-width: 1500px) {
   .campus-page__shell {
     padding-left: 56rpx;
@@ -491,5 +441,4 @@ export default {
     grid-column: auto;
   }
 }
-/* #endif */
 </style>

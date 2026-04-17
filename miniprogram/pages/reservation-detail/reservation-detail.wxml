@@ -1,0 +1,50 @@
+<view class="detail-page">
+  <!-- Status banner -->
+  <view class="status-banner status-banner-{{reservation.status}}">
+    <text class="banner-status-text">{{statusText[reservation.status]}}</text>
+    <text class="banner-status-sub">{{statusSub[reservation.status]}}</text>
+  </view>
+
+  <!-- Lab info -->
+  <view class="card">
+    <text class="card-title">实验室信息</text>
+    <view class="info-row"><text class="info-k">实验室</text><text class="info-v">{{reservation.lab_name}}</text></view>
+    <view class="info-row"><text class="info-k">位置</text><text class="info-v">{{reservation.lab_location || '—'}}</text></view>
+    <view class="info-row"><text class="info-k">校区</text><text class="info-v">{{reservation.campus_name || '—'}}</text></view>
+  </view>
+
+  <!-- Time info -->
+  <view class="card">
+    <text class="card-title">预约时间</text>
+    <view class="info-row"><text class="info-k">日期</text><text class="info-v">{{reservation.reservation_date}}</text></view>
+    <view class="info-row"><text class="info-k">时段</text><text class="info-v">{{reservation.start_time}} – {{reservation.end_time}}</text></view>
+    <view class="info-row"><text class="info-k">人数</text><text class="info-v">{{reservation.participant_count}} 人</text></view>
+  </view>
+
+  <!-- Purpose -->
+  <view class="card">
+    <text class="card-title">使用目的</text>
+    <text class="purpose-text">{{reservation.purpose}}</text>
+  </view>
+
+  <!-- Approval timeline -->
+  <view class="card" wx:if="{{approvals.length > 0}}">
+    <text class="card-title">审批记录</text>
+    <view wx:for="{{approvals}}" wx:key="id" class="approval-item">
+      <view class="approval-dot status-dot-{{item.approval_status}}"></view>
+      <view class="approval-body">
+        <view class="approval-header">
+          <text class="approval-approver">{{item.approver_name || '审批人'}}</text>
+          <view class="status-tag status-{{item.approval_status}}">{{statusText[item.approval_status]}}</view>
+        </view>
+        <text class="approval-remark" wx:if="{{item.remark}}">{{item.remark}}</text>
+        <text class="approval-time">{{item.created_at}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- Cancel button -->
+  <view class="action-bar" wx:if="{{reservation.status === 'pending' || reservation.status === 'approved'}}">
+    <button class="btn-danger cancel-btn" bindtap="doCancel" loading="{{loading}}">取消预约</button>
+  </view>
+</view>

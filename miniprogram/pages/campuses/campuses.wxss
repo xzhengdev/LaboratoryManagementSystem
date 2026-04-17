@@ -1,0 +1,28 @@
+.campuses-page { padding-bottom: 40rpx; }
+
+.campus-card { display: flex; align-items: center; gap: 20rpx; padding: 20rpx 24rpx; }
+
+.campus-cover {
+  width: 100rpx; height: 100rpx;
+  border-radius: 16rpx;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.campus-char { font-size: 44rpx; color: #fff; font-weight: 700; }
+
+.campus-body { flex: 1; display: flex; flex-direction: column; gap: 8rpx; }
+.campus-name { font-size: 30rpx; font-weight: 600; color: #222; }
+.campus-addr { font-size: 24rpx; color: #888; }
+
+.campus-status {
+  display: inline-block;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+  font-size: 22rpx;
+  font-weight: 500;
+  align-self: flex-start;
+}
+.campus-status.active   { color: #27AE60; background: #EAFAF1; }
+.campus-status.inactive { color: #999;    background: #F5F5F5; }
+
+.campus-arrow { font-size: 40rpx; color: #ccc; }

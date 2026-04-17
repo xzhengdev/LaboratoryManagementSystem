@@ -1,12 +1,6 @@
-<template>
+﻿<template>
   <view class="labs-page">
-    <!-- #ifdef H5 -->
     <student-top-nav active="labs" />
-    <!-- #endif -->
-
-    <!-- #ifndef H5 -->
-    <user-top-nav active="labs" />
-    <!-- #endif -->
 
     <view class="labs-page__body">
       <view class="labs-page__shell">
@@ -96,7 +90,6 @@
 
 <script>
 import StudentTopNav from '../../components/student-top-nav.vue'
-import UserTopNav from '../../components/user-top-nav.vue'
 import { api } from '../../api/index'
 import { requireLogin } from '../../common/guard'
 import { openPage } from '../../common/router'
@@ -120,7 +113,7 @@ const TYPE_FILTERS = [
 ]
 
 export default {
-  components: { StudentTopNav, UserTopNav },
+  components: { StudentTopNav },
   data() {
     return {
       selectedType: 'all',
@@ -164,9 +157,6 @@ export default {
       this.campusId = String(entryCampusId)
       uni.removeStorageSync('campus_entry_campus_id')
     }
-    // #ifdef H5
-    uni.hideTabBar()
-    // #endif
     await this.loadCampusOptions()
     await this.loadData()
   },
@@ -570,39 +560,9 @@ export default {
   min-height: 340rpx;
 }
 
-/* #ifndef H5 */
-.labs-page__shell {
-  padding-left: 24rpx;
-  padding-right: 24rpx;
-}
 
-.labs-page__title {
-  font-size: 56rpx;
-}
 
-.labs-page__sub {
-  font-size: 24rpx;
-}
 
-.labs-page__filters {
-  grid-template-columns: 1fr;
-}
-
-.labs-page__grid {
-  grid-template-columns: 1fr;
-}
-
-.labs-page__card.featured {
-  grid-column: auto;
-  min-height: 0;
-}
-
-.labs-page__card.featured .labs-page__cover {
-  min-height: 0;
-}
-/* #endif */
-
-/* #ifdef H5 */
 @media screen and (min-width: 1500px) {
   .labs-page__shell {
     padding-left: 56rpx;
@@ -634,5 +594,5 @@ export default {
     grid-template-columns: 1fr;
   }
 }
-/* #endif */
+
 </style>
