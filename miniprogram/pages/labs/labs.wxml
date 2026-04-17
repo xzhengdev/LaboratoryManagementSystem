@@ -34,7 +34,13 @@
   >
     <view class="lab-cover-wrap">
       <view class="lab-cover-bg" style="background:{{item.color}}">
-        <text class="lab-cover-char">{{item.lab_name[0]}}</text>
+        <image
+          wx:if="{{item.photos && item.photos.length}}"
+          class="lab-cover-image"
+          src="{{item.photos[0]}}"
+          mode="aspectFill"
+        />
+        <text wx:else class="lab-cover-char">{{item.lab_name[0]}}</text>
       </view>
     </view>
     <view class="lab-body">
