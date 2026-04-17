@@ -1,29 +1,51 @@
-<view class="login-page">
-  <view class="login-hero">
-    <view class="hero-icon">🔬</view>
-    <text class="hero-title">实验室预约系统</text>
-    <text class="hero-sub">分布式跨校区管理平台</text>
-  </view>
-
-  <view class="login-form card">
-    <view class="role-row">
-      <view
-        wx:for="{{roles}}" wx:key="value"
-        class="role-chip {{form.role === item.value ? 'active' : ''}}"
-        bindtap="selectRole" data-value="{{item.value}}"
-      >{{item.label}}</view>
+<view class="page">
+  <view class="container">
+    <view class="login-main">
+      <view class="brand-block">
+        <view class="brand-logo-wrap">
+          <image class="brand-logo" src="/assets/logo.png" mode="aspectFit" />
+        </view>
+        <text class="brand-title">{{ui.brandTitle}}</text>
+        <text class="brand-subtitle">{{ui.brandSubtitle}}</text>
+      </view>
+      <view class="login-card">
+        <view class="card-title-wrap">
+          <text class="card-title-main">{{ui.login}}</text>
+        </view>
+        <view class="card-fields">
+          <view class="form-group">
+            <view class="input-shell">
+              <text class="input-icon">{{ui.idIcon}}</text>
+              <input class="input" placeholder="{{ui.accountPlaceholder}}" placeholder-class="placeholder" bindinput="onUsername" value="{{form.username}}" confirm-type="next" />
+            </view>
+          </view>
+          <view class="form-group">
+            <view class="input-shell">
+              <text class="input-icon">{{ui.pwdIcon}}</text>
+              <input class="input" password placeholder="{{ui.passwordPlaceholder}}" placeholder-class="placeholder" bindinput="onPassword" value="{{form.password}}" confirm-type="done" />
+            </view>
+          </view>
+        </view>
+        <view class="card-actions">
+          <view class="assist-row">
+            <view class="remember-wrap">
+              <view class="remember-dot"></view>
+              <text class="remember-text">{{ui.remember}}</text>
+            </view>
+            <text class="forgot">{{ui.forgot}}</text>
+          </view>
+          <button class="submit" loading="{{loading}}" disabled="{{loading}}" bindtap="doLogin">
+            {{loading ? ui.loggingIn : ui.login}}
+          </button>
+        </view>
+      </view>
     </view>
-
-    <view class="field">
-      <text class="field-label">用户名</text>
-      <input class="field-input" placeholder="请输入用户名" value="{{form.username}}" bindinput="onUsername" />
+    <view class="login-page__bottom">
+      <view class="login-footer">
+        <view class="login-footer__line"></view>
+        <text class="login-footer__text">{{ui.secureText}}</text>
+      </view>
+      <view class="page-footer">{{ui.platformText}}</view>
     </view>
-
-    <view class="field">
-      <text class="field-label">密码</text>
-      <input class="field-input" placeholder="请输入密码" password value="{{form.password}}" bindinput="onPassword" />
-    </view>
-
-    <button class="btn-primary login-btn" bindtap="doLogin" loading="{{loading}}">登 录</button>
   </view>
 </view>

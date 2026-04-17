@@ -1,4 +1,4 @@
-const BASE_URL = 'https://6a9d-61-50-133-187.ngrok-free.app/api'
+const BASE_URL = 'http://127.0.0.1:5000/api'
 
 function getToken() {
   return wx.getStorageSync('lab_token') || ''
