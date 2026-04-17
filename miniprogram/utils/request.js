@@ -1,4 +1,4 @@
-const BASE_URL = 'http://127.0.0.1:5000/api'
+const BASE_URL = 'http://10.151.65.52:5000/api'
 
 function getToken() {
   return wx.getStorageSync('lab_token') || ''

@@ -1,46 +1,28 @@
 <view class="agent-page">
   <scroll-view scroll-y class="msg-list" scroll-into-view="{{scrollId}}">
-    <view
-      wx:for="{{messages}}" wx:key="index"
-      class="msg-wrap {{item.role}}"
-      id="msg-{{index}}"
-    >
+    <view wx:for="{{messages}}" wx:key="index" class="msg-wrap {{item.role}}" id="msg-{{index}}">
       <view class="msg-bubble">
         <text class="msg-text">{{item.content}}</text>
       </view>
-      <!-- Action buttons from assistant -->
       <view wx:if="{{item.actions && item.actions.length}}" class="action-btns">
-        <view
-          wx:for="{{item.actions}}" wx:key="path" wx:for-item="action"
-          class="action-btn-item"
-          bindtap="goAction" data-path="{{action.path}}"
-        >{{action.label}}</view>
+        <view wx:for="{{item.actions}}" wx:key="path" wx:for-item="action" class="action-btn-item" bindtap="goAction" data-path="{{action.path}}">
+          {{action.label}}
+        </view>
       </view>
     </view>
     <view id="msg-bottom"></view>
   </scroll-view>
-
   <!-- Quick prompts -->
   <scroll-view scroll-x class="quick-scroll">
     <view class="quick-list">
-      <view
-        wx:for="{{quickPrompts}}" wx:key="index"
-        class="quick-item"
-        bindtap="sendQuick" data-text="{{item}}"
-      >{{item}}</view>
+      <view wx:for="{{quickPrompts}}" wx:key="index" class="quick-item" bindtap="sendQuick" data-text="{{item}}">
+        {{item}}
+      </view>
     </view>
   </scroll-view>
-
   <!-- Input bar -->
   <view class="input-bar">
-    <input
-      class="chat-input"
-      placeholder="输入问题，例如：明天有哪些实验室可预约"
-      value="{{draft}}"
-      bindinput="onDraft"
-      confirm-type="send"
-      bindconfirm="sendMessage"
-    />
+    <input class="chat-input" placeholder="明天有哪些实验室可预约" value="{{draft}}" bindinput="onDraft" confirm-type="send" bindconfirm="sendMessage" />
     <view class="send-btn {{draft ? '' : 'disabled'}}" bindtap="sendMessage">发送</view>
   </view>
 </view>
