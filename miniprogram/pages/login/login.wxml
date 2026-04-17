@@ -1,6 +1,9 @@
 <view class="page">
   <view class="container">
+
     <view class="login-main">
+
+      <!-- 品牌 -->
       <view class="brand-block">
         <view class="brand-logo-wrap">
           <image class="brand-logo" src="/assets/logo.png" mode="aspectFit" />
@@ -8,25 +11,49 @@
         <text class="brand-title">{{ui.brandTitle}}</text>
         <text class="brand-subtitle">{{ui.brandSubtitle}}</text>
       </view>
+
+      <!-- 登录卡片 -->
       <view class="login-card">
+
         <view class="card-title-wrap">
           <text class="card-title-main">{{ui.login}}</text>
         </view>
+
+        <!-- 输入框 -->
         <view class="card-fields">
-          <view class="form-group">
-            <view class="input-shell">
-              <text class="input-icon">{{ui.idIcon}}</text>
-              <input class="input" placeholder="{{ui.accountPlaceholder}}" placeholder-class="placeholder" bindinput="onUsername" value="{{form.username}}" confirm-type="next" />
-            </view>
+
+          <!-- 用户名 -->
+          <view class="input-shell {{form.username ? 'active' : ''}}">
+            <text class="floating-label">账号</text>
+            <input
+              class="input"
+              placeholder="{{ui.accountPlaceholder}}"
+              placeholder-class="placeholder"
+              value="{{form.username}}"
+              bindinput="onUsername"
+              confirm-type="next"
+            />
           </view>
-          <view class="form-group">
-            <view class="input-shell">
-              <text class="input-icon">{{ui.pwdIcon}}</text>
-              <input class="input" password placeholder="{{ui.passwordPlaceholder}}" placeholder-class="placeholder" bindinput="onPassword" value="{{form.password}}" confirm-type="done" />
-            </view>
+
+          <!-- 密码 -->
+          <view class="input-shell {{form.password ? 'active' : ''}}">
+            <text class="floating-label">密码</text>
+            <input
+              class="input"
+              password
+              placeholder="{{ui.passwordPlaceholder}}"
+              placeholder-class="placeholder"
+              value="{{form.password}}"
+              bindinput="onPassword"
+              confirm-type="done"
+            />
           </view>
+
         </view>
+
+        <!-- 操作 -->
         <view class="card-actions">
+
           <view class="assist-row">
             <view class="remember-wrap" bindtap="toggleRemember">
               <view class="remember-dot {{rememberPassword ? 'active' : ''}}"></view>
@@ -34,17 +61,35 @@
             </view>
             <text class="forgot" bindtap="onForgotPassword">{{ui.forgot}}</text>
           </view>
-          <button class="submit" loading="{{loading}}" disabled="{{loading}}" bindtap="doLogin">
-            {{loading ? ui.loggingIn : ui.login}}
+
+          <!-- 登录按钮 -->
+          <button class="submit {{loading ? 'loading' : ''}}" bindtap="doLogin">
+
+            <view wx:if="{{!loading}}">
+              {{ui.login}}
+            </view>
+
+            <view wx:else class="btn-loading">
+              <view class="dot"></view>
+              <view class="dot"></view>
+              <view class="dot"></view>
+            </view>
+
           </button>
+
         </view>
+
       </view>
+
     </view>
+
+    <!-- 底部 -->
     <view class="login-page__bottom">
       <view class="login-footer">
         <view class="login-footer__line"></view>
         <text class="login-footer__text">{{ui.secureText}}</text>
       </view>
     </view>
+
   </view>
 </view>
