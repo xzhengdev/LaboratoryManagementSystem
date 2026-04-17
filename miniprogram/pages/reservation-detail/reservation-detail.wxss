@@ -1,58 +1,184 @@
-.detail-page { padding-bottom: 140rpx; }
+/* ===== 页面背景 ===== */
+.detail-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f5f6f8 0%, #eef1f5 100%);
+  padding-bottom: 140rpx;
+  box-sizing: border-box;
+}
 
-.status-banner {
-  padding: 40rpx 32rpx;
+
+/* ===== 内容区域 ===== */
+.detail-content {
+  padding: 30rpx 0rpx;
   display: flex;
   flex-direction: column;
-  gap: 8rpx;
+  gap: 20rpx;
+  padding-bottom: 40rpx;
 }
-.status-banner-pending  { background: linear-gradient(135deg,#F5A623,#e09010); }
-.status-banner-approved { background: linear-gradient(135deg,#27AE60,#1e8449); }
-.status-banner-rejected { background: linear-gradient(135deg,#E25454,#c0392b); }
-.status-banner-cancelled{ background: linear-gradient(135deg,#999,#777); }
-.status-banner-completed{ background: linear-gradient(135deg,#4A90E2,#2c6fbe); }
 
-.banner-status-text { font-size: 44rpx; font-weight: 700; color: #fff; }
-.banner-status-sub  { font-size: 26rpx; color: rgba(255,255,255,0.85); }
+/* ===== 卡片 ===== */
+.card {
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(20rpx);
+  border-radius: 24rpx;
+  padding: 28rpx;
+  box-shadow:
+    0 12rpx 40rpx rgba(0,0,0,0.06),
+    0 4rpx 12rpx rgba(0,0,0,0.04);
+}
 
-.card-title { font-size: 28rpx; font-weight: 600; color: #333; display: block; margin-bottom: 16rpx; }
+/* ===== 卡片头 ===== */
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
 
+/* ===== 标题 ===== */
+.card-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #222;
+}
+
+/* ===== 信息行 ===== */
 .info-row {
   display: flex;
   justify-content: space-between;
-  padding: 14rpx 0;
-  border-bottom: 1rpx solid #F5F7FA;
+  align-items: center;
+  padding: 18rpx 0;
+  border-bottom: 1rpx solid rgba(0,0,0,0.05);
 }
-.info-row:last-child { border-bottom: none; }
-.info-k { font-size: 26rpx; color: #888; }
-.info-v { font-size: 26rpx; color: #333; font-weight: 500; }
 
-.purpose-text { font-size: 26rpx; color: #555; line-height: 1.7; }
+.info-row:last-child {
+  border-bottom: none;
+}
 
-.approval-item { display: flex; gap: 16rpx; padding: 16rpx 0; border-bottom: 1rpx solid #F5F7FA; }
-.approval-item:last-child { border-bottom: none; }
+.info-k {
+  font-size: 26rpx;
+  color: rgba(0,0,0,0.6);
+}
+
+.info-v {
+  font-size: 26rpx;
+  color: #111;
+  font-weight: 500;
+  text-align: right;
+}
+
+/* ===== 使用目的 ===== */
+.purpose-text {
+  font-size: 26rpx;
+  color: #555;
+  line-height: 1.8;
+}
+
+/* ===== 审批记录 ===== */
+.approval-item {
+  display: flex;
+  gap: 16rpx;
+  padding: 18rpx 0;
+  border-bottom: 1rpx solid rgba(0,0,0,0.05);
+}
+
+.approval-item:last-child {
+  border-bottom: none;
+}
 
 .approval-dot {
-  width: 20rpx; height: 20rpx;
+  width: 18rpx;
+  height: 18rpx;
   border-radius: 50%;
   margin-top: 8rpx;
   flex-shrink: 0;
 }
+
 .approval-dot.status-dot-approved { background: #27AE60; }
 .approval-dot.status-dot-rejected { background: #E25454; }
 .approval-dot.status-dot-pending  { background: #F5A623; }
 
-.approval-body { flex: 1; display: flex; flex-direction: column; gap: 6rpx; }
-.approval-header { display: flex; justify-content: space-between; align-items: center; }
-.approval-approver { font-size: 26rpx; font-weight: 500; color: #333; }
-.approval-remark { font-size: 24rpx; color: #666; }
-.approval-time { font-size: 22rpx; color: #bbb; }
-
-.action-bar {
-  position: fixed;
-  bottom: 0; left: 0; right: 0;
-  background: #fff;
-  padding: 20rpx 32rpx;
-  box-shadow: 0 -2rpx 12rpx rgba(0,0,0,0.08);
+.approval-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
 }
-.cancel-btn { width: 100%; }
+
+.approval-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.approval-approver {
+  font-size: 26rpx;
+  font-weight: 500;
+  color: #333;
+}
+
+.approval-remark {
+  font-size: 24rpx;
+  color: #666;
+}
+
+.approval-time {
+  font-size: 22rpx;
+  color: #aaa;
+}
+
+/* ===== 状态标签 ===== */
+.status-tag {
+  font-size: 22rpx;
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+}
+
+.status-approved {
+  color: #27AE60;
+  background: rgba(39,174,96,0.12);
+}
+
+.status-rejected {
+  color: #E25454;
+  background: rgba(226,84,84,0.12);
+}
+
+.status-pending {
+  color: #F5A623;
+  background: rgba(245,166,35,0.12);
+}
+
+.status-cancelled {
+  color: #999;
+  background: rgba(0,0,0,0.08);
+}
+
+.action-wrap {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: 24rpx;
+  background: transparent;
+  box-shadow: none;
+  z-index: 10;
+}
+
+.cancel-btn {
+  width: 50%;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 16rpx;
+  border: none;
+  background: linear-gradient(135deg, #f46b6b, #e25454);
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 600;
+  box-shadow:
+    0 8rpx 20rpx rgba(226,84,84,0.18),
+    inset 0 1rpx 0 rgba(255,255,255,0.25);
+}
+
+.cancel-btn::after {
+  border: none;
+}

@@ -1,27 +1,133 @@
-.reservations-page { padding-bottom: 40rpx; }
+.reservations-page {
+  padding: 16rpx;
+  background: #f5f6f8;
+  min-height: 100vh;
+}
 
-.filter-scroll { background: #fff; border-bottom: 1rpx solid #F0F4FA; }
-.filter-tabs { display: flex; padding: 16rpx 24rpx; gap: 16rpx; white-space: nowrap; }
+/* ===== 筛选栏 ===== */
+.filter-scroll {
+  margin-bottom: 16rpx;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 12rpx;
+}
 
 .filter-tab {
-  padding: 10rpx 28rpx;
-  border-radius: 40rpx;
-  font-size: 26rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  background: #f2f3f5;
   color: #666;
-  background: #F0F4FA;
-  flex-shrink: 0;
 }
-.filter-tab.active { background: #4A90E2; color: #fff; font-weight: 600; }
 
-.res-card { display: flex; flex-direction: column; gap: 12rpx; }
+.filter-tab.active {
+  background: #0071e3;
+  color: #fff;
+  font-weight: 600;
+}
 
-.res-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4rpx; }
-.res-lab { font-size: 30rpx; font-weight: 600; color: #222; }
+/* ===== 卡片 ===== */
+.res-card {
+  background: #fff;
+  border-radius: 18rpx;
+  padding: 20rpx;
+  margin-bottom: 14rpx;
 
-.res-row { display: flex; align-items: center; gap: 12rpx; }
-.res-icon { font-size: 26rpx; }
-.res-text { font-size: 26rpx; color: #555; }
+  box-shadow: 0 6rpx 20rpx rgba(0,0,0,0.05);
+  transition: all 0.2s ease;
+}
 
-.res-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 4rpx; }
-.res-purpose { font-size: 24rpx; color: #aaa; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.res-arrow { font-size: 36rpx; color: #ccc; margin-left: 12rpx; }
+.res-card:active {
+  transform: scale(0.98);
+}
+
+/* ===== 头部 ===== */
+.res-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.res-lab {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #111;
+}
+
+/* 状态 */
+.status-tag {
+  font-size: 22rpx;
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+}
+
+.status-pending {
+  color: #F2994A;
+  background: rgba(242,153,74,0.15);
+}
+
+.status-approved {
+  color: #27AE60;
+  background: rgba(39,174,96,0.15);
+}
+
+.status-rejected {
+  color: #EB5757;
+  background: rgba(235,87,87,0.15);
+}
+
+/* ===== 信息区 ===== */
+.res-body {
+  margin-top: 12rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.res-row {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.res-icon {
+  font-size: 24rpx;
+}
+
+.res-text {
+  font-size: 24rpx;
+  color: #555;
+}
+
+/* ===== 底部 ===== */
+.res-footer {
+  margin-top: 12rpx;
+  padding-top: 12rpx;
+  border-top: 1rpx solid #f0f0f0;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.res-footer {
+  margin-top: 12rpx;
+  padding-top: 12rpx;
+  border-top: 1rpx solid #f0f0f0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.res-arrow {
+  font-size: 28rpx;
+  color: #ccc;
+}
+
+/* 空 */
+.empty-tip {
+  text-align: center;
+  margin-top: 120rpx;
+  color: #aaa;
+}
