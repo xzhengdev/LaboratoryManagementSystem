@@ -1,8 +1,18 @@
-.home-page { padding-bottom: 40rpx; }
+/* ===== 页面背景 ===== */
+.home-page {
+  padding: 16rpx;
+  padding-bottom: 40rpx;
+  background: linear-gradient(180deg, #f5f6f8 0%, #eef1f5 100%);
+  min-height: 100vh;
+}
 
+/* ===== Banner（升级） ===== */
 .banner {
   height: 320rpx;
   width: 100%;
+  border-radius: 24rpx;
+  overflow: hidden;
+  margin-bottom: 16rpx;
 }
 
 .banner-slide {
@@ -10,76 +20,127 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 0 48rpx;
+  padding: 0 40rpx;
+  border-radius: 24rpx;
 }
 
+/* 标题 */
 .banner-title {
-  font-size: 40rpx;
+  font-size: 42rpx;
   font-weight: 700;
   color: #fff;
-  margin-bottom: 12rpx;
+  margin-bottom: 10rpx;
 }
 
+/* 副标题 */
 .banner-sub {
   font-size: 26rpx;
   color: rgba(255,255,255,0.85);
 }
 
+/* ===== 快捷入口（卡片化） ===== */
 .entries {
   display: flex;
-  justify-content: space-around;
-  background: #fff;
-  padding: 32rpx 16rpx;
-  margin-bottom: 8rpx;
+  justify-content: space-between;
+  padding: 20rpx 16rpx;
+  border-radius: 20rpx;
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(20rpx);
+  box-shadow: 0 10rpx 30rpx rgba(0,0,0,0.06);
+  margin-bottom: 20rpx;
 }
-
 .entry-item {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12rpx;
 }
 
+/* icon（升级） */
 .entry-icon {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 24rpx;
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 20rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 44rpx;
+  font-size: 40rpx;
+
+  box-shadow: 0 6rpx 16rpx rgba(0,0,0,0.08);
 }
 
+/* label */
 .entry-label {
   font-size: 24rpx;
-  color: #555;
+  color: rgba(0,0,0,0.6);
 }
 
-.lab-card { padding: 0; overflow: hidden; }
+/* ===== 标题 ===== */
+.section-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  margin: 16rpx 0 8rpx;   /* 左右不要再单独加 */
+  color: #111;
+}
 
+
+/* 空状态 */
+.empty-tip {
+  text-align: center;
+  color: rgba(0,0,0,0.4);
+  margin-top: 80rpx;
+}
+
+/* ===== 实验室卡片（核心升级） ===== */
+.lab-card {
+  margin-top: 12rpx;
+  margin-left: 0;         /* 关键 */
+  margin-right: 0;        /* 关键 */
+  border-radius: 20rpx;
+  background: rgba(255,255,255,0.75);
+  backdrop-filter: blur(20rpx);
+  box-shadow:
+    0 12rpx 30rpx rgba(0,0,0,0.06),
+    0 4rpx 12rpx rgba(0,0,0,0.04);
+  overflow: hidden;
+}
+
+/* 点击反馈 */
+.lab-card:active {
+  transform: scale(0.98);
+}
+
+/* 卡片内容 */
 .lab-card-inner {
   display: flex;
   align-items: center;
-  padding: 24rpx;
+  padding: 20rpx;
   gap: 20rpx;
 }
 
+/* 封面 */
 .lab-cover {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 12rpx;
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 18rpx;
   flex-shrink: 0;
+
   display: flex;
   align-items: center;
   justify-content: center;
+
+  box-shadow: 0 6rpx 14rpx rgba(0,0,0,0.1);
 }
 
+/* 封面字 */
 .lab-cover-text {
-  font-size: 40rpx;
+  font-size: 36rpx;
   color: #fff;
   font-weight: 700;
 }
 
+/* 信息区 */
 .lab-info {
   flex: 1;
   display: flex;
@@ -87,23 +148,27 @@
   gap: 6rpx;
 }
 
+/* 名字 */
 .lab-name {
   font-size: 30rpx;
   font-weight: 600;
-  color: #222;
+  color: #111;
 }
 
+/* 元信息 */
 .lab-meta {
   font-size: 24rpx;
-  color: #888;
+  color: rgba(0,0,0,0.55);
 }
 
+/* 校区 */
 .lab-campus {
   font-size: 22rpx;
-  color: #4A90E2;
+  color: #0071e3;
 }
 
+/* 箭头 */
 .lab-arrow {
-  font-size: 40rpx;
-  color: #ccc;
+  font-size: 34rpx;
+  color: rgba(0,0,0,0.25);
 }
