@@ -11,35 +11,45 @@
   </view>
 
   <!-- Info / Edit form -->
-  <view class="card info-card">
+  <view class="info-card">
     <view class="info-row">
       <text class="info-k">用户名</text>
       <text class="info-v">{{profile.username}}</text>
     </view>
     <view class="info-row">
       <text class="info-k">姓名</text>
-      <input wx:if="{{editing}}" class="edit-input" value="{{editForm.real_name}}" bindinput="onRealName" placeholder="请输入姓名" />
-      <text wx:else class="info-v">{{profile.real_name || '—'}}</text>
+      <input wx:if="{{editing}}" class="edit-input" value="{{editForm.real_name}}" bindinput="onRealName" placeholder="请输入姓名" placeholder-style="color: rgba(0,0,0,0.48);" />
+      <text wx:else class="info-v {{!profile.real_name ? 'empty' : ''}}">{{profile.real_name || '—'}}</text>
     </view>
     <view class="info-row">
       <text class="info-k">邮箱</text>
-      <input wx:if="{{editing}}" class="edit-input" value="{{editForm.email}}" bindinput="onEmail" placeholder="请输入邮箱" />
-      <text wx:else class="info-v">{{profile.email || '—'}}</text>
+      <input wx:if="{{editing}}" class="edit-input" value="{{editForm.email}}" bindinput="onEmail" placeholder="请输入邮箱" placeholder-style="color: rgba(0,0,0,0.48);" />
+      <text wx:else class="info-v {{!profile.email ? 'empty' : ''}}">{{profile.email || '—'}}</text>
     </view>
     <view class="info-row">
       <text class="info-k">手机</text>
-      <input wx:if="{{editing}}" class="edit-input" value="{{editForm.phone}}" bindinput="onPhone" placeholder="请输入手机号" />
-      <text wx:else class="info-v">{{profile.phone || '—'}}</text>
+      <input wx:if="{{editing}}" class="edit-input" value="{{editForm.phone}}" bindinput="onPhone" placeholder="请输入手机号" placeholder-style="color: rgba(0,0,0,0.48);" />
+      <text wx:else class="info-v {{!profile.phone ? 'empty' : ''}}">{{profile.phone || '—'}}</text>
     </view>
   </view>
 
-  <!-- Actions -->
   <view class="action-group">
-    <button wx:if="{{!editing}}" class="btn-primary action-btn" bindtap="startEdit">编辑资料</button>
+  <view class="primary-actions">
+    <button wx:if="{{!editing}}" class="btn-primary" bindtap="startEdit">编辑资料</button>
+
     <view wx:else class="edit-actions">
-      <button class="btn-primary action-btn" bindtap="saveEdit" loading="{{loading}}">保存</button>
-      <button class="btn-outline action-btn" bindtap="cancelEdit">取消</button>
+      <button class="btn-primary" bindtap="saveEdit">保存</button>
+      <button class="btn-outline" bindtap="cancelEdit">取消</button>
     </view>
-    <button class="btn-logout" bindtap="doLogout">退出登录</button>
   </view>
+</view>
+
+<view class="logout-fixed">
+  <button class="btn-logout" bindtap="doLogout">退出登录</button>
+</view>
+
+<!-- Loading overlay -->
+<view wx:if="{{globalLoading}}" class="loading-overlay">
+  <view class="loading-spinner"></view>
+</view>
 </view>
