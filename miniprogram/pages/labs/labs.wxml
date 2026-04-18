@@ -34,7 +34,7 @@
     >
       <view class="picker">
         <text class="picker-text">{{selectedCampusName || '全部校区'}}</text>
-        <text class="arrow">v</text>
+        <!-- <text class="arrow">v</text> -->
       </view>
     </picker>
 

@@ -30,6 +30,12 @@ Page({
       wx.redirectTo({ url: '/pages/login/login' })
       return
     }
+    const entryCampusId = wx.getStorageSync('campus_entry_campus_id')
+    if (entryCampusId) {
+      wx.removeStorageSync('campus_entry_campus_id')
+      this.setData({ entryCampusId: String(entryCampusId) }, () => this.loadData())
+      return
+    }
     this.loadData()
   },
   async loadData() {

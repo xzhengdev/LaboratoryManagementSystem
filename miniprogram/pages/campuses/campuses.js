@@ -22,6 +22,7 @@ Page({
   },
   goLabs(e) {
     const campusId = e.currentTarget.dataset.id
-    wx.switchTab({ url: `/pages/labs/labs?campus=${campusId}` })
+    wx.setStorageSync('campus_entry_campus_id', String(campusId || ''))
+    wx.switchTab({ url: '/pages/labs/labs' })
   }
 })
