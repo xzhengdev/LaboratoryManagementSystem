@@ -94,45 +94,49 @@
 
 /* ===== 实验室卡片（核心升级） ===== */
 .lab-card {
-  margin-top: 12rpx;
+  margin-top: 20rpx;
   margin-left: 0;         /* 关键 */
   margin-right: 0;        /* 关键 */
-  border-radius: 20rpx;
-  background: rgba(255,255,255,0.75);
-  backdrop-filter: blur(20rpx);
+  border-radius: 26rpx;
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(30rpx);
+  -webkit-backdrop-filter: blur(30rpx);
+  border: 1rpx solid rgba(255,255,255,0.8);
   box-shadow:
-    0 12rpx 30rpx rgba(0,0,0,0.06),
-    0 4rpx 12rpx rgba(0,0,0,0.04);
+    0 14rpx 40rpx rgba(0,0,0,0.06),
+    inset 0 1rpx 0 rgba(255,255,255,0.9);
   overflow: hidden;
+  transition: all 0.25s ease;
 }
 
 /* 点击反馈 */
 .lab-card:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
+  box-shadow: 0 6rpx 16rpx rgba(0,0,0,0.08);
 }
 
 /* 卡片内容 */
 .lab-card-inner {
   display: flex;
   align-items: center;
-  padding: 20rpx;
-  gap: 20rpx;
+  /* padding: 22rpx; */
+  gap: 24rpx;
 }
 
 /* 封面 */
 .lab-cover {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 18rpx;
+  width: 150rpx;
+  height: 110rpx;
+  border-radius: 20rpx;
   flex-shrink: 0;
   overflow: hidden;
   background: #4A90E2;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
-  box-shadow: 0 6rpx 14rpx rgba(0,0,0,0.1);
+  box-shadow:
+    0 8rpx 18rpx rgba(0,0,0,0.1),
+    inset 0 2rpx 6rpx rgba(255,255,255,0.6);
 }
 
 .lab-cover-image {
@@ -159,23 +163,23 @@
 .lab-name {
   font-size: 30rpx;
   font-weight: 600;
-  color: #111;
+  color: #0f2c4c;
 }
 
 /* 元信息 */
 .lab-meta {
   font-size: 24rpx;
-  color: rgba(0,0,0,0.55);
+  color: #5a6b7c;
 }
 
 /* 校区 */
 .lab-campus {
   font-size: 22rpx;
-  color: #303030;
+  color: #6c7d8f;
 }
 
 /* 箭头 */
 .lab-arrow {
   font-size: 34rpx;
-  color: rgba(0,0,0,0.25);
+  color: rgba(120,140,170,0.6);
 }

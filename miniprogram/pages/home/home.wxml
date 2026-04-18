@@ -52,7 +52,6 @@
         <text class="lab-meta">容纳 {{item.capacity}} 人 · {{item.open_time}}–{{item.close_time}}</text>
         <text class="lab-campus">{{item.campus_name || ''}}</text>
       </view>
-      <text class="lab-arrow">›</text>
     </view>
   </view>
 </view>

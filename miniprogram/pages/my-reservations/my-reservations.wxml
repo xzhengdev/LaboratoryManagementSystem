@@ -55,12 +55,6 @@
     </view>
 
   </view>
-
-  <!-- 底部 -->
-  <view class="res-footer">
-    <text class="res-arrow">›</text>
-  </view>
-
 </view>
 
 </view>
