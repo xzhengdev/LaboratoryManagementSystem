@@ -20,7 +20,9 @@ const api = {
             wx.showToast({ title: payload.message || '上传失败', icon: 'none' })
             reject(payload)
           }
-        } catch (e) { reject(e) }
+        } catch (e) {
+          reject(e)
+        }
       },
       fail(err) {
         wx.showToast({ title: '上传失败', icon: 'none' })
@@ -37,7 +39,12 @@ const api = {
   myReservations: () => request({ url: '/reservations/my' }),
   reservationDetail: (id) => request({ url: `/reservations/${id}` }),
   cancelReservation: (id) => request({ url: `/reservations/${id}/cancel`, method: 'POST' }),
-  agentChat: (message) => request({ url: '/agent/chat', method: 'POST', data: { message } })
+  agentChat: (message, options = {}) => request({
+    url: '/agent/chat',
+    method: 'POST',
+    data: { message },
+    ...options
+  })
 }
 
 module.exports = { api }

@@ -4,19 +4,27 @@ function getToken() {
   return wx.getStorageSync('lab_token') || ''
 }
 
-function request({ url, method = 'GET', data = {} }) {
+function request({
+  url,
+  method = 'GET',
+  data = {},
+  loading = true,
+  loadingTitle = '加载中',
+  timeout = 15000
+}) {
   return new Promise((resolve, reject) => {
-    wx.showLoading({ title: '加载中', mask: true })
+    if (loading) wx.showLoading({ title: loadingTitle, mask: true })
     wx.request({
       url: BASE_URL + url,
       method,
       data,
+      timeout,
       header: {
         'Content-Type': 'application/json',
         Authorization: getToken() ? `Bearer ${getToken()}` : ''
       },
       success(res) {
-        wx.hideLoading()
+        if (loading) wx.hideLoading()
         if (res.statusCode === 401) {
           wx.removeStorageSync('lab_token')
           wx.removeStorageSync('lab_profile')
@@ -33,7 +41,7 @@ function request({ url, method = 'GET', data = {} }) {
         }
       },
       fail(err) {
-        wx.hideLoading()
+        if (loading) wx.hideLoading()
         wx.showToast({ title: '网络错误，请检查连接', icon: 'none' })
         reject(err)
       }

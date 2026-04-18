@@ -1,36 +1,163 @@
 const { api } = require('../../utils/api')
 
+const TAB_PATHS = [
+  '/pages/home/home',
+  '/pages/labs/labs',
+  '/pages/my-reservations/my-reservations',
+  '/pages/profile/profile'
+]
+
+let uid = Date.now()
+function nextId() {
+  uid += 1
+  return uid
+}
+
 Page({
   data: {
-    messages: [
-      { role: 'assistant', content: '你好！我是实验室预约助手，可以帮你查询实验室排期、我的预约，或引导你到对应页面。', actions: [] }
-    ],
+    messages: [],
     draft: '',
-    scrollId: 'msg-bottom',
-    quickPrompts: ['今天有哪些实验室可预约', '查看我的预约', '明天的排期']
+    sending: false,
+    canSend: false,
+    typing: false,
+    scrollAnchor: '',
+    userAvatar: '',
+    userName: '我',
+    userInitial: '我',
+    quickPrompts: [
+      '今天有哪些实验室可预约？',
+      '帮我查看我的预约记录',
+      '明天下午空闲时段有哪些？'
+    ]
   },
-  onDraft(e) { this.setData({ draft: e.detail.value }) },
+
+  onLoad() {
+    this.bootstrap()
+  },
+
+  onShow() {
+    this.loadUserProfile()
+  },
+
+  bootstrap() {
+    this.setData({
+      messages: [
+        {
+          id: nextId(),
+          role: 'assistant',
+          content: '你好，我是实验室预约助手。你可以问我实验室空闲时段、预约状态，或直接点下面的快捷问题。',
+          actions: []
+        }
+      ]
+    }, () => this.scrollToBottom())
+  },
+
+  loadUserProfile() {
+    const profile = wx.getStorageSync('lab_profile') || {}
+    const name = profile.real_name || profile.username || '我'
+    this.setData({
+      userAvatar: profile.avatar_url || '',
+      userName: name,
+      userInitial: String(name).slice(0, 1) || '我'
+    })
+  },
+
+  onDraft(e) {
+    const draft = e.detail.value || ''
+    this.setData({
+      draft,
+      canSend: !!draft.trim() && !this.data.sending
+    })
+  },
+
   sendQuick(e) {
-    this.setData({ draft: e.currentTarget.dataset.text }, () => this.sendMessage())
+    if (this.data.sending) return
+    const text = e.currentTarget.dataset.text || ''
+    this.setData({ draft: text, canSend: !!text.trim() }, () => this.sendMessage())
   },
+
+  appendMessage(message, callback) {
+    const messages = [...this.data.messages, message]
+    this.setData({ messages }, () => {
+      this.scrollToBottom()
+      if (typeof callback === 'function') callback()
+    })
+  },
+
+  scrollToBottom() {
+    const anchor = this.data.typing
+      ? 'typing-bubble'
+      : (this.data.messages.length ? `msg-${this.data.messages[this.data.messages.length - 1].id}` : '')
+    if (!anchor) return
+    setTimeout(() => {
+      this.setData({ scrollAnchor: anchor })
+    }, 20)
+  },
+
   async sendMessage() {
-    const msg = this.data.draft.trim()
+    if (this.data.sending) return
+
+    const msg = (this.data.draft || '').trim()
     if (!msg) return
-    const messages = [...this.data.messages, { role: 'user', content: msg, actions: [] }]
-    this.setData({ messages, draft: '', scrollId: 'msg-bottom' })
+
+    const userMessage = {
+      id: nextId(),
+      role: 'user',
+      content: msg,
+      actions: []
+    }
+
+    this.setData({
+      sending: true,
+      typing: true,
+      canSend: false,
+      draft: ''
+    }, () => this.scrollToBottom())
+
+    this.appendMessage(userMessage)
+
     try {
-      const res = await api.agentChat(msg)
+      const res = await api.agentChat(msg, { loading: false, timeout: 25000 })
+      const assistantMessage = {
+        id: nextId(),
+        role: 'assistant',
+        content: (res && res.reply) || '已收到你的问题。',
+        actions: (res && res.actions) || []
+      }
+      this.appendMessage(assistantMessage)
+    } catch (err) {
+      const fallbackMessage = {
+        id: nextId(),
+        role: 'assistant',
+        content: '助手暂时不可用，请稍后再试。',
+        actions: []
+      }
+      this.appendMessage(fallbackMessage)
+      console.error('agentChat error:', err)
+    } finally {
       this.setData({
-        messages: [...this.data.messages, { role: 'assistant', content: res.reply, actions: res.actions || [] }],
-        scrollId: 'msg-bottom'
-      })
-    } catch (_) {
-      this.setData({
-        messages: [...this.data.messages, { role: 'assistant', content: '助手暂时不可用，请稍后再试。', actions: [] }]
-      })
+        sending: false,
+        typing: false,
+        canSend: !!(this.data.draft || '').trim()
+      }, () => this.scrollToBottom())
     }
   },
+
   goAction(e) {
-    wx.navigateTo({ url: e.currentTarget.dataset.path })
+    const path = e.currentTarget.dataset.path
+    if (!path) return
+
+    const isTab = TAB_PATHS.includes(path)
+    if (isTab) {
+      wx.switchTab({ url: path })
+      return
+    }
+
+    wx.navigateTo({
+      url: path,
+      fail() {
+        wx.showToast({ title: '暂不支持跳转该页面', icon: 'none' })
+      }
+    })
   }
 })
