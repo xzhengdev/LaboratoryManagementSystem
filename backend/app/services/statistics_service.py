@@ -98,9 +98,7 @@ def get_overview(campus_id=None):
 def get_campus_statistics(campus_id=None):
     """
     获取校区维度统计数据
-    
     统计每个校区（或指定校区）的实验室数量和预约总数
-    
     Args:
         campus_id: 校区ID，可选参数
                    - 如果传入：只统计指定校区
