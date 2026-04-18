@@ -53,6 +53,8 @@ Page({
     this.setData({ scheduleDate: e.detail.value }, () => this.loadSchedule())
   },
   goReserve() {
-    wx.navigateTo({ url: `/pages/reserve/reserve?id=${this.labId}` })
+    const campusId = (this.data.lab && this.data.lab.campus_id) || ''
+    const query = campusId ? `id=${this.labId}&campus_id=${campusId}` : `id=${this.labId}`
+    wx.navigateTo({ url: `/pages/reserve/reserve?${query}` })
   }
 })
