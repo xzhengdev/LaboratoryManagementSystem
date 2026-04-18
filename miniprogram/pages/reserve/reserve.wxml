@@ -8,7 +8,7 @@
     <!-- Date -->
     <view class="form-row">
       <text class="form-label">预约日期</text>
-      <picker mode="date" value="{{form.date}}" bindchange="onDate">
+      <picker mode="date" value="{{form.date}}" start="{{minDate}}" end="{{maxDate}}" bindchange="onDate">
         <view class="form-val">{{form.date}} ›</view>
       </picker>
     </view>

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <view class="reserve-page">
     <student-top-nav active="labs" />
 
@@ -52,6 +52,7 @@
                   mode="date"
                   :value="form.reservation_date"
                   :start="todayDate"
+                  :end="maxReserveDate"
                   @change="setField('reservation_date', $event.detail.value)"
                 >
                   <view class="reserve-form__input reserve-form__input--picker">
@@ -206,9 +207,21 @@ function todayString() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
 
+function addDaysString(days) {
+  const now = new Date()
+  now.setDate(now.getDate() + days)
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
 function currentMinuteValue() {
   const now = new Date()
   return now.getHours() * 60 + now.getMinutes()
+}
+
+function toDateTimeValue(dateText, timeText) {
+  const [year, month, day] = String(dateText || '').split('-').map((item) => Number(item || 0))
+  const [hour, minute] = String(timeText || '').split(':').map((item) => Number(item || 0))
+  return new Date(year, Math.max(0, month - 1), day || 1, hour || 0, minute || 0, 0)
 }
 
 function toMinuteValue(raw) {
@@ -338,6 +351,9 @@ export default {
     todayDate() {
       return todayString()
     },
+    maxReserveDate() {
+      return addDaysString(7)
+    },
     participantPlaceholder() {
       return this.maxParticipants ? `请输入人数（上限 ${this.maxParticipants} 人）` : '请输入人数'
     },
@@ -374,7 +390,7 @@ export default {
     },
     noticeItems() {
       return [
-        '请提前 15 分钟到达实验室进行安全签到。',
+        '预约开始时间需至少提前 30 分钟，请尽早提交申请。',
         '实验室严禁携带食物和饮料进入，请放在储物区。',
         '如需取消预约，请至少提前 2 小时通过系统撤回。',
         '使用过程中请务必穿戴好必要的防护装备。'
@@ -386,7 +402,7 @@ export default {
       const selectedStart = toMinuteValue(this.form.start_time)
       const selectedEnd = toMinuteValue(this.form.end_time)
       const reservations = Array.isArray(this.schedule?.reservations) ? this.schedule.reservations : []
-      const blockedBefore = this.form.reservation_date === todayString() ? currentMinuteValue() + 1 : null
+      const blockedBefore = this.form.reservation_date === todayString() ? currentMinuteValue() + 30 : null
       return buildSegments(openMinute, closeMinute, reservations, selectedStart, selectedEnd, blockedBefore)
     },
     timeMarkItems() {
@@ -429,16 +445,21 @@ export default {
       const openMinute = toMinuteValue(this.schedule?.open_time || this.currentLab.open_time || '08:00')
       const closeMinute = toMinuteValue(this.schedule?.close_time || this.currentLab.close_time || '21:00')
       const isToday = this.form.reservation_date === todayString()
-      const earliestStart = isToday ? Math.max(openMinute, currentMinuteValue() + 1) : openMinute
+      const earliestStart = isToday ? Math.max(openMinute, currentMinuteValue() + 30) : openMinute
       return { openMinute, closeMinute, isToday, earliestStart }
     },
     ensureValidTimeRange(showMessage = false) {
       const today = todayString()
+      const maxDate = addDaysString(7)
       let message = ''
 
       if (this.form.reservation_date < today) {
         this.form.reservation_date = today
         message = '不能选择今天之前的日期'
+      }
+      if (this.form.reservation_date > maxDate) {
+        this.form.reservation_date = maxDate
+        message = '预约日期不能超过未来7天'
       }
 
       const { openMinute, closeMinute, isToday, earliestStart } = this.getTimeBounds()
@@ -462,7 +483,7 @@ export default {
         start = Math.min(Math.max(earliestStart, openMinute), maxStart)
         this.form.start_time = toTimeLabel(start)
         if (!message) {
-          message = '今天只能预约当前时间之后的时段'
+          message = '预约开始时间必须至少提前30分钟'
         }
       }
 
@@ -570,12 +591,17 @@ export default {
       }
 
       const today = todayString()
+      const maxDate = addDaysString(7)
       const startMinute = toMinuteValue(this.form.start_time)
       const endMinute = toMinuteValue(this.form.end_time)
       const { openMinute, closeMinute, isToday, earliestStart } = this.getTimeBounds()
 
       if (this.form.reservation_date < today) {
         uni.showToast({ title: '不能预约今天之前的日期', icon: 'none' })
+        return
+      }
+      if (this.form.reservation_date > maxDate) {
+        uni.showToast({ title: '预约日期不能超过未来7天', icon: 'none' })
         return
       }
 
@@ -585,7 +611,19 @@ export default {
       }
 
       if (isToday && startMinute < earliestStart) {
-        uni.showToast({ title: '今天只能预约当前时间之后的时段', icon: 'none' })
+        uni.showToast({ title: '预约开始时间必须至少提前30分钟', icon: 'none' })
+        return
+      }
+
+      const now = new Date()
+      const startAt = toDateTimeValue(this.form.reservation_date, this.form.start_time)
+      const endAt = toDateTimeValue(this.form.reservation_date, this.form.end_time)
+      if (isToday && endAt <= now) {
+        uni.showToast({ title: '不能预约今天已过去的时间段', icon: 'none' })
+        return
+      }
+      if (startAt.getTime() < now.getTime() + 30 * 60 * 1000) {
+        uni.showToast({ title: '预约开始时间必须至少提前30分钟', icon: 'none' })
         return
       }
 

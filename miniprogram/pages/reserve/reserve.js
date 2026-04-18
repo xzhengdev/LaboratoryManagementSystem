@@ -8,15 +8,32 @@ const STATUS_TEXT = {
   completed: '已完成'
 }
 
-function today() {
-  const d = new Date()
+function dateToString(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function today() {
+  return dateToString(new Date())
+}
+
+function dateAfterDays(days) {
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  return dateToString(d)
+}
+
+function combineDateTime(dateStr, timeStr) {
+  const [y, m, d] = String(dateStr || '').split('-').map((n) => Number(n || 0))
+  const [h, mi] = String(timeStr || '').split(':').map((n) => Number(n || 0))
+  return new Date(y, (m || 1) - 1, d || 1, h || 0, mi || 0, 0)
 }
 
 Page({
   data: {
     lab: {},
     schedule: [],
+    minDate: today(),
+    maxDate: dateAfterDays(7),
     form: {
       date: today(),
       start_time: '09:00',
@@ -67,7 +84,7 @@ Page({
     if (n > 1) this.setData({ 'form.participant_count': n - 1 })
   },
   async doSubmit() {
-    const { form } = this.data
+    const { form, minDate, maxDate } = this.data
     const campusId = this.campusId || this.data.lab.campus_id
 
     if (!form.purpose.trim()) {
@@ -80,6 +97,28 @@ Page({
     }
     if (!campusId) {
       wx.showToast({ title: '缺少必要参数: campus_id', icon: 'none' })
+      return
+    }
+
+    if (form.date < minDate) {
+      wx.showToast({ title: '不能预约过去的日期', icon: 'none' })
+      return
+    }
+    if (form.date > maxDate) {
+      wx.showToast({ title: '预约日期不能超过未来7天', icon: 'none' })
+      return
+    }
+
+    const now = new Date()
+    const startAt = combineDateTime(form.date, form.start_time)
+    const endAt = combineDateTime(form.date, form.end_time)
+
+    if (form.date === minDate && endAt <= now) {
+      wx.showToast({ title: '不能预约今天已过去的时间段', icon: 'none' })
+      return
+    }
+    if (startAt.getTime() < now.getTime() + 30 * 60 * 1000) {
+      wx.showToast({ title: '预约开始时间必须至少提前30分钟', icon: 'none' })
       return
     }
 
