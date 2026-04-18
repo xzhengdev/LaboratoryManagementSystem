@@ -1,69 +1,189 @@
-.reserve-page { padding-bottom: 140rpx; }
+/* ===== 页面背景 ===== */
+.reserve-page {
+  min-height: 100vh;
+  padding: 30rpx 0rpx 180rpx;
+  background: linear-gradient(180deg, #f5f6f8 0%, #eef1f5 100%);
+  box-sizing: border-box;
+}
 
-.lab-summary { display: flex; flex-direction: column; gap: 8rpx; }
-.lab-summary-name { font-size: 32rpx; font-weight: 600; color: #222; }
-.lab-summary-loc  { font-size: 24rpx; color: #888; }
+/* ===== 卡片统一（核心） ===== */
+.card {
+  border-radius: 28rpx;
+  padding: 26rpx 22rpx;
+  margin-bottom: 20rpx;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(28rpx);
+  -webkit-backdrop-filter: blur(28rpx);
+  border: 1rpx solid rgba(255,255,255,0.8);
+  box-shadow:
+    0 14rpx 36rpx rgba(0,0,0,0.05),
+    inset 0 1rpx 0 rgba(255,255,255,0.9);
+}
 
-.form-card { display: flex; flex-direction: column; gap: 0; padding: 0; }
+/* ===== 实验室摘要（更像卡片头） ===== */
+.lab-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
 
+.lab-summary-name {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #0f2c4c;
+}
+
+.lab-summary-loc {
+  font-size: 24rpx;
+  color: #6c7d8f;
+}
+
+/* ===== 表单卡片 ===== */
+.form-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* 行 */
 .form-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 28rpx 24rpx;
-  border-bottom: 1rpx solid #F5F7FA;
+
+  padding: 26rpx 22rpx;
+  border-bottom: 1rpx solid rgba(0,0,0,0.04);
 }
 
+.form-row:last-child {
+  border-bottom: none;
+}
+
+.form-label {
+  font-size: 28rpx;
+  color: #6b7c8f;
+}
+
+.form-val {
+  font-size: 28rpx;
+  color: #0a74ea;
+  font-weight: 500;
+}
+
+/* ===== 人数选择（更高级） ===== */
+.count-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.count-btn {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(74,144,226,0.1);
+  color: #4A90E2;
+  font-size: 34rpx;
+  font-weight: 700;
+
+  box-shadow:
+    inset 0 1rpx 0 rgba(255,255,255,0.7);
+}
+
+.count-val {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #111;
+  min-width: 40rpx;
+  text-align: center;
+}
+
+/* ===== 使用目的 ===== */
 .form-col {
-  padding: 24rpx;
+  padding: 24rpx 22rpx;
   display: flex;
   flex-direction: column;
-  gap: 12rpx;
+  gap: 14rpx;
 }
-
-.form-label { font-size: 28rpx; color: #444; }
-.form-val   { font-size: 28rpx; color: #4A90E2; }
-
-.count-ctrl { display: flex; align-items: center; gap: 24rpx; }
-.count-btn  {
-  width: 56rpx; height: 56rpx;
-  border-radius: 50%;
-  background: #F0F4FA;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 36rpx; color: #4A90E2; font-weight: 700;
-}
-.count-val { font-size: 32rpx; font-weight: 600; color: #222; min-width: 40rpx; text-align: center; }
 
 .purpose-input {
   width: 100%;
-  height: 160rpx;
-  background: #F7F9FC;
-  border-radius: 12rpx;
-  padding: 16rpx;
+  height: 170rpx;
+  border-radius: 18rpx;
+
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(16rpx);
+
+  border: 1rpx solid rgba(255,255,255,0.7);
+
+  padding: 18rpx;
   font-size: 26rpx;
-  color: #333;
+  color: #223246;
+
   box-sizing: border-box;
-  border: 2rpx solid #E8EDF5;
 }
 
-.char-count { font-size: 22rpx; color: #bbb; text-align: right; }
+.char-count {
+  font-size: 22rpx;
+  color: #9aa6b2;
+  text-align: right;
+}
 
-.card-title { font-size: 28rpx; font-weight: 600; color: #333; display: block; margin-bottom: 16rpx; }
+/* ===== 排期 ===== */
+.card-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1c2d3f;
+  margin-bottom: 14rpx;
+}
 
 .sched-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12rpx 0;
-  border-bottom: 1rpx solid #F5F7FA;
-}
-.sched-time { font-size: 26rpx; color: #555; }
 
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid rgba(0,0,0,0.04);
+}
+
+.sched-row:last-child {
+  border-bottom: none;
+}
+
+.sched-time {
+  font-size: 26rpx;
+  color: #223246;
+}
+
+/* ===== 底部按钮（重点优化） ===== */
 .submit-bar {
   position: fixed;
-  bottom: 0; left: 0; right: 0;
-  background: #fff;
-  padding: 20rpx 32rpx;
-  box-shadow: 0 -2rpx 12rpx rgba(0,0,0,0.08);
+  left: 20rpx;
+  right: 20rpx;
+  bottom: calc(20rpx + env(safe-area-inset-bottom));
+  background: transparent;
 }
-.submit-btn { width: 100%; }
+
+.submit-btn {
+  width:40%;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0a74ea, #4ea1ff);
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 600;
+
+  box-shadow:
+    0 12rpx 28rpx rgba(10,116,234,0.25),
+    inset 0 1rpx 0 rgba(255,255,255,0.3);
+}
+
+.submit-btn:active {
+  transform: scale(0.97);
+}
