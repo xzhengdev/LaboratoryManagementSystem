@@ -18,10 +18,10 @@
 
 /* ===== 卡片 ===== */
 .card {
-  background: rgba(255,255,255,0.92);
+  background: rgba(255,255,255,0.62);
   backdrop-filter: blur(20rpx);
   border-radius: 24rpx;
-  padding: 28rpx;
+  padding:  28rpx;
   box-shadow:
     0 12rpx 40rpx rgba(0,0,0,0.06),
     0 4rpx 12rpx rgba(0,0,0,0.04);
@@ -39,6 +39,7 @@
 .card-title {
   font-size: 28rpx;
   font-weight: 600;
+  margin-right: 13rpx;
   color: #222;
 }
 
@@ -165,8 +166,9 @@
 }
 
 .cancel-btn {
-  width: 50%;
+  width:40%;
   height: 88rpx;
+  bottom: 20rpx;
   line-height: 88rpx;
   border-radius: 16rpx;
   border: none;

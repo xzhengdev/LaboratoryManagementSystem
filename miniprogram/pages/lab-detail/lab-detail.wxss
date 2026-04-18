@@ -334,7 +334,7 @@
 }
 .reserve-btn {
   width: 40%;
-  height: 92rpx;
+  height: 88rpx;
   border-radius: 23rpx;
   display: flex;
   align-items: center;
