@@ -1,1 +1,6 @@
-{ "navigationBarTitleText": "AI 助手" }
+{
+  "navigationBarTitleText": "AI 助手",
+  "backgroundColor": "#e9edf3",
+  "backgroundTextStyle": "dark",
+  "disableScroll": true
+}

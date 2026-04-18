@@ -1,10 +1,16 @@
+page {
+  background: #e9edf3;
+}
+
 
 .agent-page {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100vh;
+  min-height: 100vh;
   overflow: hidden;
-  background: linear-gradient(180deg, #eef3f9 0%, #f7f9fc 100%);
+  background: #e9edf3;
 }
 
 .chat-main {
@@ -16,7 +22,7 @@
 .msg-list {
   height: 100%;
   min-height: 0;
-  padding: 24rpx 18rpx 0;
+  padding: 24rpx 18rpx 170rpx;
   box-sizing: border-box;
 }
 
@@ -177,46 +183,20 @@
   background: #ebf4ff;
 }
 
-.quick-scroll {
-  margin: 0 16rpx;
-  border-radius: 22rpx 22rpx 0 0;
-  background: rgba(255, 255, 255, 0.78);
-  border-top: 1rpx solid rgba(255, 255, 255, 0.86);
-  box-shadow: 0 -6rpx 20rpx rgba(0, 0, 0, 0.04);
-}
-
-.quick-list {
-  display: flex;
-  align-items: center;
-  padding: 16rpx 18rpx;
-  gap: 14rpx;
-  white-space: nowrap;
-}
-
-.quick-item {
-  flex-shrink: 0;
-  padding: 10rpx 22rpx;
-  border-radius: 999rpx;
-  background: #ffffff;
-  border: 1rpx solid rgba(0, 0, 0, 0.04);
-  color: #56687a;
-  font-size: 24rpx;
-}
-
-.quick-item:active {
-  background: #eaf2ff;
-  color: #4a90e2;
-}
-
 .input-bar {
+  position: absolute;
+  left: 16rpx;
+  right: 16rpx;
+  bottom: calc(16rpx + env(safe-area-inset-bottom));
   display: flex;
   align-items: center;
   gap: 14rpx;
-  padding: 16rpx 16rpx calc(20rpx + env(safe-area-inset-bottom));
-  background: rgba(255, 255, 255, 0.9);
-  border-top: 1rpx solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 -8rpx 22rpx rgba(0, 0, 0, 0.04);
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
   box-sizing: border-box;
+  z-index: 10;
 }
 
 .chat-input {
@@ -224,11 +204,12 @@
   height: 78rpx;
   padding: 0 26rpx;
   border-radius: 40rpx;
-  background: rgba(245, 247, 250, 0.95);
-  border: 2rpx solid #e6ebf2;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1rpx solid rgba(82, 102, 130, 0.16);
   box-sizing: border-box;
   font-size: 28rpx;
   color: #333;
+  box-shadow: 0 8rpx 24rpx rgba(27, 49, 77, 0.12);
 }
 
 .chat-placeholder {
@@ -244,16 +225,19 @@
   justify-content: center;
   padding: 0 24rpx;
   box-sizing: border-box;
-  background: linear-gradient(135deg, #4a90e2, #6aa8f0);
-  color: #fff;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1rpx solid rgba(82, 102, 130, 0.2);
+  color: #30445d;
   font-size: 28rpx;
   font-weight: 600;
   flex-shrink: 0;
-  box-shadow: 0 10rpx 22rpx rgba(74, 144, 226, 0.2);
+  box-shadow: 0 8rpx 24rpx rgba(27, 49, 77, 0.12);
 }
 
 .send-btn.disabled {
-  background: linear-gradient(135deg, #bfd4ee, #c9dcf3);
-  color: rgba(255, 255, 255, 0.95);
+  color: #9aa8bb;
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(82, 102, 130, 0.12);
   box-shadow: none;
 }
+

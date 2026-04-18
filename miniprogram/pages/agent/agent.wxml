@@ -6,6 +6,7 @@
       scroll-into-view="{{scrollAnchor}}"
       scroll-with-animation
       enhanced
+      bounces="{{false}}"
       show-scrollbar="false"
     >
       <view
@@ -62,24 +63,10 @@
     </scroll-view>
   </view>
 
-  <scroll-view scroll-x class="quick-scroll" show-scrollbar="false">
-    <!-- <view class="quick-list">
-      <view
-        wx:for="{{quickPrompts}}"
-        wx:key="index"
-        class="quick-item"
-        bindtap="sendQuick"
-        data-text="{{item}}"
-      >
-        {{item}}
-      </view>
-    </view> -->
-  </scroll-view>
-
   <view class="input-bar">
     <input
       class="chat-input"
-      placeholder="例如：明天下午2点有哪些实验室空闲？"
+      placeholder="明天下午2点有哪些实验室空闲？"
       placeholder-class="chat-placeholder"
       value="{{draft}}"
       bindinput="onDraft"
@@ -92,4 +79,3 @@
     </view>
   </view>
 </view>
-
