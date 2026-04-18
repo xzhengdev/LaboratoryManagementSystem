@@ -15,11 +15,18 @@
     "miniprogram": {
       "list": [
         {
-          "name": "pages/my-reservations/my-reservations",
-          "pathName": "pages/my-reservations/my-reservations",
+          "name": "pages/labs/labs",
+          "pathName": "pages/labs/labs",
           "query": "",
           "scene": null,
           "launchMode": "default"
+        },
+        {
+          "name": "pages/my-reservations/my-reservations",
+          "pathName": "pages/my-reservations/my-reservations",
+          "query": "",
+          "launchMode": "default",
+          "scene": null
         },
         {
           "name": "pages/profile/profile",

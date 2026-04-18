@@ -1,58 +1,117 @@
+<!--
+  实验室列表页面 (labs-page)
+  ============================================================
+  功能说明：
+    展示实验室列表，支持按校区筛选、按实验室类型筛选、按名称搜索
+  数据依赖：
+    campusOptions      - 校区选项数组 [{campus_name, id}, ...]
+    selectedCampusIndex - 当前选中校区索引
+    selectedCampusName  - 当前选中校区名称
+    keyword             - 搜索关键词
+    types               - 实验室类型数组 [{label, value}, ...]
+    selectedType        - 当前选中类型值
+    labs                - 过滤后展示的实验室列表
+  事件处理：
+    onCampusChange      - 校区切换时触发
+    onSearch            - 搜索输入时触发
+    selectType          - 类型标签点击时触发
+    goDetail            - 卡片点击时触发（跳转详情页）
+  ============================================================
+-->
 <view class="labs-page">
-  <!-- Campus filter -->
-  <scroll-view scroll-x class="campus-scroll">
-    <view class="campus-tabs">
-      <view
-        class="campus-tab {{selectedCampus === '' ? 'active' : ''}}"
-        bindtap="selectCampus" data-id=""
-      >全部</view>
-      <view
-        wx:for="{{campuses}}" wx:key="id"
-        class="campus-tab {{selectedCampus === item.id ? 'active' : ''}}"
-        bindtap="selectCampus" data-id="{{item.id}}"
-      >{{item.campus_name}}</view>
-    </view>
-  </scroll-view>
+  
+  <!-- 筛选栏：校区选择器 + 搜索框 -->
+  <view class="filter-row">
+    
+    <!-- 校区选择器（Picker 下拉选择） -->
+    <picker
+      class="picker-wrap"
+      mode="selector"
+      range="{{campusOptions}}"
+      range-key="campus_name"
+      value="{{selectedCampusIndex}}"
+      bindchange="onCampusChange"
+    >
+      <view class="picker">
+        <text class="picker-text">{{selectedCampusName || '全部校区'}}</text>
+        <text class="arrow">v</text>
+      </view>
+    </picker>
 
-  <!-- Type filter -->
-  <scroll-view scroll-x class="type-scroll">
+    <!-- 搜索框 -->
+    <view class="search-box">
+      <text class="search-icon"></text>
+      <input
+        class="search-input"
+        placeholder="搜索实验室"
+        placeholder-class="search-placeholder"
+        value="{{keyword}}"
+        bindinput="onSearch"
+      />
+    </view>
+  </view>
+
+  <!-- 横向滚动：实验室类型标签栏 -->
+  <scroll-view scroll-x class="type-scroll" show-scrollbar="false">
     <view class="type-tabs">
       <view
-        wx:for="{{types}}" wx:key="value"
+        wx:for="{{types}}"
+        wx:key="value"
         class="type-tab {{selectedType === item.value ? 'active' : ''}}"
-        bindtap="selectType" data-value="{{item.value}}"
-      >{{item.label}}</view>
+        bindtap="selectType"
+        data-value="{{item.value}}"
+      >
+        {{item.label}}
+      </view>
     </view>
   </scroll-view>
 
-  <!-- Lab list -->
-  <view wx:if="{{labs.length === 0}}" class="empty-tip">暂无实验室</view>
+  <!-- 空状态提示：无实验室时显示 -->
+  <view wx:if="{{labs.length === 0}}" class="empty-tip">
+    暂无符合条件的实验室
+  </view>
+
+  <!-- 实验室卡片列表 -->
   <view
-    wx:for="{{labs}}" wx:key="id"
-    class="lab-item card"
-    bindtap="goDetail" data-id="{{item.id}}"
+    wx:for="{{labs}}"
+    wx:key="id"
+    class="lab-card"
+    bindtap="goDetail"
+    data-id="{{item.id}}"
   >
-    <view class="lab-cover-wrap">
-      <view class="lab-cover-bg" style="background:{{item.color}}">
-        <image
-          wx:if="{{item.photos && item.photos.length}}"
-          class="lab-cover-image"
-          src="{{item.photos[0]}}"
-          mode="aspectFill"
-        />
-        <text wx:else class="lab-cover-char">{{item.lab_name[0]}}</text>
+    <!-- 左侧：实验室图片 / 占位符 -->
+    <view class="lab-img-wrap">
+      <image
+        wx:if="{{item.photos && item.photos.length}}"
+        class="lab-img"
+        src="{{item.photos[0]}}"
+        mode="aspectFill"
+      />
+      <view
+        wx:else
+        class="lab-img fallback"
+        style="background: {{item.color}}"
+      >
+        <text class="lab-char">{{item.lab_name ? item.lab_name[0] : '实'}}</text>
       </view>
     </view>
-    <view class="lab-body">
-      <text class="lab-name">{{item.lab_name}}</text>
-      <text class="lab-loc">📍 {{item.location || '暂无位置'}}</text>
-      <view class="lab-row">
-        <text class="lab-cap">容纳 {{item.capacity}} 人</text>
-        <text class="lab-time">{{item.open_time}}–{{item.close_time}}</text>
+
+    <!-- 右侧：实验室详细信息 -->
+    <view class="lab-main">
+      <view class="lab-head">
+        <text class="lab-name">{{item.lab_name}}</text>
+        <view class="lab-status {{item.statusClass}}">
+          {{item.statusText}}
+        </view>
       </view>
-    </view>
-    <view class="lab-status {{item.status === 'open' ? 'open' : 'closed'}}">
-      {{item.status === 'open' ? '开放' : '关闭'}}
+
+      <text class="lab-campus">{{item.campus_name || '未配置校区'}}</text>
+      <text class="lab-loc">{{item.location || '暂无位置信息'}}</text>
+
+      <view class="lab-meta">
+        <text class="meta-tag">容量 {{item.capacity || 0}} 人</text>
+        <text class="meta-tag">{{item.openText}}</text>
+      </view>
     </view>
   </view>
 </view>
