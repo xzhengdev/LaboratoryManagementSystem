@@ -150,17 +150,74 @@ def _debug_enabled() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+_DEBUG_EVENT_META: Dict[str, Tuple[str, str]] = {
+    "chat_received": ("chat", "收到用户输入"),
+    "chat_rejected": ("chat", "用户校验失败"),
+    "route": ("chat", "路由分支"),
+    "agent_loop_start": ("_agent_loop", "开始智能循环"),
+    "fallback_rule": ("_agent_loop", "降级到规则引擎"),
+    "form_initialized": ("_agent_loop", "初始化表单"),
+    "llm_decision": ("_llm_agent_decide", "LLM 决策"),
+    "auto_fill_params": ("_auto_fill_params", "自动补参"),
+    "params_filled": ("_agent_loop", "补参完成"),
+    "run_tool_enter": ("_run_tool", "执行工具"),
+    "run_tool_missing_fields": ("_run_tool", "缺少必填参数"),
+    "run_tool_unknown": ("_run_tool", "未知工具"),
+    "tool_executed": ("_run_tool", "工具执行结果"),
+    "done_return": ("_agent_loop", "任务完成返回"),
+    "agent_loop_exception_fallback": ("chat", "Agent异常，进入兜底"),
+    "fallback_exception_general_llm": ("chat", "兜底异常，转通用LLM"),
+}
+
+
+def _debug_clip(value: Any, limit: int = 60) -> str:
+    text = str(value)
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3] + "..."
+
+
+def _debug_brief_payload(event: str, payload: Dict[str, Any]) -> str:
+    if not payload:
+        return ""
+    preferred_keys: Dict[str, List[str]] = {
+        "chat_received": ["message"],
+        "route": ["target", "lab_related", "lab_followup"],
+        "llm_decision": ["step", "tool", "done", "params"],
+        "auto_fill_params": ["tool", "out_params"],
+        "params_filled": ["step", "tool", "params"],
+        "run_tool_enter": ["tool", "params"],
+        "run_tool_missing_fields": ["tool", "missing"],
+        "tool_executed": ["step", "tool", "ok", "error_code", "data_preview"],
+        "done_return": ["step", "reply_preview"],
+    }
+    keys = preferred_keys.get(event) or list(payload.keys())[:3]
+    parts: List[str] = []
+    for k in keys:
+        if k not in payload:
+            continue
+        v = payload.get(k)
+        if isinstance(v, dict):
+            # show only commonly useful fields from params/form dictionaries
+            compact = {}
+            for sub in ["date", "start_time", "end_time", "lab_id", "participant_count", "preference", "purpose"]:
+                if sub in v and v.get(sub) not in [None, ""]:
+                    compact[sub] = v.get(sub)
+            v = compact or v
+        parts.append(f"{k}={_debug_clip(v)}")
+    return " | ".join(parts)
+
+
 def _debug_log(trace_id: str, event: str, **payload: Any) -> None:
     if not _debug_enabled():
         return
     now = _localized_now().strftime("%Y-%m-%d %H:%M:%S")
-    body = ""
-    if payload:
-        try:
-            body = " " + json.dumps(payload, ensure_ascii=False, default=str)
-        except Exception:
-            body = f" {str(payload)}"
-    print(f"[AGENT][{now}][{trace_id}][{event}]{body}")
+    func_name, desc = _DEBUG_EVENT_META.get(event, ("-", event))
+    body = _debug_brief_payload(event, payload)
+    if body:
+        print(f"[AGENT][{now}][{trace_id}] {func_name} | {desc} | {body}")
+    else:
+        print(f"[AGENT][{now}][{trace_id}] {func_name} | {desc}")
 
 
 def _tool_call(tool: str, params: Dict[str, Any], reply: str) -> Dict[str, Any]:
@@ -675,8 +732,67 @@ def _extract_intent(text: str) -> str:
 
 def _is_lab_related(text: str) -> bool:
     msg = (text or "").lower()
-    keys = ["实验室", "预约", "排期", "空闲", "lab", "schedule", "reservation", "校区", "设备", "取消预约"]
+    keys = [
+        "实验室",
+        "预约",
+        "排期",
+        "空闲",
+        "可用时间",
+        "可预约时间",
+        "推荐时间",
+        "推荐一下",
+        "帮我推荐",
+        "几点开始",
+        "下午",
+        "上午",
+        "lab",
+        "schedule",
+        "reservation",
+        "校区",
+        "设备",
+        "取消预约",
+    ]
     return any(k in msg for k in keys)
+
+
+def _is_lab_followup(text: str, session: Dict[str, Any]) -> bool:
+    # Continue prior lab task when user sends short supplementary info
+    # like “下午2点开始”“2小时”“就这个实验室”.
+    if str(session.get("last_domain") or "") != "lab":
+        return False
+    msg = (text or "").strip().lower()
+    if not msg:
+        return False
+    if _is_lab_related(msg):
+        return True
+    followup_keys = [
+        "下午",
+        "上午",
+        "中午",
+        "晚上",
+        "开始",
+        "到",
+        "至",
+        "小时",
+        "分钟",
+        "人",
+        "purpose",
+        "用途",
+        "就这个",
+        "这个",
+    ]
+    if any(k in msg for k in followup_keys):
+        return True
+    if any(k in msg for k in ["明天", "后天", "今天"]):
+        if any(x in msg for x in ["可用", "预约", "推荐", "空闲", "时间", "时段", "几点", "开始"]):
+            return True
+    if re.search(r"\d{1,2}:\d{2}", msg):
+        return True
+    if re.search(r"\d{1,2}点", msg):
+        return True
+    if re.search(r"^\d{1,2}$", msg):
+        return True
+    return False
 
 
 def _is_cancel_flow_message(text: str) -> bool:
@@ -835,6 +951,11 @@ def _query_schedule(date_text: str, lab_id: Optional[int]) -> Dict[str, Any]:
 
 
 def _recommend_time(date_text: str, lab_id: Optional[int], preference: str) -> Tuple[str, Optional[Dict[str, Any]]]:
+    print("执行推荐时间函数")
+    print("执行推荐时间函数")
+    print("执行推荐时间函数")
+    print("执行推荐时间函数")
+    print("执行推荐时间函数")
     result = _query_schedule(date_text, lab_id)
     if not result.get("ok"):
         return result.get("message") or "无法查询排期。", None
@@ -1764,6 +1885,7 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
     )
 
 def chat(user, message):
+    print("=========================================================下一轮对话==========================")
     """
     对话主入口函数 - 处理用户消息并返回 Agent 响应
     这是整个 Agent 系统的统一入口，负责：
@@ -1838,8 +1960,11 @@ def chat(user, message):
         # ----- 4.2 实验室相关问题 vs 通用问题 -----
         # 判断用户问题是否与实验室预约相关
         # 相关关键词：实验室、预约、排期、空闲、lab、schedule等
-        if _is_lab_related(text):
-            _debug_log(trace_id, "route", target="agent_loop")
+        lab_related = _is_lab_related(text)
+        lab_followup = _is_lab_followup(text, session)
+        if lab_related or lab_followup:
+            _debug_log(trace_id, "route", target="agent_loop", lab_related=lab_related, lab_followup=lab_followup)
+            session["last_domain"] = "lab"
             # 实验室相关问题：Agent 智能处理
             # 使用 LLM 驱动的 Agent 循环处理复杂预约场景
             # Agent 会自动决策调用哪个工具、补充缺失信息等
@@ -1866,6 +1991,7 @@ def chat(user, message):
         # 所有非实验室相关问题统一交给通用 LLM 处理
         # 通用 LLM 本身就能回答日期时间、天气、计算等问题
         _debug_log(trace_id, "route", target="general_llm")
+        session["last_domain"] = "general"
         result = _call_general_llm(user, text)
         _save_session(user_id, session)
         return _normalize_chat_result(result, trace_id)
