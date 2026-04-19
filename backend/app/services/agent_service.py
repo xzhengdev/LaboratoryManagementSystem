@@ -164,6 +164,7 @@ _DEBUG_EVENT_META: Dict[str, Tuple[str, str]] = {
     "run_tool_missing_fields": ("_run_tool", "缺少必填参数"),
     "run_tool_unknown": ("_run_tool", "未知工具"),
     "tool_executed": ("_run_tool", "工具执行结果"),
+    "form_synced_by_tool": ("_agent_loop", "根据工具结果回填表单"),
     "done_return": ("_agent_loop", "任务完成返回"),
     "agent_loop_exception_fallback": ("chat", "Agent异常，进入兜底"),
     "fallback_exception_general_llm": ("chat", "兜底异常，转通用LLM"),
@@ -189,6 +190,7 @@ def _debug_brief_payload(event: str, payload: Dict[str, Any]) -> str:
         "run_tool_enter": ["tool", "params"],
         "run_tool_missing_fields": ["tool", "missing"],
         "tool_executed": ["step", "tool", "ok", "error_code", "data_preview"],
+        "form_synced_by_tool": ["step", "tool", "form"],
         "done_return": ["step", "reply_preview"],
     }
     keys = preferred_keys.get(event) or list(payload.keys())[:3]
@@ -953,9 +955,6 @@ def _query_schedule(date_text: str, lab_id: Optional[int]) -> Dict[str, Any]:
 def _recommend_time(date_text: str, lab_id: Optional[int], preference: str) -> Tuple[str, Optional[Dict[str, Any]]]:
     print("执行推荐时间函数")
     print("执行推荐时间函数")
-    print("执行推荐时间函数")
-    print("执行推荐时间函数")
-    print("执行推荐时间函数")
     result = _query_schedule(date_text, lab_id)
     if not result.get("ok"):
         return result.get("message") or "无法查询排期。", None
@@ -1149,145 +1148,19 @@ def _llm_agent_decide(context: str, history: List[Dict[str, Any]], form: Dict[st
         return {}
     
     # ==================== 2. 工具定义 ====================
-    # 定义所有可用工具及其参数要求
-    # 这个定义会发给 LLM，让它知道有哪些能力可用
-    # 
-    # 字段说明：
-    # - name: 工具名称
-    # - required: 必需参数列表（不提供无法执行）
-    # - optional: 可选参数列表（可以后续补充）
-    tools = [
-
-    # ===== 查询类（基础数据获取） =====
-    {
-        "name": "query_labs",  
-        # 查询实验室列表（支持多条件筛选）
-        # 用于“有哪些实验室 / 可用实验室”场景
-        "required": [],
-        "optional": ["date", "campus", "type", "participant_count"]
-    },
-
-    {
-        "name": "query_schedule",  
-        # 查询某天的实验室排期（占用情况）
-        # 用于判断某一天是否空闲
-        "required": ["date"],
-        "optional": ["lab_id"]
-    },
-
-    {
-        "name": "check_availability",  
-        # 判断某个时间段是否可预约（强约束工具）
-        # 用于避免冲突，是 create_reservation 前的关键校验
-        "required": ["lab_id", "date", "start_time", "end_time"],
-        "optional": []
-    },
-
-
-    # ===== 推荐类（AI智能能力） =====
-    {
-        "name": "recommend_time",  
-        # 推荐最优预约时间段（基于排期计算）
-        # 用于“什么时候有空 / 推荐时间”
-        "required": ["date"],
-        "optional": ["lab_id", "preference"]   # preference: 上午/下午
-    },
-
-    {
-        "name": "recommend_lab",  
-        # 推荐最合适的实验室（基于人数/类型/校区）
-        # 用于“帮我推荐一个实验室”
-        "required": ["date"],
-        "optional": ["participant_count", "type", "campus"]
-    },
-
-
-    # ===== 实验室信息类 =====
-    {
-        "name": "get_lab_detail",  
-        # 获取实验室详细信息（设备 / 描述 / 容量等）
-        # 用于解释性回答（增强智能感）
-        "required": ["lab_id"],
-        "optional": []
-    },
-
-
-    # ===== 预约操作类（核心业务） =====
-    {
-        "name": "create_reservation",  
-        # 创建预约（最终执行动作）
-        # Agent最终目标之一
-        "required": [
-            "lab_id",
-            "date",
-            "start_time",
-            "end_time",
-            "participant_count",
-            "purpose"
-        ],
-        "optional": []
-    },
-
-    {
-        "name": "update_reservation",  
-        # 修改已有预约
-        # 支持“帮我改时间”这种高级交互
-        "required": ["reservation_id"],
-        "optional": ["date", "start_time", "end_time"]
-    },
-
-    {
-        "name": "cancel_reservation",  
-        # 取消预约
-        # 支持完整生命周期管理
-        "required": ["reservation_id"],
-        "optional": []
-    },
-
-    {
-        "name": "my_reservations",  
-        # 查询当前用户的预约记录
-        # 用于“我的预约”
-        "required": [],
-        "optional": []
-    },
-
-
-    # ===== 规则解释类（RAG能力） =====
-    {
-        "name": "explain_rules",  
-        # 解释实验室预约规则
-        # 用于“为什么不能预约 / 有什么限制”
-        "required": [],
-        "optional": ["question"]
-    },
-
-
-    # ===== 前端自动化（Agent核心能力） =====
-    {
-        "name": "navigate",  
-        # 页面跳转（小程序路由）
-        # AI驱动UI行为
-        "required": ["path"],
-        "optional": []
-    },
-
-    {
-        "name": "fill_form",  
-        # 自动填写预约表单
-        # 实现“AI帮你填表”
-        "required": ["form"],
-        "optional": []
-    },
-
-    {
-        "name": "submit_form",  
-        # 自动提交表单
-        # 实现“AI帮你完成预约”（关键一步）
-        "required": [],
-        "optional": []
-    },
-]
+    # 动态从 AGENT_TOOL_SCHEMAS 生成，确保 description/returns 能传给 LLM
+    # 避免维护两套工具定义导致不一致。
+    tools: List[Dict[str, Any]] = []
+    for tool_name, schema in AGENT_TOOL_SCHEMAS.items():
+        tools.append(
+            {
+                "name": tool_name,
+                "required": list(schema.get("required") or []),
+                "optional": list(schema.get("optional") or []),
+                "description": str(schema.get("description") or ""),
+                "returns": str(schema.get("returns") or ""),
+            }
+        )
     
     # ==================== 3. 构建提示词 ====================
     # 将系统状态、工具定义、历史记录等信息组装成提示词
@@ -1405,6 +1278,33 @@ def _tool_reply_prefer_facts(
     if factual:
         return factual
     return planner_reply or "?????"
+
+
+def _sync_form_from_tool_result(form: Dict[str, Any], tool: str, tool_result: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(form, dict):
+        return {}
+    if not isinstance(tool_result, dict) or not tool_result.get("ok"):
+        return form
+
+    if tool == "recommend_lab":
+        rid = _safe_int(tool_result.get("lab_id"))
+        if rid is not None:
+            form["lab_id"] = rid
+        return form
+
+    if tool == "recommend_time":
+        pick = tool_result.get("pick")
+        if isinstance(pick, dict):
+            rid = _safe_int(pick.get("lab_id"))
+            if rid is not None:
+                form["lab_id"] = rid
+            for key in ["date", "start_time", "end_time"]:
+                value = pick.get(key)
+                if value not in [None, ""]:
+                    form[key] = value
+        return form
+
+    return form
 
 
 def _auto_fill_params(tool: str, user, params: Dict[str, Any], form: Dict[str, Any], text: str, session: Dict[str, Any]) -> Dict[str, Any]:
@@ -1782,6 +1682,9 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
             error_code=tool_result.get("error_code"),
             data_preview=str(tool_result.get("data") or "")[:120],
         )
+        form = _sync_form_from_tool_result(form, tool, tool_result)
+        session["reservation_form"] = form
+        _debug_log(trace_id, "form_synced_by_tool", step=step, tool=tool, form=form)
         
         # ----- 3.5 记录执行历史 -----
         # 供 LLM 在下一步决策时参考
@@ -1885,7 +1788,7 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
     )
 
 def chat(user, message):
-    print("=========================================================下一轮对话==========================")
+    print("=========================================================下一轮对话============================================================")
     """
     对话主入口函数 - 处理用户消息并返回 Agent 响应
     这是整个 Agent 系统的统一入口，负责：
