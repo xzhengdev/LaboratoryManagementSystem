@@ -4,9 +4,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
 from zoneinfo import ZoneInfo
-
 import requests
-
 from app.config import Config
 from app.models import Laboratory, Reservation
 from app.services.reservation_service import cancel_reservation, create_reservation, get_lab_schedule
@@ -226,6 +224,13 @@ def _debug_log(trace_id: str, event: str, **payload: Any) -> None:
         print(f"[AGENT][{now}][{trace_id}] {func_name} | {desc} | {body}")
     else:
         print(f"[AGENT][{now}][{trace_id}] {func_name} | {desc}")
+
+
+def _is_abab_loop(history: List[Dict[str, Any]]) -> bool:
+    if len(history) < 4:
+        return False
+    tools = [str(x.get("tool") or "") for x in history[-4:]]
+    return tools[0] == tools[2] and tools[1] == tools[3] and tools[0] != tools[1]
 
 
 def _tool_call(tool: str, params: Dict[str, Any], reply: str) -> Dict[str, Any]:
@@ -507,6 +512,7 @@ def _clean_session(user_id: int) -> Dict[str, Any]:
             "lab_id": None,                # 实验室ID
             "campus": "",                  # 校区（用于实验室筛选）
             "type": "",                    # 实验室类型（用于筛选）
+            "preference": "",              # 时间偏好（上午/下午）
         },
     )
     # 3.2 最近查询的实验室列表
@@ -541,6 +547,7 @@ def _reset_form(session: Dict[str, Any]) -> None:
         "lab_id": None,
         "campus": "",
         "type": "",
+        "preference": "",
     }
     session["last_labs"] = []
     session["pending_action"] = None
@@ -1026,6 +1033,9 @@ def _extract_form_from_text(user, text: str, form: Dict[str, Any], session: Dict
     t = _detect_type(text)
     if t:
         merged["type"] = t
+    pref = _detect_preference(text)
+    if pref:
+        merged["preference"] = pref
     lab_id = _detect_lab_id_or_choice(text, session)
     if lab_id:
         merged["lab_id"] = lab_id
@@ -1711,7 +1721,7 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
         
         # 将成功填充的参数同步回表单（持久化）
         for key in ["date", "participant_count", "start_time", "end_time", 
-                    "purpose", "campus", "type", "lab_id"]:
+                    "purpose", "campus", "type", "lab_id", "preference"]:
             if params.get(key) not in [None, ""]:
                 form[key] = params.get(key)
         session["reservation_form"] = form
@@ -1743,6 +1753,59 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
                 "error_code": tool_result.get("error_code"),
             }
         )
+
+        # ----- 3.5a 冲突后硬规则：清空原时段并优先推荐新时段 -----
+        if tool == "check_availability" and not tool_result.get("ok") and tool_result.get("error_code") == "conflict":
+            form["start_time"] = ""
+            form["end_time"] = ""
+            session["reservation_form"] = form
+            rec_params: Dict[str, Any] = {"date": form.get("date"), "preference": form.get("preference") or ""}
+            if form.get("lab_id"):
+                rec_params["lab_id"] = form.get("lab_id")
+            rec_params = _sanitize_tool_params("recommend_time", rec_params)
+            _debug_log(trace_id, "run_tool_enter", tool="recommend_time(auto_after_conflict)", params=rec_params)
+            rec_result = _run_tool("recommend_time", rec_params, user, session)
+            _debug_log(
+                trace_id,
+                "tool_executed",
+                step=step,
+                tool="recommend_time(auto_after_conflict)",
+                ok=bool(rec_result.get("ok")),
+                error_code=rec_result.get("error_code"),
+                data_preview=str(rec_result.get("data") or "")[:120],
+            )
+            # 若限定实验室无可用时段，则自动放宽到不限实验室再试一次
+            if (
+                not rec_result.get("ok")
+                and rec_result.get("error_code") == "no_slot"
+                and rec_params.get("lab_id") is not None
+            ):
+                rec_params.pop("lab_id", None)
+                _debug_log(trace_id, "run_tool_enter", tool="recommend_time(auto_relax_lab)", params=rec_params)
+                rec_result = _run_tool("recommend_time", rec_params, user, session)
+                _debug_log(
+                    trace_id,
+                    "tool_executed",
+                    step=step,
+                    tool="recommend_time(auto_relax_lab)",
+                    ok=bool(rec_result.get("ok")),
+                    error_code=rec_result.get("error_code"),
+                    data_preview=str(rec_result.get("data") or "")[:120],
+                )
+            if rec_result.get("ok"):
+                form = _sync_form_from_tool_result(form, "recommend_time", rec_result)
+                session["reservation_form"] = form
+                _debug_log(trace_id, "form_synced_by_tool", step=step, tool="recommend_time(auto)", form=form)
+                return {
+                    "reply": str(rec_result.get("data") or "该时段冲突，已为你推荐其他可用时间。"),
+                    "actions": [],
+                    "trace_id": trace_id,
+                }
+            return {
+                "reply": "你选择的时段已被占用，暂时没有找到合适替代时段。你可以告诉我新的时间范围（例如 14:00-16:00）。",
+                "actions": [],
+                "trace_id": trace_id,
+            }
         
         # ----- 3.6 工具重复调用检测 -----
         # 防止 Agent 陷入同一工具的循环调用
@@ -1813,6 +1876,12 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
                 "reply": str(tool_result.get("data") or "处理失败。"),
                 "actions": [],
                 "trace_id": trace_id
+            }
+        if _is_abab_loop(history):
+            return {
+                "reply": "我检测到策略在重复尝试（如查冲突/换实验室来回循环）。请告诉我你更倾向的新时间范围，我马上按新范围推荐。",
+                "actions": [],
+                "trace_id": trace_id,
             }
         
         # ==================== 5. 继续下一轮循环 ====================
