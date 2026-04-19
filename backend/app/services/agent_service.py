@@ -9,7 +9,7 @@ from app.config import Config
 from app.models import Laboratory, Reservation
 from app.services.reservation_service import cancel_reservation, create_reservation, get_lab_schedule
 from app.utils.exceptions import AppError
-
+from app.extensions import db  # 如果你的项目不是这个路径，改成你自己的 db 导入
 
 ACTIVE_RESERVATION_STATUSES = {"pending", "approved"} #预约状态控制，判断预约时间是否冲突
 SESSION_TTL_MINUTES = 60                              #用户会话保留 60 分钟
@@ -295,22 +295,30 @@ def _missing_required_tool_fields(tool: str, params: Dict[str, Any]) -> List[str
 
 # 根据缺失参数生成用户友好的提示信息，引导用户补充数据
 def _missing_fields_hint(tool: str, missing: List[str]) -> str:
-    if tool == "create_reservation":
-        label_map = {
-            "lab_id": "实验室ID",
-            "date": "预约日期(YYYY-MM-DD)",
-            "start_time": "开始时间(HH:MM)",
-            "end_time": "结束时间(HH:MM)",
-            "participant_count": "参与人数",
-            "purpose": "用途说明",
-        }
-        labels = [label_map.get(x, x) for x in missing]
+    common_label_map = {
+        "lab_id": "实验室ID",
+        "date": "预约日期(YYYY-MM-DD)",
+        "start_time": "开始时间(HH:MM)",
+        "end_time": "结束时间(HH:MM)",
+        "participant_count": "参与人数",
+        "purpose": "用途说明",
+        "reservation_id": "预约ID",
+        "path": "页面路径",
+        "form": "表单数据",
+    }
+
+    if tool in {"create_reservation", "update_reservation"}:
+        labels = [common_label_map.get(x, x) for x in missing]
         return "还缺少这些信息: " + "、".join(labels) + "。"
+
     if tool == "query_schedule":
         return "请先告诉我日期，例如 2026-04-20。"
+
     if tool == "cancel_reservation":
         return "请告诉我要取消的预约ID，例如：取消预约ID 23。"
-    return "参数不完整，请补充必要信息后重试。"
+
+    labels = [common_label_map.get(x, x) for x in missing]
+    return "参数不完整，请补充这些信息：" + "、".join(labels) + "。"
 
  # 获取预约规则上下文（优先读取配置，否则使用默认规则）
 def _rules_context() -> str:
@@ -404,13 +412,18 @@ def _call_llm_messages(messages: List[Dict[str, str]], temperature: float = 0.1)
     # ==================== 6. 解析响应并提取内容 ====================
     # 将 JSON 字符串解析为 Python 字典
     data = resp.json()
-   
+    choices = data.get("choices") or []
+    if not choices:
+        raise RuntimeError("llm response missing choices")
     # 提取第一 choice 的 message.content
     # 响应格式遵循 OpenAI Chat Completion API
     # data["choices"][0]["message"]["content"] 是标准路径
-    content = str(data["choices"][0]["message"]["content"]).strip()
-    # print(content)
-    return content
+    message = choices[0].get("message") or {}
+    content = message.get("content")
+    if content is None:
+        raise RuntimeError("llm response missing content")
+
+    return str(content).strip()
 
 # 当 Agent 不走工具流程时，用这个函数直接和大模型聊天
 def _call_general_llm(user, message: str) -> str:
@@ -476,6 +489,7 @@ def _clean_session(user_id: int) -> Dict[str, Any]:
     # 3.4 最后更新时间戳
     # 用于会话过期判断，每次操作都会更新
     session.setdefault("updated_at", now)
+    session.setdefault("last_choice_type", "")
     # ==================== 4. 保存并返回 ====================
     # 将会话写回全局字典
     AGENT_SESSIONS[user_id] = session
@@ -501,6 +515,7 @@ def _reset_form(session: Dict[str, Any]) -> None:
         "preference": "",
     }
     session["last_labs"] = []
+    session["last_choice_type"] = ""
     session["pending_action"] = None
 
 # 识别“今天/明天/后天”等相对日期，并转换为对应的天数偏移
@@ -624,32 +639,48 @@ def _detect_preference(text: str) -> str:
         return "上午"
     return ""
 
+def _can_treat_as_choice(session: Dict[str, Any], choice_type: str) -> bool:
+    last_choice_type = str(session.get("last_choice_type") or "")
+    if choice_type == "lab":
+        return last_choice_type == "lab_list" and bool(session.get("last_labs"))
+    if choice_type == "reservation":
+        return last_choice_type == "reservation_list" and bool(session.get("last_reservations"))
+    return False
 
 def _detect_lab_id_or_choice(text: str, session: Dict[str, Any]) -> Optional[int]:
     msg = (text or "").strip()
+
     m = re.search(r"(?:实验室ID|lab_id|ID)[:：]?\s*(\d+)", msg, re.IGNORECASE)
     if m:
         return int(m.group(1))
-    m2 = re.match(r"^\D*(\d{1,2})\D*$", msg)
-    if m2 and session.get("last_labs"):
-        idx = int(m2.group(1))
-        labs = session["last_labs"]
+
+    # 只有在刚展示过实验室列表时，才把纯数字解释为“选第几个”
+    if _can_treat_as_choice(session, "lab") and re.fullmatch(r"\d{1,2}", msg):
+        idx = int(msg)
+        labs = session.get("last_labs") or []
         if 1 <= idx <= len(labs):
             return int(labs[idx - 1]["id"])
+
     return None
+
+
+
 
 # 这个函数是用来把用户的模糊表达（第几个）转成具体 reservation_id，方便后端执行操作
 def _detect_reservation_id_or_choice(text: str, session: Dict[str, Any]) -> Optional[int]:
     msg = (text or "").strip()
+
     m = re.search(r"(?:reservation_id|预约ID|预约id|ID)[:：#\s]*(\d+)", msg, re.IGNORECASE)
     if m:
         return int(m.group(1))
-    m2 = re.match(r"^\D*(\d{1,2})\D*$", msg)
-    if m2 and session.get("last_reservations"):
-        idx = int(m2.group(1))
-        rows = session["last_reservations"]
+
+    # 只有在刚展示过预约列表时，才把纯数字解释为“选第几个”
+    if _can_treat_as_choice(session, "reservation") and re.fullmatch(r"\d{1,2}", msg):
+        idx = int(msg)
+        rows = session.get("last_reservations") or []
         if 1 <= idx <= len(rows):
             return int(rows[idx - 1]["id"])
+
     return None
 
 
@@ -691,120 +722,110 @@ def _llm_extract_form(text: str, form: Dict[str, Any]) -> Dict[str, Any]:
     return form
 
 
+def _contains_any(msg: str, keywords: List[str]) -> bool:
+    return any(k in msg for k in keywords)
+
+
 def _extract_intent(text: str) -> str:
     msg = (text or "").strip().lower()
-    # ===== 取消预约 =====
-    if any(k in msg for k in [
-        "取消预约", "撤销预约", "删除预约", "不去这个预约了", "取消这个预约",
+    if not msg:
+        return "general"
+
+    # 1. 先识别最高优先级动作
+    if _contains_any(msg, [
+        "取消当前预约", "退出预约", "结束预约", "停止预约",
+        "不需要预约", "不用预约", "不约了", "算了不约了"
+    ]):
+        return "cancel_flow"
+
+    if _contains_any(msg, [
+        "取消预约", "撤销预约", "删除预约", "取消这个预约",
         "cancel reservation", "cancel_reservation"
     ]):
         return "cancel_reservation"
-    # ===== 取消当前预约流程 =====
-    if any(k in msg for k in [
-        "不需要预约", "不用预约", "先不预约", "不约了", "取消当前预约",
-        "退出预约", "结束预约", "停止预约", "先这样吧", "算了不约了"
-    ]):
-        return "cancel_flow"
-    # ===== 修改预约 =====
-    if any(k in msg for k in [
-        "修改预约", "更改预约", "调整预约", "改预约", "改一下预约",
-        "修改时间", "更改时间", "调整时间", "改时间", "换时间",
-        "改日期", "改实验室", "重新预约时间", "update reservation",
-        "update_reservation"
+
+    if _contains_any(msg, [
+        "修改预约", "更改预约", "调整预约", "改预约",
+        "修改时间", "更改时间", "调整时间", "改时间",
+        "改日期", "改实验室", "update reservation", "update_reservation"
     ]):
         return "update_reservation"
-    # ===== 页面跳转 =====
-    if any(k in msg for k in [
-        "去预约页面", "去排期页面", "跳转", "打开页面", "进入页面",
-        "带我去", "前往", "打开预约页", "打开实验室页面", "去实验室页面",
-        "进入预约", "进入实验室", "打开我的预约", "去我的预约"
-    ]):
-        return "navigate"
-    # ===== 我的预约 =====
-    if any(k in msg for k in [
-        "我的预约", "我有哪些预约", "预约列表", "查看预约", "查看我的预约",
-        "我的预约记录", "预约记录", "我预约了什么", "我都约了什么",
-        "我的实验室预约", "已预约"
+
+    if _contains_any(msg, [
+        "我的预约", "我有哪些预约", "查看我的预约", "预约记录", "我的预约记录"
     ]):
         return "my_reservations"
-    # ===== 推荐时间 =====
-    if any(k in msg for k in [
-        "推荐时间", "什么时候有空", "什么时候空", "帮我推荐时间",
-        "推荐一个时间", "推荐时段", "哪个时间合适", "什么时间合适",
-        "什么时候能约", "什么时候可以预约", "哪天有空", "哪个时段空闲",
-        "推荐一下时间", "给我推荐个时间"
-    ]):
-        return "recommend_time"
-    # ===== 推荐实验室 =====
-    if any(k in msg for k in [
-        "推荐实验室", "帮我推荐实验室", "推荐一个实验室", "哪个实验室好",
-        "适合的实验室", "给我推荐实验室", "有什么推荐的实验室",
-        "哪间实验室合适", "哪个实验室适合", "适合8个人的实验室",
-        "有推荐吗", "推荐一下实验室", "哪个实验室更好"
-    ]):
-        return "recommend_lab"
-    # ===== 查询排期 =====
-    if any(k in msg for k in [
-        "排期", "查看排期", "实验室排期", "查排期", "当天排期",
-        "有没有空", "是否空闲", "空闲吗", "有空吗", "schedule",
-        "查询空闲时间", "空闲时段", "当天有没有人约", "今天能不能用",
-        "某天能不能用", "这个实验室明天有空吗"
-    ]):
-        return "query_schedule"
-    # ===== 检查可用性 =====
-    if any(k in msg for k in [
-        "能不能约", "是否可以预约", "可以预约吗", "这个时间可以吗",
-        "这个时间能约吗", "有没有冲突", "是否冲突", "时间冲突",
-        "这个时段行吗", "这个时间段行吗", "这个实验室这个时间能用吗",
-        "check availability", "check_availability"
-    ]):
-        return "check_availability"
-    # ===== 获取实验室详情 =====
-    if any(k in msg for k in [
-        "实验室详情", "实验室信息", "实验室介绍", "实验室情况",
-        "这个实验室怎么样", "介绍一下实验室", "查看实验室详情",
-        "实验室位置", "实验室容量", "实验室设备", "有什么设备",
-        "这个实验室能坐多少人", "实验室在哪", "实验室具体信息"
-    ]):
-        return "get_lab_detail"
-    # ===== 创建预约 =====
-    if any(k in msg for k in [
-        "预约", "预定", "我要预约", "帮我预约", "创建预约",
-        "提交预约", "约实验室", "订实验室", "预约实验室",
-        "我要预定", "帮我定一个实验室", "创建一个预约",
-        "create reservation", "create_reservation"
-    ]):
-        return "create_reservation"
-    # ===== 查询实验室 =====
-    if any(k in msg for k in [
-        "有哪些实验室", "查询实验室", "查实验室", "实验室列表",
-        "可用实验室", "空闲实验室", "实验室", "lab",
-        "有哪些可用实验室", "还有哪些实验室", "有什么实验室",
-        "查看实验室", "找实验室", "搜实验室", "有哪些空实验室"
-    ]):
-        return "query_labs"
-    # ===== 规则解释 =====
-    if any(k in msg for k in [
-        "为什么不能预约", "预约规则", "规则", "限制", "规则说明",
-        "为什么约不了", "为什么不能约", "有什么限制", "预约要求",
-        "预约条件", "实验室预约规则", "预约须知", "不能预约的原因",
-        "规则是什么", "怎么规定的", "为什么冲突"
+
+    # 2. 规则 / 说明 / 原因
+    if _contains_any(msg, [
+        "为什么不能预约", "为什么约不了", "预约规则", "规则说明",
+        "有什么限制", "预约要求", "预约条件", "规则是什么", "为什么冲突"
     ]):
         return "explain_rules"
-    # ===== 自动填表 =====
-    if any(k in msg for k in [
-        "填写表单", "帮我填", "自动填", "填一下表单",
-        "帮我填写预约表单", "自动填写", "填表", "把表单填好"
+
+    # 3. 页面跳转
+    if _contains_any(msg, [
+        "去预约页面", "去排期页面", "打开页面", "进入页面",
+        "打开预约页", "打开实验室页面", "打开我的预约", "去我的预约"
+    ]):
+        return "navigate"
+
+    # 4. 查询 / 推荐 / 检查
+    if _contains_any(msg, [
+        "推荐时间", "帮我推荐时间", "推荐时段", "哪个时间合适",
+        "什么时候能约", "什么时候可以预约", "哪天有空"
+    ]):
+        return "recommend_time"
+
+    if _contains_any(msg, [
+        "推荐实验室", "帮我推荐实验室", "推荐一个实验室",
+        "哪间实验室合适", "哪个实验室适合"
+    ]):
+        return "recommend_lab"
+
+    if _contains_any(msg, [
+        "排期", "查看排期", "实验室排期", "查排期",
+        "当天排期", "空闲时段", "查询空闲时间"
+    ]):
+        return "query_schedule"
+
+    if _contains_any(msg, [
+        "能不能约", "是否可以预约", "可以预约吗", "有没有冲突",
+        "时间冲突", "这个时间可以吗", "这个时间能约吗", "这个时段行吗"
+    ]):
+        return "check_availability"
+
+    if _contains_any(msg, [
+        "实验室详情", "实验室信息", "实验室介绍", "实验室位置",
+        "实验室容量", "实验室设备", "这个实验室怎么样", "实验室在哪"
+    ]):
+        return "get_lab_detail"
+
+    # 5. 创建预约
+    if _contains_any(msg, [
+        "我要预约", "帮我预约", "创建预约", "约实验室",
+        "订实验室", "预约实验室", "创建一个预约", "我要预定"
+    ]):
+        return "create_reservation"
+
+    # 6. 查询实验室
+    if _contains_any(msg, [
+        "有哪些实验室", "查询实验室", "查实验室", "实验室列表",
+        "可用实验室", "空闲实验室", "有哪些可用实验室", "找实验室"
+    ]):
+        return "query_labs"
+
+    # 7. 表单类
+    if _contains_any(msg, [
+        "填写表单", "帮我填", "自动填", "填一下表单", "填表"
     ]):
         return "fill_form"
-    # ===== 提交表单 =====
-    if any(k in msg for k in [
-        "提交表单", "确认提交", "提交预约", "提交吧",
-        "帮我提交", "确认预约", "现在提交", "直接提交",
-        "submit form", "submit_form"
+
+    if _contains_any(msg, [
+        "提交表单", "确认提交", "提交吧", "帮我提交", "确认预约", "直接提交"
     ]):
         return "submit_form"
-    # ===== 默认普通对话 =====
+
     return "general"
 
 def _is_lab_related(text: str) -> bool:
@@ -1016,31 +1037,115 @@ def _is_cancel_flow_message(text: str) -> bool:
 
 #     return f"{label}是 {target.strftime('%Y-%m-%d')}（{weekday}）。"
 
+def _validate_time_range(start_time: str, end_time: str) -> Optional[str]:
+    if not start_time or not end_time:
+        return "开始时间和结束时间不能为空。"
+
+    try:
+        st = _to_minutes(start_time)
+        et = _to_minutes(end_time)
+    except Exception:
+        return "时间格式不正确，请使用 HH:MM。"
+
+    if st >= et:
+        return "开始时间必须早于结束时间。"
+
+    return None
+
+
+def _validate_schedule_window(schedule: Dict[str, Any], start_time: str, end_time: str) -> Optional[str]:
+    open_time = str(schedule.get("open_time") or "")[:5]
+    close_time = str(schedule.get("close_time") or "")[:5]
+    if not open_time or not close_time:
+        return None
+
+    try:
+        st = _to_minutes(start_time)
+        et = _to_minutes(end_time)
+        om = _to_minutes(open_time)
+        cm = _to_minutes(close_time)
+    except Exception:
+        return "时间格式不正确。"
+
+    if st < om or et > cm:
+        return f"预约时间必须在实验室开放时间内（{open_time}-{close_time}）。"
+
+    return None
+
+def _free_slots_from_schedule(schedule: Dict[str, Any]) -> List[Tuple[int, int]]:
+    open_time = schedule.get("open_time")
+    close_time = schedule.get("close_time")
+    if not open_time or not close_time:
+        return []
+
+    open_m = _to_minutes(str(open_time)[:5])
+    close_m = _to_minutes(str(close_time)[:5])
+    if open_m >= close_m:
+        return []
+
+    reservations = schedule.get("reservations") or []
+    occupied: List[Tuple[int, int]] = []
+
+    for r in reservations:
+        try:
+            s = _to_minutes(str(r["start_time"])[:5])
+            e = _to_minutes(str(r["end_time"])[:5])
+            if s < e:
+                occupied.append((s, e))
+        except Exception:
+            continue
+
+    occupied.sort()
+    free: List[Tuple[int, int]] = []
+    cur = open_m
+
+    for s, e in occupied:
+        if s > cur:
+            free.append((cur, s))
+        cur = max(cur, e)
+
+    if cur < close_m:
+        free.append((cur, close_m))
+
+    return free
+
+
+def _has_available_slot(schedule: Dict[str, Any], min_duration: int = 60) -> bool:
+    for s, e in _free_slots_from_schedule(schedule):
+        if e - s >= min_duration:
+            return True
+    return False
+
 #=======================================================工具实现函数========================================
 def _query_labs(date_text: str, campus: str, lab_type: str, participant_count: Optional[int] = None) -> List[Laboratory]:
     labs = Laboratory.query.filter_by(status="active").order_by(Laboratory.id.asc()).all()
+
     if campus:
         labs = [lab for lab in labs if lab.campus and campus in (lab.campus.campus_name or "")]
+
     if lab_type:
         labs = [
-            lab
-            for lab in labs
+            lab for lab in labs
             if (lab.description and lab_type.lower() in lab.description.lower())
             or (lab.lab_name and lab_type.lower() in lab.lab_name.lower())
         ]
-    if participant_count:
+
+    if participant_count is not None:
         labs = [lab for lab in labs if (lab.capacity or 0) >= participant_count]
+
     if date_text:
         try:
             d = datetime.strptime(date_text, "%Y-%m-%d").date()
         except Exception:
             return []
+
         filtered: List[Laboratory] = []
         for lab in labs:
-            rows = get_lab_schedule(lab, d).get("reservations") or []
-            if len(rows) < 12:
+            schedule = get_lab_schedule(lab, d)
+            if _has_available_slot(schedule, min_duration=60):
                 filtered.append(lab)
         labs = filtered
+
     return labs
 
 
@@ -1102,40 +1207,50 @@ def _recommend_time(date_text: str, lab_id: Optional[int], preference: str) -> T
 
 
 def _extract_form_from_text(user, text: str, form: Dict[str, Any], session: Dict[str, Any]) -> Dict[str, Any]:
-    merged = dict(form)
+    merged = dict(form or {})
     relative_date = _resolve_relative_date(text)
+
     d = _detect_date(text)
     if d:
         merged["date"] = d
+
     st, et = _detect_time_range(text)
     if st:
         merged["start_time"] = st
     if et:
         merged["end_time"] = et
+
     c = _detect_participant_count(text)
-    if c:
+    if c is not None:
         merged["participant_count"] = c
+
     p = _detect_purpose(text)
     if p:
         merged["purpose"] = p
+
     campus = _detect_campus(text)
     if campus:
         merged["campus"] = campus
+
     t = _detect_type(text)
     if t:
         merged["type"] = t
+
     pref = _detect_preference(text)
     if pref:
         merged["preference"] = pref
+
     lab_id = _detect_lab_id_or_choice(text, session)
-    if lab_id:
+    if lab_id is not None:
         merged["lab_id"] = lab_id
+
     merged = _llm_extract_form(text, merged)
-    # 相对日期强制优先，避免被 LLM 错误覆盖
+
+    # 相对日期优先，防止 LLM 覆盖错
     if relative_date:
         merged["date"] = relative_date
-    if not merged.get("participant_count"):
-        merged["participant_count"] = 1
+
+    # 注意：这里不再默认 participant_count = 1
     return merged
 
 
@@ -1381,16 +1496,14 @@ def _normalize_nav_path(path: str) -> str:
 def _tool_reply_prefer_facts(
     tool: str, tool_result: Dict[str, Any], planner_reply: str, params: Dict[str, Any]
 ) -> str:
-    # 优先使用工具返回的真实结果文本，避免 LLM 回复与实际数据不一致
     factual = str(tool_result.get("data") or "").strip()
-    if tool in {"query_labs", "query_schedule", "recommend_time"}:
-        # For date/schedule related tools, trust tool output first.
-        if factual:
-            return factual
-        return planner_reply or "?????"
     if factual:
         return factual
-    return planner_reply or "?????"
+
+    if planner_reply:
+        return planner_reply.strip()
+
+    return "已处理完成。"
 
 
 def _sync_form_from_tool_result(form: Dict[str, Any], tool: str, tool_result: Dict[str, Any]) -> Dict[str, Any]:
@@ -1446,7 +1559,6 @@ def _auto_fill_params(tool: str, user, params: Dict[str, Any], form: Dict[str, A
 
 
 def _handle_query_labs(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
-    # 处理实验室查询工具，筛选实验室并保存最近查询结果
     labs = _query_labs(
         params.get("date") or "",
         params.get("campus") or "",
@@ -1454,6 +1566,7 @@ def _handle_query_labs(tool: str, params: Dict[str, Any], user, session: Dict[st
         _safe_int(params.get("participant_count")),
     )
     session["last_labs"] = [{"id": lab.id, "name": lab.lab_name} for lab in labs[:8]]
+    session["last_choice_type"] = "lab_list"
     return _tool_result(tool, True, _labs_to_text(labs), extra={"labs_count": len(labs)})
 
 
@@ -1470,21 +1583,62 @@ def _handle_query_schedule(tool: str, params: Dict[str, Any], user, session: Dic
 
 
 def _handle_check_availability(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
-    # 处理可用性检查工具，判断指定实验室在目标时间段是否存在冲突
     lab_id = _safe_int(params.get("lab_id"))
+    if lab_id is None:
+        return _tool_result(tool, False, "缺少实验室ID", error_code="missing_fields")
+
+    date_text = params.get("date")
+    start_time = params.get("start_time")
+    end_time = params.get("end_time")
+
+    time_error = _validate_time_range(start_time, end_time)
+    if time_error:
+        return _tool_result(tool, False, time_error, error_code="invalid_time")
+
+    try:
+        target_date = datetime.strptime(date_text, "%Y-%m-%d").date()
+    except Exception:
+        return _tool_result(tool, False, "日期格式不正确，请使用 YYYY-MM-DD。", error_code="invalid_date")
+
     lab = Laboratory.query.get(lab_id)
     if not lab:
         return _tool_result(tool, False, "实验室不存在", error_code="not_found")
-    schedule = get_lab_schedule(lab, datetime.strptime(params["date"], "%Y-%m-%d").date())
+
+    schedule = get_lab_schedule(lab, target_date)
+
+    window_error = _validate_schedule_window(schedule, start_time, end_time)
+    if window_error:
+        return _tool_result(tool, False, window_error, error_code="outside_open_time")
+
+    st = _to_minutes(start_time)
+    et = _to_minutes(end_time)
+
     rows = schedule.get("reservations") or []
-    st = _to_minutes(params["start_time"])
-    et = _to_minutes(params["end_time"])
+    conflicts = []
     for r in rows:
-        s = _to_minutes(r["start_time"][:5])
-        e = _to_minutes(r["end_time"][:5])
+        try:
+            s = _to_minutes(str(r["start_time"])[:5])
+            e = _to_minutes(str(r["end_time"])[:5])
+        except Exception:
+            continue
         if not (et <= s or st >= e):
-            return _tool_result(tool, False, "该时间段已被占用", error_code="conflict")
-    return _tool_result(tool, True, "该时间段可以预约")
+            conflicts.append(f"{str(r['start_time'])[:5]}-{str(r['end_time'])[:5]}")
+
+    if conflicts:
+        return _tool_result(
+            tool,
+            False,
+            f"该时间段不可预约，冲突时间段：{'；'.join(conflicts)}",
+            error_code="time_conflict",
+            raw={"conflicts": conflicts},
+        )
+
+    return _tool_result(
+        tool,
+        True,
+        f"{date_text} {start_time}-{end_time} 可以预约。",
+        raw={"available": True},
+    )
 
 
 def _handle_recommend_time(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
@@ -1527,15 +1681,24 @@ def _handle_get_lab_detail(tool: str, params: Dict[str, Any], user, session: Dic
 
 
 def _handle_create_reservation(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
-    # 处理预约创建工具，组装预约参数并调用预约服务完成创建
+    participant_count = _safe_int(params.get("participant_count"))
     payload = {
         "lab_id": _safe_int(params.get("lab_id")),
         "reservation_date": params.get("date"),
         "start_time": params.get("start_time"),
         "end_time": params.get("end_time"),
-        "participant_count": _safe_int(params.get("participant_count")) or 1,
+        "participant_count": participant_count,
         "purpose": params.get("purpose"),
     }
+    if payload["participant_count"] is None:
+        return _tool_result(
+            tool,
+            False,
+            "还缺少这些信息: 参与人数。",
+            error_code="missing_fields",
+            error_message="missing required params",
+            extra={"missing_fields": ["participant_count"]},
+        )
     lab = Laboratory.query.get(payload["lab_id"])
     if not lab:
         return _tool_result(tool, False, "实验室不存在", error_code="not_found")
@@ -1554,29 +1717,100 @@ def _handle_create_reservation(tool: str, params: Dict[str, Any], user, session:
         return _tool_result(tool, False, f"预约失败：{exc.message}", error_code="business_rule")
 
 
+
+
 def _handle_update_reservation(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
-    # 处理预约修改工具，更新已有预约的日期或时间信息
-    reservation = Reservation.query.get(_safe_int(params.get("reservation_id")))
+    reservation_id = _safe_int(params.get("reservation_id"))
+    reservation = Reservation.query.get(reservation_id)
     if not reservation:
         return _tool_result(tool, False, "预约不存在", error_code="not_found")
-    if params.get("date"):
-        reservation.reservation_date = params["date"]
-    if params.get("start_time"):
-        reservation.start_time = params["start_time"]
-    if params.get("end_time"):
-        reservation.end_time = params["end_time"]
-    return _tool_result(tool, True, "预约已更新")
+
+    if reservation.user_id != user.id:
+        return _tool_result(tool, False, "你无权修改这条预约。", error_code="forbidden")
+
+    new_date = params.get("date") or str(reservation.reservation_date)
+    new_start = params.get("start_time") or str(reservation.start_time)[:5]
+    new_end = params.get("end_time") or str(reservation.end_time)[:5]
+
+    time_error = _validate_time_range(new_start, new_end)
+    if time_error:
+        return _tool_result(tool, False, time_error, error_code="invalid_time")
+
+    try:
+        target_date = datetime.strptime(new_date, "%Y-%m-%d").date()
+    except Exception:
+        return _tool_result(tool, False, "日期格式不正确，请使用 YYYY-MM-DD。", error_code="invalid_date")
+
+    lab = reservation.lab
+    if not lab:
+        return _tool_result(tool, False, "预约关联的实验室不存在。", error_code="not_found")
+
+    schedule = get_lab_schedule(lab, target_date)
+
+    window_error = _validate_schedule_window(schedule, new_start, new_end)
+    if window_error:
+        return _tool_result(tool, False, window_error, error_code="outside_open_time")
+
+    st = _to_minutes(new_start)
+    et = _to_minutes(new_end)
+
+    rows = schedule.get("reservations") or []
+    for r in rows:
+        rid = _safe_int(r.get("id"))
+        if rid == reservation.id:
+            continue
+        try:
+            s = _to_minutes(str(r["start_time"])[:5])
+            e = _to_minutes(str(r["end_time"])[:5])
+        except Exception:
+            continue
+        if not (et <= s or st >= e):
+            return _tool_result(
+                tool,
+                False,
+                f"修改失败：与 {str(r['start_time'])[:5]}-{str(r['end_time'])[:5]} 冲突。",
+                error_code="time_conflict",
+            )
+
+    try:
+        reservation.reservation_date = new_date
+        reservation.start_time = new_start
+        reservation.end_time = new_end
+        db.session.commit()
+
+        return _tool_result(
+            tool,
+            True,
+            f"预约已更新：{lab.lab_name} {new_date} {new_start}-{new_end}",
+            raw={
+                "id": reservation.id,
+                "lab_id": getattr(reservation, "lab_id", None),
+                "reservation_date": new_date,
+                "start_time": new_start,
+                "end_time": new_end,
+            },
+        )
+    except Exception:
+        db.session.rollback()
+        return _tool_result(tool, False, "预约更新失败，请稍后重试。", error_code="db_error")
 
 
 def _handle_my_reservations(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
-    # 处理“我的预约”查询工具，并保存最近预约列表用于后续选择操作
-    rows = Reservation.query.filter_by(user_id=user.id).limit(8).all()
+    rows = Reservation.query.filter_by(user_id=user.id).order_by(Reservation.id.desc()).limit(8).all()
     if not rows:
+        session["last_reservations"] = []
+        session["last_choice_type"] = ""
         return _tool_result(tool, True, "暂无预约记录")
-    session["last_reservations"] = [{"id": r.id} for r in rows]
-    text = "\n".join([f"{r.id} | {r.lab.lab_name if r.lab else '-'} | {r.reservation_date}" for r in rows])
-    return _tool_result(tool, True, text)
 
+    session["last_reservations"] = [{"id": r.id} for r in rows]
+    session["last_choice_type"] = "reservation_list"
+
+    text = "\n".join([
+        f"{idx}. 预约ID={r.id} | {r.lab.lab_name if r.lab else '-'} | {r.reservation_date} | "
+        f"{str(r.start_time)[:5]}-{str(r.end_time)[:5]} | {getattr(r, 'status', '-')}"
+        for idx, r in enumerate(rows, start=1)
+    ])
+    return _tool_result(tool, True, text)
 
 def _handle_cancel_reservation(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
     # 处理预约取消工具，调用取消服务撤销指定预约
@@ -1635,6 +1869,11 @@ def _run_tool(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) 
     missing = _missing_required_tool_fields(tool, params)
     if missing:
         _debug_log(trace_id, "run_tool_missing_fields", tool=tool, missing=missing)
+        session["pending_action"] = {
+            "tool": tool,
+            "missing": missing,
+            "params": dict(params or {}),
+        }
         return _tool_result(
             tool,
             False,
@@ -1648,6 +1887,7 @@ def _run_tool(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) 
     if not handler:
         _debug_log(trace_id, "run_tool_unknown", tool=tool)
         return _tool_result(tool, False, f"未知工具：{tool}", error_code="unknown_tool")
+
     return handler(tool, params, user, session)
 
 
@@ -1683,8 +1923,9 @@ def _continue_pending_action(user, text: str, session: Dict[str, Any], trace_id:
     pending = session.get("pending_action")
     if not isinstance(pending, dict):
         return None
+
     tool = str(pending.get("tool") or "")
-    if tool != "create_reservation":
+    if not tool:
         return None
 
     _debug_log(trace_id, "pending_action_continue", tool=tool, message=text)
@@ -1692,27 +1933,42 @@ def _continue_pending_action(user, text: str, session: Dict[str, Any], trace_id:
     form = dict(session.get("reservation_form") or {})
     form = _extract_form_from_text(user, text, form, session)
     session["reservation_form"] = form
-    params = _auto_fill_params("create_reservation", user, {}, form, text, session)
-    result = _run_tool("create_reservation", params, user, session)
+
+    params = _auto_fill_params(tool, user, pending.get("params") or {}, form, text, session)
+    result = _run_tool(tool, params, user, session)
 
     if result.get("ok"):
         session["pending_action"] = None
         _debug_log(trace_id, "pending_action_cleared", tool=tool)
         return {
-            "reply": f"已帮你完成预约: {result.get('data')}",
-            "actions": [{"label": "查看我的预约", "path": "/pages/my-reservations/my-reservations"}],
+            "reply": str(result.get("data") or "处理成功。"),
+            "actions": [{"label": "查看我的预约", "path": "/pages/my-reservations/my-reservations"}]
+            if tool in {"create_reservation", "update_reservation", "cancel_reservation"}
+            else [],
             "trace_id": trace_id,
         }
 
     if result.get("error_code") == "missing_fields":
         missing = result.get("missing_fields") or []
-        session["pending_action"] = {"tool": "create_reservation", "missing": missing}
-        _debug_log(trace_id, "pending_action_set", tool="create_reservation", missing=missing)
-        return {"reply": str(result.get("data") or "还需要补充信息后才能创建预约。"), "actions": [], "trace_id": trace_id}
+        session["pending_action"] = {
+            "tool": tool,
+            "missing": missing,
+            "params": params,
+        }
+        _debug_log(trace_id, "pending_action_set", tool=tool, missing=missing)
+        return {
+            "reply": str(result.get("data") or "还需要补充信息。"),
+            "actions": [],
+            "trace_id": trace_id,
+        }
 
     session["pending_action"] = None
     _debug_log(trace_id, "pending_action_cleared", tool=tool)
-    return {"reply": str(result.get("data") or "处理失败。"), "actions": [], "trace_id": trace_id}
+    return {
+        "reply": str(result.get("data") or "处理失败。"),
+        "actions": [],
+        "trace_id": trace_id,
+    }
 
 
 # 开始
