@@ -3,6 +3,7 @@ import re
 from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -17,39 +18,31 @@ SESSION_TTL_MINUTES = 60
 MAX_AGENT_STEPS = 5
 MAX_TOOL_REPEAT_STEPS = 2
 MAX_HISTORY_SUMMARY_CHARS = 280
+DEFAULT_AGENT_TIMEZONE = "Asia/Shanghai"
+WEEKDAY_CN = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
 
 AGENT_TOOL_SCHEMAS: Dict[str, Dict[str, Any]] = {
-    "query_labs": {
-        "required": [],
-        "optional": ["date", "campus", "type", "participant_count"],
-    },
-    "query_schedule": {
-        "required": ["date"],
-        "optional": ["lab_id"],
-    },
-    "recommend_time": {
-        "required": ["date"],
-        "optional": ["lab_id", "preference"],
-    },
+    "query_labs": {"required": [], "optional": ["date", "campus", "type", "participant_count"]},
+    "query_schedule": {"required": ["date"], "optional": ["lab_id"]},
+    "recommend_time": {"required": ["date"], "optional": ["lab_id", "preference"]},
     "create_reservation": {
         "required": ["lab_id", "date", "start_time", "end_time", "participant_count", "purpose"],
         "optional": [],
     },
-    "my_reservations": {
-        "required": [],
-        "optional": [],
-    },
-    "cancel_reservation": {
-        "required": ["reservation_id"],
-        "optional": [],
-    },
-    "navigate": {
-        "required": ["path"],
-        "optional": [],
-    },
+    "my_reservations": {"required": [], "optional": []},
+    "cancel_reservation": {"required": ["reservation_id"], "optional": []},
+    "navigate": {"required": ["path"], "optional": []},
 }
 
 AGENT_SESSIONS: Dict[int, Dict[str, Any]] = {}
+
+
+def _localized_now() -> datetime:
+    tz_name = str(getattr(Config, "AGENT_TIMEZONE", DEFAULT_AGENT_TIMEZONE) or DEFAULT_AGENT_TIMEZONE)
+    try:
+        return datetime.now(ZoneInfo(tz_name))
+    except Exception:
+        return datetime.now()
 
 
 def _now() -> datetime:
@@ -57,7 +50,7 @@ def _now() -> datetime:
 
 
 def _today() -> date:
-    return date.today()
+    return _localized_now().date()
 
 
 def _new_trace_id() -> str:
@@ -65,12 +58,7 @@ def _new_trace_id() -> str:
 
 
 def _tool_call(tool: str, params: Dict[str, Any], reply: str) -> Dict[str, Any]:
-    return {
-        "type": "tool_call",
-        "tool": tool,
-        "params": params,
-        "reply": reply,
-    }
+    return {"type": "tool_call", "tool": tool, "params": params, "reply": reply}
 
 
 def _tool_result(
@@ -83,7 +71,7 @@ def _tool_result(
     raw: Optional[Any] = None,
     extra: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    result: Dict[str, Any] = {
+    out: Dict[str, Any] = {
         "ok": ok,
         "tool": tool,
         "data": data,
@@ -91,16 +79,14 @@ def _tool_result(
         "error_message": error_message,
     }
     if raw is not None:
-        result["raw"] = raw
+        out["raw"] = raw
     if extra:
-        result.update(extra)
-    return result
+        out.update(extra)
+    return out
 
 
 def _normalize_params_shape(params: Any) -> Dict[str, Any]:
-    if isinstance(params, dict):
-        return dict(params)
-    return {}
+    return dict(params) if isinstance(params, dict) else {}
 
 
 def _safe_int(value: Any) -> Optional[int]:
@@ -152,7 +138,8 @@ def _missing_fields_hint(tool: str, missing: List[str]) -> str:
             "participant_count": "参与人数",
             "purpose": "用途说明",
         }
-        return "还缺少这些信息: " + "、".join([label_map.get(x, x) for x in missing]) + "。"
+        labels = [label_map.get(x, x) for x in missing]
+        return "还缺少这些信息: " + "、".join(labels) + "。"
     if tool == "query_schedule":
         return "请先告诉我日期，例如 2026-04-20。"
     if tool == "cancel_reservation":
@@ -209,15 +196,8 @@ def _safe_json_loads(text: str) -> Optional[Dict[str, Any]]:
 def _call_llm_messages(messages: List[Dict[str, str]], temperature: float = 0.1) -> str:
     if not Config.LLM_API_KEY:
         raise RuntimeError("missing LLM_API_KEY")
-    headers = {
-        "Authorization": f"Bearer {Config.LLM_API_KEY}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": Config.AGENT_MODEL,
-        "messages": messages,
-        "temperature": temperature,
-    }
+    headers = {"Authorization": f"Bearer {Config.LLM_API_KEY}", "Content-Type": "application/json"}
+    payload = {"model": Config.AGENT_MODEL, "messages": messages, "temperature": temperature}
     resp = requests.post(Config.LLM_BASE_URL, headers=headers, json=payload, timeout=20)
     resp.raise_for_status()
     data = resp.json()
@@ -284,15 +264,30 @@ def _reset_form(session: Dict[str, Any]) -> None:
     session["last_labs"] = []
 
 
+def _relative_day_offset(text: str) -> Optional[int]:
+    msg = text or ""
+    if "后天" in msg:
+        return 2
+    if "明天" in msg:
+        return 1
+    if "今天" in msg:
+        return 0
+    return None
+
+
+def _resolve_relative_date(text: str) -> Optional[str]:
+    offset = _relative_day_offset(text)
+    if offset is None:
+        return None
+    return (_today() + timedelta(days=offset)).isoformat()
+
+
 def _detect_date(text: str) -> Optional[str]:
     msg = text or ""
     today = _today()
-    if "今天" in msg:
-        return today.isoformat()
-    if "明天" in msg:
-        return (today + timedelta(days=1)).isoformat()
-    if "后天" in msg:
-        return (today + timedelta(days=2)).isoformat()
+    relative = _resolve_relative_date(msg)
+    if relative:
+        return relative
     m = re.search(r"(20\d{2}-\d{1,2}-\d{1,2})", msg)
     if m:
         try:
@@ -403,7 +398,11 @@ def _to_minutes(hhmm: str) -> int:
 def _llm_extract_form(text: str, form: Dict[str, Any]) -> Dict[str, Any]:
     if not Config.LLM_API_KEY:
         return form
-    prompt = f"抽取预约字段并仅返回JSON。已有表单: {json.dumps(form, ensure_ascii=False)}。用户输入: {text}"
+    prompt = (
+        "从用户输入中抽取预约字段并仅返回 JSON。"
+        f"已有表单: {json.dumps(form, ensure_ascii=False)}。"
+        f"用户输入: {text}"
+    )
     try:
         content = _call_llm_messages(
             [
@@ -462,6 +461,31 @@ def _is_cancel_flow_message(text: str) -> bool:
     return any(k in msg for k in keys)
 
 
+def _is_date_time_question(text: str) -> bool:
+    msg = (text or "").strip().lower()
+    keys = [
+        "今天几号",
+        "今天是几号",
+        "今天几月几号",
+        "今天日期",
+        "几号",
+        "几月几日",
+        "星期几",
+        "周几",
+        "现在几点",
+        "现在时间",
+        "time",
+        "date",
+    ]
+    return any(k in msg for k in keys)
+
+
+def _build_date_time_reply() -> str:
+    now = _localized_now()
+    weekday = WEEKDAY_CN[now.weekday()]
+    return f"今天是 {now.strftime('%Y-%m-%d')}（{weekday}），当前时间 {now.strftime('%H:%M:%S')}。"
+
+
 def _query_labs(date_text: str, campus: str, lab_type: str, participant_count: Optional[int] = None) -> List[Laboratory]:
     labs = Laboratory.query.filter_by(status="active").order_by(Laboratory.id.asc()).all()
     if campus:
@@ -480,7 +504,7 @@ def _query_labs(date_text: str, campus: str, lab_type: str, participant_count: O
             d = datetime.strptime(date_text, "%Y-%m-%d").date()
         except Exception:
             return []
-        filtered = []
+        filtered: List[Laboratory] = []
         for lab in labs:
             rows = get_lab_schedule(lab, d).get("reservations") or []
             if len(rows) < 12:
@@ -509,7 +533,8 @@ def _recommend_time(date_text: str, lab_id: Optional[int], preference: str) -> T
     result = _query_schedule(date_text, lab_id)
     if not result.get("ok"):
         return result.get("message") or "无法查询排期。", None
-    best, best_score = None, -1
+    best = None
+    best_score = -1
     for item in result["schedules"]:
         lab, schedule = item["lab"], item["schedule"]
         open_m, close_m = _to_minutes(schedule["open_time"]), _to_minutes(schedule["close_time"])
@@ -525,7 +550,11 @@ def _recommend_time(date_text: str, lab_id: Optional[int], preference: str) -> T
             dur = e - s
             if dur < 60:
                 continue
-            score = dur + (30 if "上午" in preference and s < 12 * 60 else 0) + (30 if "下午" in preference and s >= 12 * 60 else 0)
+            score = dur
+            if "上午" in preference and s < 12 * 60:
+                score += 30
+            if "下午" in preference and s >= 12 * 60:
+                score += 30
             if score > best_score:
                 best_score = score
                 best = {"lab_id": lab.id, "lab_name": lab.lab_name, "start": s, "end": min(s + 120, e)}
@@ -538,6 +567,7 @@ def _recommend_time(date_text: str, lab_id: Optional[int], preference: str) -> T
 
 def _extract_form_from_text(user, text: str, form: Dict[str, Any], session: Dict[str, Any]) -> Dict[str, Any]:
     merged = dict(form)
+    relative_date = _resolve_relative_date(text)
     d = _detect_date(text)
     if d:
         merged["date"] = d
@@ -562,6 +592,9 @@ def _extract_form_from_text(user, text: str, form: Dict[str, Any], session: Dict
     if lab_id:
         merged["lab_id"] = lab_id
     merged = _llm_extract_form(text, merged)
+    # 相对日期强制优先，避免被 LLM 错误覆盖
+    if relative_date:
+        merged["date"] = relative_date
     if not merged.get("participant_count"):
         merged["participant_count"] = 1
     return merged
@@ -681,6 +714,20 @@ def _normalize_nav_path(path: str) -> str:
     return mapping.get(raw, raw)
 
 
+def _tool_reply_prefer_facts(
+    tool: str, tool_result: Dict[str, Any], planner_reply: str, params: Dict[str, Any]
+) -> str:
+    factual = str(tool_result.get("data") or "").strip()
+    if tool in {"query_labs", "query_schedule", "recommend_time"}:
+        # For date/schedule related tools, trust tool output first.
+        if factual:
+            return factual
+        return planner_reply or "?????"
+    if factual:
+        return factual
+    return planner_reply or "?????"
+
+
 def _auto_fill_params(tool: str, user, params: Dict[str, Any], form: Dict[str, Any], text: str, session: Dict[str, Any]) -> Dict[str, Any]:
     merged = _extract_form_from_text(user, text, form, session)
     raw = dict(params or {})
@@ -691,7 +738,12 @@ def _auto_fill_params(tool: str, user, params: Dict[str, Any], form: Dict[str, A
         rid = _detect_reservation_id_or_choice(text, session)
         if rid:
             raw["reservation_id"] = rid
+    # Double safety: force relative date before tool execution.
+    relative_date = _resolve_relative_date(text)
+    if relative_date:
+        raw["date"] = relative_date
     return _sanitize_tool_params(tool, raw)
+
 
 
 def _run_tool(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
@@ -840,6 +892,10 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
         if not tool:
             return {"reply": planner_reply or "请补充更多信息。", "actions": [], "trace_id": trace_id}
         params = _auto_fill_params(tool, user, params, form, context, session)
+        for key in ["date", "participant_count", "start_time", "end_time", "purpose", "campus", "type", "lab_id"]:
+            if params.get(key) not in [None, ""]:
+                form[key] = params.get(key)
+        session["reservation_form"] = form
         tool_result = _run_tool(tool, params, user, session)
         history.append(
             {
@@ -864,7 +920,8 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
                 return {"reply": f"已帮你完成预约: {tool_result.get('data')}", "actions": [{"label": "查看我的预约", "path": "/pages/my-reservations/my-reservations"}], "trace_id": trace_id}
             return {"reply": str(tool_result.get("data") or "预约失败。"), "actions": [], "trace_id": trace_id}
         if done:
-            return {"reply": planner_reply or str(tool_result.get("data") or "处理完成。"), "actions": [], "trace_id": trace_id}
+            final_reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params)
+            return {"reply": final_reply, "actions": [], "trace_id": trace_id}
         if not tool_result.get("ok") and tool_result.get("error_code") in {"missing_fields", "invalid_params", "not_found", "business_rule"}:
             return {"reply": str(tool_result.get("data") or "处理失败。"), "actions": [], "trace_id": trace_id}
         context = (
@@ -896,6 +953,10 @@ def chat(user, message):
             _reset_form(session)
             _save_session(user_id, session)
             return _normalize_chat_result("好的，已退出当前预约流程。后续你可以继续让我查实验室、排期或帮你预约。", trace_id)
+        if _is_date_time_question(text):
+            result = _build_date_time_reply()
+            _save_session(user_id, session)
+            return _normalize_chat_result(result, trace_id)
         if not _is_lab_related(text):
             result = _call_general_llm(user, text)
             _save_session(user_id, session)
