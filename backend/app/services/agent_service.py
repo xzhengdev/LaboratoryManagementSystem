@@ -404,7 +404,7 @@ def _call_llm_messages(messages: List[Dict[str, str]], temperature: float = 0.1)
         Config.LLM_BASE_URL,  # API 端点地址
         headers=headers,
         json=payload,         # 自动将 dict 序列化为 JSON
-        timeout=60
+        timeout=160
     )
     
     # ==================== 5. 检查响应状态 ====================
@@ -1174,6 +1174,19 @@ def _recommend_time(date_text: str, lab_id: Optional[int], preference: str) -> T
         return result.get("message") or "无法查询排期。", None
     best = None
     best_score = -1
+
+    def _preference_windows(pref_text: str) -> List[Tuple[int, int]]:
+        pref = str(pref_text or "")
+        if "上午" in pref:
+            return [(8 * 60, 12 * 60)]
+        if "下午" in pref:
+            return [(12 * 60, 18 * 60)]
+        if "晚上" in pref or "晚间" in pref:
+            return [(18 * 60, 22 * 60)]
+        return []
+
+    preferred_windows = _preference_windows(preference)
+
     for item in result["schedules"]:
         lab, schedule = item["lab"], item["schedule"]
         open_m, close_m = _to_minutes(schedule["open_time"]), _to_minutes(schedule["close_time"])
@@ -1186,22 +1199,23 @@ def _recommend_time(date_text: str, lab_id: Optional[int], preference: str) -> T
         if cur < close_m:
             free.append((cur, close_m))
         for s, e in free:
-            dur = e - s
-            if dur < 60:
-                continue
-            # Honor explicit user preference first.
-            if "上午" in preference and s >= 12 * 60:
-                continue
-            if "下午" in preference and s < 12 * 60:
-                continue
-            score = dur
-            if "上午" in preference and s < 12 * 60:
-                score += 30
-            if "下午" in preference and s >= 12 * 60:
-                score += 30
-            if score > best_score:
-                best_score = score
-                best = {"lab_id": lab.id, "lab_name": lab.lab_name, "start": s, "end": min(s + 120, e)}
+            candidate_ranges: List[Tuple[int, int]] = []
+            if preferred_windows:
+                for ws, we in preferred_windows:
+                    cs, ce = max(s, ws), min(e, we)
+                    if ce - cs >= 60:
+                        candidate_ranges.append((cs, ce))
+            elif e - s >= 60:
+                candidate_ranges.append((s, e))
+
+            for cs, ce in candidate_ranges:
+                dur = ce - cs
+                score = dur
+                if preferred_windows:
+                    score += 30
+                if score > best_score:
+                    best_score = score
+                    best = {"lab_id": lab.id, "lab_name": lab.lab_name, "start": cs, "end": min(cs + 120, ce)}
     if not best:
         return "当天没有合适的连续空闲时段。", None
     st = f"{best['start'] // 60:02d}:{best['start'] % 60:02d}"
@@ -1399,6 +1413,9 @@ def _llm_agent_decide(context: str, history: List[Dict[str, Any]], form: Dict[st
 
 规则:
 {_rules_context()}
+- 如果信息不足以完成用户目标，优先继续推进：调用工具或明确追问缺失信息，不要空泛结束。
+- 只有在“已满足用户请求”或“明确无法继续且已说明缺什么”时才 done=true。
+- 用户目标若是创建预约，不要停在“推荐/查询”中间结果，应继续到可提交或明确缺参。
 
 工具:
 {json.dumps(tools, ensure_ascii=False)}
@@ -1507,6 +1524,104 @@ def _tool_reply_prefer_facts(
         return planner_reply.strip()
 
     return "已处理完成。"
+
+
+def _build_followup_question(tool: str, tool_result: Dict[str, Any], form: Dict[str, Any]) -> str:
+    """
+    在工具执行后给出可执行的下一步追问，避免“只报结果不推进”。
+    """
+    if not tool_result.get("ok"):
+        return ""
+
+    if tool == "query_labs":
+        return "要不要我继续按日期/时段给你筛选可预约实验室？例如：`明天下午，3人`。"
+
+    if tool == "recommend_lab":
+        return "要不要我基于这个实验室继续推荐具体可用时间段？"
+
+    if tool == "recommend_time":
+        return "要继续的话，我可以直接帮你检查该时段是否可约，或你直接说“创建预约”。"
+
+    if tool == "get_lab_detail":
+        return "要不要我再查这个实验室明天的排期，或直接帮你预约一个时间段？"
+
+    if tool == "check_availability":
+        purpose = str((form or {}).get("purpose") or "").strip()
+        if purpose:
+            return "这个时段可用。你回复“创建预约”我就直接提交。"
+        return "这个时段可用。还差预约用途（purpose），补充后我就能直接创建预约。"
+
+    return ""
+
+
+def _wants_create_flow(user_input: str) -> bool:
+    """
+    判断用户是否明确想“完成预约”，用于避免中间结果过早返回。
+    """
+    intent = _extract_intent(user_input or "")
+    if intent == "create_reservation":
+        return True
+    msg = user_input or ""
+    return any(k in msg for k in ["帮我预约", "创建预约", "直接预约", "下预约"])
+
+
+def _needs_create_flow_clarification(form: Dict[str, Any], user_input: str) -> List[str]:
+    """
+    用户明确要创建预约时，先判断是否缺少“规划阶段”必须的信息。
+    这里不等同于 create_reservation 的最终必填字段，而是用于先把需求问清楚。
+    """
+    if not _wants_create_flow(user_input):
+        return []
+
+    current = dict(form or {})
+    missing: List[str] = []
+
+    if not current.get("date"):
+        missing.append("date")
+
+    if not current.get("campus") and not current.get("lab_id"):
+        missing.append("campus")
+
+    has_time_range = bool(current.get("start_time") and current.get("end_time"))
+    has_preference = bool(current.get("preference"))
+    if not has_time_range and not has_preference:
+        missing.append("time_range")
+    elif has_preference and not has_time_range:
+        missing.append("time_range_detail")
+
+    if current.get("participant_count") in [None, "", 0]:
+        missing.append("participant_count")
+
+    if not str(current.get("purpose") or "").strip():
+        missing.append("purpose")
+
+    return missing
+
+
+def _build_create_flow_clarification(missing: List[str], form: Dict[str, Any]) -> str:
+    parts: List[str] = []
+
+    if "campus" in missing:
+        parts.append("想预约哪个校区")
+    if "date" in missing:
+        parts.append("预约哪一天")
+    if "time_range" in missing:
+        parts.append("具体几点到几点")
+    if "time_range_detail" in missing:
+        pref = str((form or {}).get("preference") or "").strip()
+        if pref:
+            parts.append(f"{pref}具体几点开始、几点结束")
+        else:
+            parts.append("具体几点到几点")
+    if "participant_count" in missing:
+        parts.append("几个人使用")
+    if "purpose" in missing:
+        parts.append("预约用途是什么")
+
+    if not parts:
+        return ""
+
+    return "为了帮你把预约真正办下来，我还需要确认这些信息：" + "，".join(parts) + "。"
 
 
 def _sync_form_from_tool_result(form: Dict[str, Any], tool: str, tool_result: Dict[str, Any]) -> Dict[str, Any]:
@@ -1937,6 +2052,27 @@ def _continue_pending_action(user, text: str, session: Dict[str, Any], trace_id:
     form = _extract_form_from_text(user, text, form, session)
     session["reservation_form"] = form
 
+    # 创建预约在“规划阶段”的追问不直接执行工具；
+    # 当高层信息补齐后，交回 agent_loop 继续推荐/检查/创建。
+    if tool == "create_reservation":
+        create_flow_missing = _needs_create_flow_clarification(form, text)
+        if create_flow_missing:
+            session["pending_action"] = {
+                "tool": tool,
+                "missing": create_flow_missing,
+                "params": pending.get("params") or {},
+            }
+            _debug_log(trace_id, "pending_action_set", tool=tool, missing=create_flow_missing)
+            return {
+                "reply": _build_create_flow_clarification(create_flow_missing, form),
+                "actions": [],
+                "trace_id": trace_id,
+            }
+
+        session["pending_action"] = None
+        _debug_log(trace_id, "pending_action_cleared", tool=tool)
+        return None
+
     params = _auto_fill_params(tool, user, pending.get("params") or {}, form, text, session)
     result = _run_tool(tool, params, user, session)
 
@@ -1974,14 +2110,13 @@ def _continue_pending_action(user, text: str, session: Dict[str, Any], trace_id:
     }
 
 
-def _should_fast_return_tool(tool: str, user_input: str, tool_result: Dict[str, Any]) -> bool:
+def _should_fast_return_tool(tool: str, tool_result: Dict[str, Any]) -> bool:
     """
     哪些工具在成功执行后可以直接返回，不必再让 LLM 继续规划下一步
     """
     if not tool_result.get("ok"):
         return False
 
-    # 查询类工具：通常一步足够回答
     fast_tools = {
         "query_labs",
         "query_schedule",
@@ -1990,16 +2125,12 @@ def _should_fast_return_tool(tool: str, user_input: str, tool_result: Dict[str, 
         "explain_rules",
         "recommend_lab",
         "recommend_time",
+        "cancel_reservation",
+        "navigate",
+        "fill_form",
+        "submit_form",
     }
-
-    if tool in fast_tools:
-        return True
-
-    # 导航 / 前端动作类也适合直接返回
-    if tool in {"navigate", "fill_form", "submit_form", "cancel_reservation"}:
-        return True
-
-    return False
+    return tool in fast_tools
 
 # 开始
 #   ↓
@@ -2024,6 +2155,380 @@ def _should_fast_return_tool(tool: str, user_input: str, tool_result: Dict[str, 
 #   ↓
 # 返回结果
 
+def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -> Any:
+    """
+    Agent 主循环 - 改进版
+    目标：
+    1. LLM 决策下一步调用哪个工具
+    2. 自动填充缺失参数
+    3. 执行工具并处理结果
+    4. 防止重复调用和 ABAB 死循环
+    5. 查询类工具成功后快速返回，避免过度规划
+    """
+
+    # ==================== 1. 降级检查 ====================
+    session["_debug_trace_id"] = trace_id
+    _debug_log(trace_id, "agent_loop_start", user_input=user_input)
+
+    if not Config.LLM_API_KEY:
+        _debug_log(trace_id, "fallback_rule", reason="missing_llm_api_key")
+        return _normalize_chat_result(
+            _fallback_rule_chat(user, user_input, session),
+            trace_id
+        )
+
+    # ==================== 2. 初始化循环状态 ====================
+    context = user_input
+    history: List[Dict[str, Any]] = []
+
+    form = dict(session.get("reservation_form") or {})
+    form = _extract_form_from_text(user, user_input, form, session)
+    session["reservation_form"] = form
+    _debug_log(trace_id, "form_initialized", form=form)
+
+    create_flow_missing = _needs_create_flow_clarification(form, user_input)
+    if create_flow_missing:
+        reply = _build_create_flow_clarification(create_flow_missing, form)
+        session["pending_action"] = {
+            "tool": "create_reservation",
+            "missing": create_flow_missing,
+            "params": {},
+        }
+        _debug_log(trace_id, "pending_action_set", tool="create_reservation", missing=create_flow_missing)
+        return {
+            "reply": reply,
+            "actions": [],
+            "trace_id": trace_id,
+        }
+
+    last_tool, same_tool_count = "", 0
+
+    # ==================== 3. Agent 主循环 ====================
+    for step in range(1, MAX_AGENT_STEPS + 1):
+
+        # ----- 3.1 LLM 决策 -----
+        decision = _llm_agent_decide(context, history, form) or {}
+        tool = str(decision.get("tool") or "").strip()
+        params = _normalize_params_shape(decision.get("params"))
+        planner_reply = str(decision.get("reply") or "").strip()
+        done = bool(decision.get("done", False))
+
+        _debug_log(trace_id, "llm_decision", step=step, tool=tool, done=done, params=params)
+
+        # ----- 3.2 终止条件 -----
+        if done and not tool:
+            final_reply = planner_reply or "处理完成。"
+            _debug_log(trace_id, "done_return", step=step, reply_preview=final_reply[:120])
+            return {
+                "reply": final_reply,
+                "actions": [],
+                "trace_id": trace_id
+            }
+
+        if not tool:
+            final_reply = planner_reply or "请补充更多信息。"
+            _debug_log(trace_id, "done_return", step=step, reply_preview=final_reply[:120])
+            return {
+                "reply": final_reply,
+                "actions": [],
+                "trace_id": trace_id
+            }
+
+        # ----- 3.3 参数自动填充 -----
+        params = _auto_fill_params(tool, user, params, form, user_input, session)
+        _debug_log(trace_id, "params_filled", step=step, tool=tool, params=params)
+
+        # 同步回表单
+        for key in ["date", "participant_count", "start_time", "end_time",
+                    "purpose", "campus", "type", "lab_id", "preference"]:
+            if params.get(key) not in [None, ""]:
+                form[key] = params.get(key)
+        session["reservation_form"] = form
+
+        # ----- 3.4 缺参时统一挂起 -----
+        missing = _missing_required_tool_fields(tool, params)
+        if missing:
+            session["pending_action"] = {
+                "tool": tool,
+                "missing": missing,
+                "params": dict(params or {}),
+            }
+            _debug_log(trace_id, "pending_action_set", tool=tool, missing=missing)
+            return {
+                "reply": _missing_fields_hint(tool, missing),
+                "actions": [],
+                "trace_id": trace_id,
+            }
+
+        # ----- 3.5 执行工具 -----
+        tool_result = _run_tool(tool, params, user, session)
+        _debug_log(
+            trace_id,
+            "tool_executed",
+            step=step,
+            tool=tool,
+            ok=bool(tool_result.get("ok")),
+            error_code=tool_result.get("error_code"),
+            data_preview=str(tool_result.get("data") or "")[:120],
+        )
+
+        form = _sync_form_from_tool_result(form, tool, tool_result)
+        session["reservation_form"] = form
+        _debug_log(trace_id, "form_synced_by_tool", step=step, tool=tool, form=form)
+
+        # ----- 3.6 工具执行后仍缺参，也统一挂起 -----
+        if tool_result.get("error_code") == "missing_fields":
+            missing = tool_result.get("missing_fields") or []
+            session["pending_action"] = {
+                "tool": tool,
+                "missing": missing,
+                "params": dict(params or {}),
+            }
+            _debug_log(trace_id, "pending_action_set", tool=tool, missing=missing)
+            return {
+                "reply": str(tool_result.get("data") or _missing_fields_hint(tool, missing)),
+                "actions": [],
+                "trace_id": trace_id,
+            }
+
+        # ----- 3.7 记录执行历史 -----
+        history.append(
+            {
+                "step": step,
+                "tool": tool,
+                "params": params,
+                "ok": bool(tool_result.get("ok")),
+                "result_summary": str(tool_result.get("data") or "")[:MAX_HISTORY_SUMMARY_CHARS],
+                "error_code": tool_result.get("error_code"),
+            }
+        )
+
+        # ----- 3.7a 冲突后硬规则：优先推荐新时段 -----
+        if tool == "check_availability" and not tool_result.get("ok") and tool_result.get("error_code") in {"conflict", "time_conflict"}:
+            form["start_time"] = ""
+            form["end_time"] = ""
+            session["reservation_form"] = form
+
+            rec_params: Dict[str, Any] = {
+                "date": form.get("date"),
+                "preference": form.get("preference") or ""
+            }
+            if form.get("lab_id"):
+                rec_params["lab_id"] = form.get("lab_id")
+
+            rec_params = _sanitize_tool_params("recommend_time", rec_params)
+            _debug_log(trace_id, "run_tool_enter", tool="recommend_time(auto_after_conflict)", params=rec_params)
+
+            rec_result = _run_tool("recommend_time", rec_params, user, session)
+            _debug_log(
+                trace_id,
+                "tool_executed",
+                step=step,
+                tool="recommend_time(auto_after_conflict)",
+                ok=bool(rec_result.get("ok")),
+                error_code=rec_result.get("error_code"),
+                data_preview=str(rec_result.get("data") or "")[:120],
+            )
+
+            if (
+                not rec_result.get("ok")
+                and rec_result.get("error_code") == "no_slot"
+                and rec_params.get("lab_id") is not None
+            ):
+                rec_params.pop("lab_id", None)
+                _debug_log(trace_id, "run_tool_enter", tool="recommend_time(auto_relax_lab)", params=rec_params)
+
+                rec_result = _run_tool("recommend_time", rec_params, user, session)
+                _debug_log(
+                    trace_id,
+                    "tool_executed",
+                    step=step,
+                    tool="recommend_time(auto_relax_lab)",
+                    ok=bool(rec_result.get("ok")),
+                    error_code=rec_result.get("error_code"),
+                    data_preview=str(rec_result.get("data") or "")[:120],
+                )
+
+            if rec_result.get("ok"):
+                form = _sync_form_from_tool_result(form, "recommend_time", rec_result)
+                session["reservation_form"] = form
+                _debug_log(trace_id, "form_synced_by_tool", step=step, tool="recommend_time(auto)", form=form)
+
+                reply = str(rec_result.get("data") or "该时段冲突，已为你推荐其他可用时间。")
+                _debug_log(trace_id, "done_return", step=step, reply_preview=reply[:120])
+                return {
+                    "reply": reply,
+                    "actions": [],
+                    "trace_id": trace_id,
+                }
+
+            reply = "你选择的时段已被占用，暂时没有找到合适替代时段。你可以告诉我新的时间范围（例如 14:00-16:00）。"
+            _debug_log(trace_id, "done_return", step=step, reply_preview=reply[:120])
+            return {
+                "reply": reply,
+                "actions": [],
+                "trace_id": trace_id,
+            }
+
+        # ----- 3.7b 推荐时间失败时，若已限定实验室则自动放宽到全量实验室再试 -----
+        if tool == "recommend_time" and not tool_result.get("ok") and tool_result.get("error_code") == "no_slot":
+            if params.get("lab_id") is not None:
+                relaxed_params = dict(params)
+                relaxed_params.pop("lab_id", None)
+                relaxed_params = _sanitize_tool_params("recommend_time", relaxed_params)
+                _debug_log(trace_id, "run_tool_enter", tool="recommend_time(auto_relax_lab)", params=relaxed_params)
+
+                relaxed_result = _run_tool("recommend_time", relaxed_params, user, session)
+                _debug_log(
+                    trace_id,
+                    "tool_executed",
+                    step=step,
+                    tool="recommend_time(auto_relax_lab)",
+                    ok=bool(relaxed_result.get("ok")),
+                    error_code=relaxed_result.get("error_code"),
+                    data_preview=str(relaxed_result.get("data") or "")[:120],
+                )
+
+                if relaxed_result.get("ok"):
+                    form = _sync_form_from_tool_result(form, "recommend_time", relaxed_result)
+                    session["reservation_form"] = form
+                    _debug_log(trace_id, "form_synced_by_tool", step=step, tool="recommend_time(auto_relax_lab)", form=form)
+                    tool_result = relaxed_result
+                    tool = "recommend_time"
+
+        # ----- 3.8 重复调用检测 -----
+        same_tool_count = same_tool_count + 1 if tool == last_tool else 1
+        last_tool = tool
+
+        if same_tool_count > MAX_TOOL_REPEAT_STEPS:
+            reply = "同一步骤重复尝试过多次。请补充更具体信息后我再继续。"
+            _debug_log(trace_id, "done_return", step=step, reply_preview=reply[:120])
+            return {
+                "reply": reply,
+                "actions": [],
+                "trace_id": trace_id
+            }
+
+        if _is_abab_loop(history):
+            reply = "我检测到策略在重复尝试（如查冲突/换实验室来回循环）。请告诉我你更倾向的新时间范围，我马上按新范围推荐。"
+            _debug_log(trace_id, "done_return", step=step, reply_preview=reply[:120])
+            return {
+                "reply": reply,
+                "actions": [],
+                "trace_id": trace_id,
+            }
+
+        # ==================== 4. 查询/动作类工具快速返回 ====================
+
+        # 4.1 导航类
+        if tool == "navigate" and tool_result.get("ok"):
+            reply = planner_reply or "我带你进入对应页面。"
+            _debug_log(trace_id, "done_return", step=step, reply_preview=reply[:120])
+            return {
+                "reply": reply,
+                "actions": [{"label": "前往页面", "path": str(tool_result.get("data") or "/pages/agent/agent")}],
+                "trace_id": trace_id
+            }
+
+        # 4.2 我的预约 / 取消预约
+        if tool in {"my_reservations", "cancel_reservation"}:
+            reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params)
+            _debug_log(trace_id, "done_return", step=step, reply_preview=reply[:120])
+            return {
+                "reply": reply,
+                "actions": [{"label": "查看我的预约", "path": "/pages/my-reservations/my-reservations"}],
+                "trace_id": trace_id
+            }
+
+        # 4.3 创建 / 修改预约
+        if tool in {"create_reservation", "update_reservation"}:
+            reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params)
+            _debug_log(trace_id, "done_return", step=step, reply_preview=reply[:120])
+            return {
+                "reply": reply,
+                "actions": [{"label": "查看我的预约", "path": "/pages/my-reservations/my-reservations"}] if tool_result.get("ok") else [],
+                "trace_id": trace_id
+            }
+
+        # 4.4 其他查询类成功后直接返回
+        if _should_fast_return_tool(tool, tool_result):
+            # 用户目标是“完成预约”时，不在中间查询/推荐结果提前结束，继续规划到可提交或明确缺参。
+            if _wants_create_flow(user_input) and tool in {
+                "query_labs",
+                "query_schedule",
+                "recommend_lab",
+                "recommend_time",
+                "get_lab_detail",
+                "check_availability",
+            }:
+                _debug_log(trace_id, "route", target="continue_planning", reason="create_flow_not_finished", step=step, tool=tool)
+            else:
+                reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params)
+                followup = _build_followup_question(tool, tool_result, form)
+                if followup:
+                    reply = f"{reply}\n\n{followup}"
+                _debug_log(trace_id, "done_return", step=step, reply_preview=reply[:120])
+                return {
+                    "reply": reply,
+                    "actions": [],
+                    "trace_id": trace_id
+                }
+
+        # 4.5 LLM 本轮已标记完成
+        if done:
+            if _wants_create_flow(user_input) and tool in {
+                "query_labs",
+                "query_schedule",
+                "recommend_lab",
+                "recommend_time",
+                "get_lab_detail",
+                "check_availability",
+            }:
+                _debug_log(trace_id, "route", target="continue_planning", reason="done_but_create_flow_not_finished", step=step, tool=tool)
+            else:
+                final_reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params)
+                followup = _build_followup_question(tool, tool_result, form)
+                if followup:
+                    final_reply = f"{final_reply}\n\n{followup}"
+                _debug_log(trace_id, "done_return", step=step, reply_preview=final_reply[:120])
+                return {
+                    "reply": final_reply,
+                    "actions": [],
+                    "trace_id": trace_id
+                }
+
+        # 4.6 不可恢复错误直接返回
+        if not tool_result.get("ok") and tool_result.get("error_code") in {
+            "invalid_params",
+            "not_found",
+            "business_rule"
+        }:
+            reply = str(tool_result.get("data") or "处理失败。")
+            _debug_log(trace_id, "done_return", step=step, reply_preview=reply[:120])
+            return {
+                "reply": reply,
+                "actions": [],
+                "trace_id": trace_id
+            }
+
+        # ==================== 5. 更新上下文，继续下一轮 ====================
+        context = (
+            f"USER_REQUEST: {user_input}\n"
+            f"STEP: {step}\n"
+            f"TOOL: {tool}\n"
+            f"TOOL_PARAMS: {json.dumps(params, ensure_ascii=False)}\n"
+            f"TOOL_OK: {tool_result.get('ok')}\n"
+            f"TOOL_RESULT: {str(tool_result.get('data') or '')[:MAX_HISTORY_SUMMARY_CHARS]}\n"
+            f"CURRENT_FORM: {json.dumps(form, ensure_ascii=False)}\n"
+            "继续选择下一步。若已满足需求，请 done=true。"
+        )
+
+    # ==================== 6. 超过最大步数，降级 ====================
+    _debug_log(trace_id, "fallback_rule", reason="max_steps_exceeded")
+    return _normalize_chat_result(
+        _fallback_rule_chat(user, user_input, session),
+        trace_id
+    )
 
 def chat(user, message):
     print("=========================================================下一轮对话============================================================")
