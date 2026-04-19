@@ -165,6 +165,9 @@ _DEBUG_EVENT_META: Dict[str, Tuple[str, str]] = {
     "run_tool_unknown": ("_run_tool", "未知工具"),
     "tool_executed": ("_run_tool", "工具执行结果"),
     "form_synced_by_tool": ("_agent_loop", "根据工具结果回填表单"),
+    "pending_action_set": ("_agent_loop", "挂起待续动作"),
+    "pending_action_continue": ("chat", "续接待续动作"),
+    "pending_action_cleared": ("chat", "清除待续动作"),
     "done_return": ("_agent_loop", "任务完成返回"),
     "agent_loop_exception_fallback": ("chat", "Agent异常，进入兜底"),
     "fallback_exception_general_llm": ("chat", "兜底异常，转通用LLM"),
@@ -191,6 +194,9 @@ def _debug_brief_payload(event: str, payload: Dict[str, Any]) -> str:
         "run_tool_missing_fields": ["tool", "missing"],
         "tool_executed": ["step", "tool", "ok", "error_code", "data_preview"],
         "form_synced_by_tool": ["step", "tool", "form"],
+        "pending_action_set": ["tool", "missing"],
+        "pending_action_continue": ["tool", "message"],
+        "pending_action_cleared": ["tool"],
         "done_return": ["step", "reply_preview"],
     }
     keys = preferred_keys.get(event) or list(payload.keys())[:3]
@@ -509,6 +515,7 @@ def _clean_session(user_id: int) -> Dict[str, Any]:
     # 3.3 最近查询的预约列表
     # 用于支持用户通过序号取消预约（例如："取消第2个"）
     session.setdefault("last_reservations", [])
+    session.setdefault("pending_action", None)
     # 3.4 最后更新时间戳
     # 用于会话过期判断，每次操作都会更新
     session.setdefault("updated_at", now)
@@ -536,6 +543,7 @@ def _reset_form(session: Dict[str, Any]) -> None:
         "type": "",
     }
     session["last_labs"] = []
+    session["pending_action"] = None
 
 
 def _relative_day_offset(text: str) -> Optional[int]:
@@ -1344,6 +1352,7 @@ def _run_tool(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) 
             _missing_fields_hint(tool, missing),
             error_code="missing_fields",
             error_message="missing required params",
+            extra={"missing_fields": missing},
         )
 
     # ===== 查询实验室 =====
@@ -1553,6 +1562,42 @@ def _fallback_rule_chat(user, text: str, session: Dict[str, Any]) -> Any:
     return _call_general_llm(user, text)
 
 
+def _continue_pending_action(user, text: str, session: Dict[str, Any], trace_id: str) -> Optional[Dict[str, Any]]:
+    pending = session.get("pending_action")
+    if not isinstance(pending, dict):
+        return None
+    tool = str(pending.get("tool") or "")
+    if tool != "create_reservation":
+        return None
+
+    _debug_log(trace_id, "pending_action_continue", tool=tool, message=text)
+
+    form = dict(session.get("reservation_form") or {})
+    form = _extract_form_from_text(user, text, form, session)
+    session["reservation_form"] = form
+    params = _auto_fill_params("create_reservation", user, {}, form, text, session)
+    result = _run_tool("create_reservation", params, user, session)
+
+    if result.get("ok"):
+        session["pending_action"] = None
+        _debug_log(trace_id, "pending_action_cleared", tool=tool)
+        return {
+            "reply": f"已帮你完成预约: {result.get('data')}",
+            "actions": [{"label": "查看我的预约", "path": "/pages/my-reservations/my-reservations"}],
+            "trace_id": trace_id,
+        }
+
+    if result.get("error_code") == "missing_fields":
+        missing = result.get("missing_fields") or []
+        session["pending_action"] = {"tool": "create_reservation", "missing": missing}
+        _debug_log(trace_id, "pending_action_set", tool="create_reservation", missing=missing)
+        return {"reply": str(result.get("data") or "还需要补充信息后才能创建预约。"), "actions": [], "trace_id": trace_id}
+
+    session["pending_action"] = None
+    _debug_log(trace_id, "pending_action_cleared", tool=tool)
+    return {"reply": str(result.get("data") or "处理失败。"), "actions": [], "trace_id": trace_id}
+
+
 # 开始
 #   ↓
 # LLM API 可用？ ─No→ 规则引擎降级
@@ -1760,6 +1805,10 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
             "not_found",        # 资源不存在
             "business_rule"     # 违反业务规则
         }:
+            if tool == "create_reservation" and tool_result.get("error_code") == "missing_fields":
+                missing = tool_result.get("missing_fields") or []
+                session["pending_action"] = {"tool": "create_reservation", "missing": missing}
+                _debug_log(trace_id, "pending_action_set", tool="create_reservation", missing=missing)
             return {
                 "reply": str(tool_result.get("data") or "处理失败。"),
                 "actions": [],
@@ -1859,6 +1908,11 @@ def chat(user, message):
                 "好的，已退出当前预约流程。后续你可以继续让我查实验室、排期或帮你预约。",
                 trace_id
             )
+
+        pending_result = _continue_pending_action(user, text, session, trace_id)
+        if pending_result is not None:
+            _save_session(user_id, session)
+            return _normalize_chat_result(pending_result, trace_id)
         
         # ----- 4.2 实验室相关问题 vs 通用问题 -----
         # 判断用户问题是否与实验室预约相关
