@@ -419,13 +419,13 @@ def _call_llm_messages(messages: List[Dict[str, str]], temperature: float = 0.1)
     }
     
     # ==================== 4. 发送 HTTP 请求 ====================
-    # timeout=35: 35秒超时限制，防止长时间阻塞
+    # timeout=60: 60秒超时限制，防止长时间阻塞
     # 如果超时，requests 会抛出 Timeout 异常
     resp = requests.post(
         Config.LLM_BASE_URL,  # API 端点地址
         headers=headers,
         json=payload,         # 自动将 dict 序列化为 JSON
-        timeout=35
+        timeout=60
     )
     
     # ==================== 5. 检查响应状态 ====================
