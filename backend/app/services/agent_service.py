@@ -145,6 +145,24 @@ def _new_trace_id() -> str:
     return f"agt-{uuid4().hex[:12]}"
 
 
+def _debug_enabled() -> bool:
+    raw = str(getattr(Config, "AGENT_DEBUG_TRACE", "") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _debug_log(trace_id: str, event: str, **payload: Any) -> None:
+    if not _debug_enabled():
+        return
+    now = _localized_now().strftime("%Y-%m-%d %H:%M:%S")
+    body = ""
+    if payload:
+        try:
+            body = " " + json.dumps(payload, ensure_ascii=False, default=str)
+        except Exception:
+            body = f" {str(payload)}"
+    print(f"[AGENT][{now}][{trace_id}][{event}]{body}")
+
+
 def _tool_call(tool: str, params: Dict[str, Any], reply: str) -> Dict[str, Any]:
     return {"type": "tool_call", "tool": tool, "params": params, "reply": reply}
 
@@ -353,7 +371,7 @@ def _call_llm_messages(messages: List[Dict[str, str]], temperature: float = 0.1)
     # 响应格式遵循 OpenAI Chat Completion API
     # data["choices"][0]["message"]["content"] 是标准路径
     content = str(data["choices"][0]["message"]["content"]).strip()
-    print(content)
+    # print(content)
     return content
 
 
@@ -1194,8 +1212,8 @@ def _llm_agent_decide(context: str, history: List[Dict[str, Any]], form: Dict[st
         
         # 提取工具名称并验证
         tool = str(parsed.get("tool") or "").strip()
-        print("工具：")
-        print(tool)
+        # print("工具：")
+        # print(tool)
         # 验证工具是否存在（防止 LLM 幻觉，输出不存在的工具）
         if tool and tool not in AGENT_TOOL_SCHEMAS:
             tool = ""  # 工具不存在，清空
@@ -1285,14 +1303,20 @@ def _auto_fill_params(tool: str, user, params: Dict[str, Any], form: Dict[str, A
     relative_date = _resolve_relative_date(text)
     if relative_date:
         raw["date"] = relative_date
-    return _sanitize_tool_params(tool, raw)
+    sanitized = _sanitize_tool_params(tool, raw)
+    trace_id = str(session.get("_debug_trace_id") or "")
+    _debug_log(trace_id, "auto_fill_params", tool=tool, in_params=params, out_params=sanitized)
+    return sanitized
 
 
 
 def _run_tool(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    trace_id = str(session.get("_debug_trace_id") or "")
+    _debug_log(trace_id, "run_tool_enter", tool=tool, params=params)
     # ===== 参数校验 =====
     missing = _missing_required_tool_fields(tool, params)
     if missing:
+        _debug_log(trace_id, "run_tool_missing_fields", tool=tool, missing=missing)
         return _tool_result(
             tool,
             False,
@@ -1476,6 +1500,7 @@ def _run_tool(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) 
     if tool == "submit_form":
         return _tool_result(tool, True, "表单已提交")
 
+    _debug_log(trace_id, "run_tool_unknown", tool=tool)
     return _tool_result(tool, False, f"未知工具：{tool}", error_code="unknown_tool")
 
 
@@ -1558,7 +1583,10 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
     # ==================== 1. 降级检查 ====================
     # 如果 LLM API 未配置，直接使用规则引擎降级
     # 这是系统的第一道防线
+    session["_debug_trace_id"] = trace_id
+    _debug_log(trace_id, "agent_loop_start", user_input=user_input)
     if not Config.LLM_API_KEY:
+        _debug_log(trace_id, "fallback_rule", reason="missing_llm_api_key")
         return _normalize_chat_result(
             _fallback_rule_chat(user, user_input, session), 
             trace_id
@@ -1574,6 +1602,7 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
     # 从用户输入中提取信息，更新表单
     form = _extract_form_from_text(user, user_input, form, session)
     session["reservation_form"] = form
+    _debug_log(trace_id, "form_initialized", form=form)
     
     # 工具重复调用检测（防止死循环）
     last_tool, same_tool_count = "", 0
@@ -1589,6 +1618,7 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
         params = _normalize_params_shape(decision.get("params"))
         planner_reply = str(decision.get("reply") or "").strip()
         done = bool(decision.get("done", False))
+        _debug_log(trace_id, "llm_decision", step=step, tool=tool, done=done, params=params)
         
         # ----- 3.2 终止条件判断 -----
         # 情况1：LLM 认为任务完成且不需要调用工具
@@ -1611,6 +1641,7 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
         # 从用户输入和表单中补充缺失的参数
         # 例如：用户说了"明天下午3点"，自动填充 date、start_time
         params = _auto_fill_params(tool, user, params, form, context, session)
+        _debug_log(trace_id, "params_filled", step=step, tool=tool, params=params)
         
         # 将成功填充的参数同步回表单（持久化）
         for key in ["date", "participant_count", "start_time", "end_time", 
@@ -1621,6 +1652,15 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
         
         # ----- 3.4 执行工具 -----
         tool_result = _run_tool(tool, params, user, session)
+        _debug_log(
+            trace_id,
+            "tool_executed",
+            step=step,
+            tool=tool,
+            ok=bool(tool_result.get("ok")),
+            error_code=tool_result.get("error_code"),
+            data_preview=str(tool_result.get("data") or "")[:120],
+        )
         
         # ----- 3.5 记录执行历史 -----
         # 供 LLM 在下一步决策时参考
@@ -1681,6 +1721,7 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
         # ----- 4.4 LLM 标记完成：返回结果 -----
         if done:
             final_reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params)
+            _debug_log(trace_id, "done_return", step=step, reply_preview=final_reply[:120])
             return {
                 "reply": final_reply,
                 "actions": [],
@@ -1749,6 +1790,7 @@ def chat(user, message):
     
     # 生成唯一的追踪ID，用于全链路追踪
     trace_id = _new_trace_id()
+    _debug_log(trace_id, "chat_received", message=text)
     
     # 处理空消息：返回引导提示
     if not text:
@@ -1767,6 +1809,7 @@ def chat(user, message):
     
     # 用户信息异常时拒绝处理
     if not user_id:
+        _debug_log(trace_id, "chat_rejected", reason="invalid_user")
         return {
             "reply": "用户信息异常，暂时无法处理请求。",
             "actions": [],
@@ -1784,6 +1827,7 @@ def chat(user, message):
         # 检查用户是否想要退出当前的预约创建流程
         # 关键词：不需要预约、不用预约、先不预约、不约了等
         if _is_cancel_flow_message(text):
+            _debug_log(trace_id, "route", target="cancel_flow")
             _reset_form(session)           # 清空预约表单
             _save_session(user_id, session) # 保存会话状态
             return _normalize_chat_result(
@@ -1795,6 +1839,7 @@ def chat(user, message):
         # 判断用户问题是否与实验室预约相关
         # 相关关键词：实验室、预约、排期、空闲、lab、schedule等
         if _is_lab_related(text):
+            _debug_log(trace_id, "route", target="agent_loop")
             # 实验室相关问题：Agent 智能处理
             # 使用 LLM 驱动的 Agent 循环处理复杂预约场景
             # Agent 会自动决策调用哪个工具、补充缺失信息等
@@ -1802,10 +1847,12 @@ def chat(user, message):
                 # 首选方案：LLM Agent 循环（智能决策）
                 result = _agent_loop(user, text, session, trace_id)
             except Exception:
+                _debug_log(trace_id, "agent_loop_exception_fallback", reason="agent_loop_exception")
                 # 降级方案1：规则引擎（基于正则匹配的简单处理）
                 try:
                     result = _fallback_rule_chat(user, text, session)
                 except Exception:
+                    _debug_log(trace_id, "fallback_exception_general_llm", reason="fallback_exception")
                     # 降级方案2：通用 LLM 兜底
                     result = _call_general_llm(user, text)
             
@@ -1818,6 +1865,7 @@ def chat(user, message):
         # ----- 4.3 通用问题（包括日期时间、天气、新闻、闲聊等）-----
         # 所有非实验室相关问题统一交给通用 LLM 处理
         # 通用 LLM 本身就能回答日期时间、天气、计算等问题
+        _debug_log(trace_id, "route", target="general_llm")
         result = _call_general_llm(user, text)
         _save_session(user_id, session)
         return _normalize_chat_result(result, trace_id)

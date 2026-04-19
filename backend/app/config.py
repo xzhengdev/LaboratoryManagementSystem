@@ -110,6 +110,8 @@ class Config:
         "AGENT_MODEL",
         os.getenv("LLM_MODEL", default_agent_model(AGENT_PROVIDER)),
     )
+    # Agent debug trace switch: 1/true/on enables console print tracing.
+    AGENT_DEBUG_TRACE = os.getenv("AGENT_DEBUG_TRACE", "0")
     
     # LLM API 密钥（用于调用大语言模型接口）
     # 优先级：LLM_API_KEY > DEEPSEEK_API_KEY > OPENAI_API_KEY > 空字符串
