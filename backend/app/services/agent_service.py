@@ -810,179 +810,212 @@ def _extract_intent(text: str) -> str:
 def _is_lab_related(text: str) -> bool:
     msg = (text or "").lower()
     keys = [
-        "实验室",
-        "预约",
-        "排期",
-        "空闲",
-        "可用时间",
-        "可预约时间",
-        "推荐时间",
-        "推荐一下",
-        "帮我推荐",
-        "几点开始",
-        "下午",
-        "上午",
-        "lab",
-        "schedule",
-        "reservation",
-        "校区",
-        "设备",
-        "取消预约",
+        # ===== 实验室基础词 =====
+        "实验室", "lab", "实验间", "教室", "机房",
+        # ===== 预约相关 =====
+        "预约", "预定", "约", "约实验室", "订实验室", "创建预约",
+        "取消预约", "修改预约", "更改预约", "调整预约", "预约记录",
+        "我的预约", "预约列表", "预约信息", "预约详情",
+        # ===== 排期/空闲相关 =====
+        "排期", "schedule", "空闲", "有空", "没空", "空余",
+        "是否空闲", "有没有空", "什么时候有空", "什么时候空",
+        "空闲时间", "空闲时段", "可用时间", "可预约时间",
+        "这个时间可以吗", "这个时间能约吗", "这个时段行吗",
+        "是否可以预约", "能不能约", "有没有冲突", "时间冲突",
+        # ===== 推荐相关 =====
+        "推荐时间", "推荐实验室", "推荐一下", "帮我推荐",
+        "推荐个时间", "推荐个实验室", "哪个实验室好",
+        "适合的实验室", "哪个时间合适", "什么时间合适",
+        # ===== 实验室信息相关 =====
+        "实验室详情", "实验室信息", "实验室介绍", "实验室情况",
+        "位置", "容量", "设备", "有什么设备", "在哪",
+        "能坐多少人", "实验室类型",
+        # ===== 时间表达 =====
+        "今天", "明天", "后天", "上午", "下午", "晚上", "中午",
+        "几点", "开始", "结束", "到", "至", "时段", "时间段",
+        # ===== 条件筛选 =====
+        "校区", "海淀", "丰台", "海南", "校本部",
+        "计算机", "化学", "物理", "生物", "电子", "语音", "ai", "人工智能",
+        # ===== 表单/页面交互 =====
+        "填写表单", "自动填", "填表", "提交表单", "提交预约",
+        "跳转", "打开页面", "进入页面", "去预约页面", "去排期页面",
+        # ===== 规则说明 =====
+        "预约规则", "规则", "限制", "规则说明", "预约要求",
+        "为什么不能预约", "为什么约不了", "预约条件"
     ]
     return any(k in msg for k in keys)
 
 
 def _is_lab_followup(text: str, session: Dict[str, Any]) -> bool:
-    # Continue prior lab task when user sends short supplementary info
-    # like “下午2点开始”“2小时”“就这个实验室”.
+    msg = (text or "").strip().lower()
     if str(session.get("last_domain") or "") != "lab":
         return False
-    msg = (text or "").strip().lower()
     if not msg:
         return False
+
+    # 只要本身明显还是实验室相关，直接认为是续接
     if _is_lab_related(msg):
         return True
+
     followup_keys = [
-        "下午",
-        "上午",
-        "中午",
-        "晚上",
-        "开始",
-        "到",
-        "至",
-        "小时",
-        "分钟",
-        "人",
-        "purpose",
-        "用途",
-        "就这个",
-        "这个",
+        # ===== 时间补充 =====
+        "今天", "明天", "后天", "上午", "下午", "晚上", "中午", "早上",
+        "几点", "开始", "结束", "到", "至", "时段", "时间段",
+        "两点", "三点", "四点", "五点", "六点", "七点", "八点",
+        "1点", "2点", "3点", "4点", "5点", "6点", "7点", "8点",
+
+        # ===== 时长补充 =====
+        "小时", "个小时", "分钟", "半小时", "一小时", "两小时", "三小时",
+
+        # ===== 人数补充 =====
+        "人", "个人",
+
+        # ===== 用途补充 =====
+        "用途", "用于", "目的", "做实验", "上课", "讨论", "答辩", "开会",
+
+        # ===== 选择补充 =====
+        "就这个", "这个", "这个实验室", "选这个", "选它", "要这个",
+        "第一个", "第二个", "第三个", "第四个", "第五个",
+        "第1个", "第2个", "第3个", "第4个", "第5个",
+
+        # ===== 确认补充 =====
+        "可以", "行", "好", "好的", "那就这个", "那这个吧", "就它吧",
+
+        # ===== 校区/类型补充 =====
+        "海淀", "丰台", "海南", "校本部",
+        "计算机", "化学", "物理", "生物", "电子", "语音", "ai", "人工智能"
     ]
+
     if any(k in msg for k in followup_keys):
         return True
-    if any(k in msg for k in ["明天", "后天", "今天"]):
-        if any(x in msg for x in ["可用", "预约", "推荐", "空闲", "时间", "时段", "几点", "开始"]):
-            return True
+    # 纯数字，可能表示“选第几个”
+    if re.search(r"^\d{1,2}$", msg):
+        return True
+    # 时间格式：14:00 / 14:00-16:00
     if re.search(r"\d{1,2}:\d{2}", msg):
         return True
-    if re.search(r"\d{1,2}点", msg):
+    # 中文时间格式：下午2点 / 2点半
+    if re.search(r"(上午|下午|晚上|中午|早上)?\s*\d{1,2}点", msg):
         return True
-    if re.search(r"^\d{1,2}$", msg):
+    # 中文日期格式：4月20日 / 2026-04-20
+    if re.search(r"\d{1,2}月\d{1,2}日", msg):
+        return True
+    if re.search(r"20\d{2}-\d{1,2}-\d{1,2}", msg):
         return True
     return False
 
 
 def _is_cancel_flow_message(text: str) -> bool:
     msg = (text or "").strip().lower()
-    keys = ["不需要预约", "不用预约", "先不预约", "不约了", "取消当前预约", "退出预约"]
-    return any(k in msg for k in keys)
-
-
-def _is_date_time_question(text: str) -> bool:
-    msg = (text or "").strip().lower()
     keys = [
-        "今天几号",
-        "今天是几号",
-        "今天几月几号",
-        "今天日期",
-        "明天几号",
-        "明天是几号",
-        "后天几号",
-        "昨天几号",
-        "几号",
-        "几月几日",
-        "星期几",
-        "周几",
-        "礼拜几",
-        "现在几点",
-        "现在时间",
-        "time",
-        "date",
+        "不需要预约", "不用预约", "先不预约", "不约了", "取消当前预约", "退出预约",
+        "结束预约", "停止预约", "先这样吧", "算了不约了", "不用继续了",
+        "先取消这个流程", "不预约了", "先不弄了", "不用帮我约了"
     ]
     return any(k in msg for k in keys)
 
+# def _is_date_time_question(text: str) -> bool:
+#     msg = (text or "").strip().lower()
+#     keys = [
+#         "今天几号",
+#         "今天是几号",
+#         "今天几月几号",
+#         "今天日期",
+#         "明天几号",
+#         "明天是几号",
+#         "后天几号",
+#         "昨天几号",
+#         "几号",
+#         "几月几日",
+#         "星期几",
+#         "周几",
+#         "礼拜几",
+#         "现在几点",
+#         "现在时间",
+#         "time",
+#         "date",
+#     ]
+#     return any(k in msg for k in keys)
 
-def _resolve_date_target(text: str, today: date) -> date:
-    msg = (text or "").strip()
+# def _resolve_date_target(text: str, today: date) -> date:
+#     # 从用户输入中解析目标日期（支持相对日期、标准日期、中文日期及星期表达），解析失败则返回今天
+#     msg = (text or "").strip()
 
-    # Relative date first.
-    if "大后天" in msg:
-        return today + timedelta(days=3)
-    if "后天" in msg:
-        return today + timedelta(days=2)
-    if "明天" in msg:
-        return today + timedelta(days=1)
-    if "前天" in msg:
-        return today - timedelta(days=2)
-    if "昨天" in msg:
-        return today - timedelta(days=1)
-    if "今天" in msg:
-        return today
-
-    # ISO date: 2026-04-20
-    m = re.search(r"(20\d{2})-(\d{1,2})-(\d{1,2})", msg)
-    if m:
-        try:
-            return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-        except Exception:
-            pass
-
-    # Chinese month/day: 4?20?
-    m2 = re.search("(\d{1,2})月(\d{1,2})日", msg)
-    if m2:
-        try:
-            return date(today.year, int(m2.group(1)), int(m2.group(2)))
-        except Exception:
-            pass
-
-    # Weekday expressions: ??? / ??? / ?? / ???
-    weekday_map = {
-        "一": 0,
-        "二": 1,
-        "三": 2,
-        "四": 3,
-        "五": 4,
-        "六": 5,
-        "日": 6,
-        "天": 6,
-    }
-    m3 = re.search("(本周|这周|下周)?(?:星期|周|礼拜)([一二三四五六日天])", msg)
-    if m3:
-        prefix = m3.group(1) or ""
-        target_wd = weekday_map.get(m3.group(2), today.weekday())
-        cur_wd = today.weekday()
-        delta = (target_wd - cur_wd) % 7
-        if prefix == "下周":
-            delta += 7
-        return today + timedelta(days=delta)
-
-    return today
+#     # Relative date first.
+#     if "大后天" in msg:
+#         return today + timedelta(days=3)
+#     if "后天" in msg:
+#         return today + timedelta(days=2)
+#     if "明天" in msg:
+#         return today + timedelta(days=1)
+#     if "前天" in msg:
+#         return today - timedelta(days=2)
+#     if "昨天" in msg:
+#         return today - timedelta(days=1)
+#     if "今天" in msg:
+#         return today
+#     # ISO date: 2026-04-20
+#     m = re.search(r"(20\d{2})-(\d{1,2})-(\d{1,2})", msg)
+#     if m:
+#         try:
+#             return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+#         except Exception:
+#             pass
+#     # Chinese month/day: 4月20日
+#     m2 = re.search("(\d{1,2})月(\d{1,2})日", msg)
+#     if m2:
+#         try:
+#             return date(today.year, int(m2.group(1)), int(m2.group(2)))
+#         except Exception:
+#             pass
+#     # Weekday expressions: 本周三 / 下周一 / 周五
+#     weekday_map = {
+#         "一": 0,
+#         "二": 1,
+#         "三": 2,
+#         "四": 3,
+#         "五": 4,
+#         "六": 5,
+#         "日": 6,
+#         "天": 6,
+#     }
+#     m3 = re.search("(本周|这周|下周)?(?:星期|周|礼拜)([一二三四五六日天])", msg)
+#     if m3:
+#         prefix = m3.group(1) or ""
+#         target_wd = weekday_map.get(m3.group(2), today.weekday())
+#         cur_wd = today.weekday()
+#         delta = (target_wd - cur_wd) % 7
+#         if prefix == "下周":
+#             delta += 7
+#         return today + timedelta(days=delta)
+#     return today
 
 
-def _build_date_time_reply(text: str = "") -> str:
-    now = _localized_now()
-    today = now.date()
-    target = _resolve_date_target(text, today)
-    weekday = WEEKDAY_CN[target.weekday()]
+# def _build_date_time_reply(text: str = "") -> str:
+#     now = _localized_now()
+#     today = now.date()
+#     target = _resolve_date_target(text, today)
+#     weekday = WEEKDAY_CN[target.weekday()]
 
-    msg = (text or "").strip()
-    ask_time = any(k in msg for k in ["几点", "时间", "time"])
+#     msg = (text or "").strip()
+#     ask_time = any(k in msg for k in ["几点", "时间", "time"])
 
-    if target == today and ask_time:
-        return f"今天是 {today.strftime('%Y-%m-%d')}（{weekday}），当前时间 {now.strftime('%H:%M:%S')}。"
+#     if target == today and ask_time:
+#         return f"今天是 {today.strftime('%Y-%m-%d')}（{weekday}），当前时间 {now.strftime('%H:%M:%S')}。"
 
-    if target == today:
-        label = "今天"
-    elif target == today + timedelta(days=1):
-        label = "明天"
-    elif target == today + timedelta(days=2):
-        label = "后天"
-    elif target == today - timedelta(days=1):
-        label = "昨天"
-    else:
-        label = "你问的日期"
+#     if target == today:
+#         label = "今天"
+#     elif target == today + timedelta(days=1):
+#         label = "明天"
+#     elif target == today + timedelta(days=2):
+#         label = "后天"
+#     elif target == today - timedelta(days=1):
+#         label = "昨天"
+#     else:
+#         label = "你问的日期"
 
-    return f"{label}是 {target.strftime('%Y-%m-%d')}（{weekday}）。"
+#     return f"{label}是 {target.strftime('%Y-%m-%d')}（{weekday}）。"
+
 #=======================================================工具实现函数========================================
 def _query_labs(date_text: str, campus: str, lab_type: str, participant_count: Optional[int] = None) -> List[Laboratory]:
     labs = Laboratory.query.filter_by(status="active").order_by(Laboratory.id.asc()).all()
