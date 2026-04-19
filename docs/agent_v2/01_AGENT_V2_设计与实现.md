@@ -107,3 +107,18 @@
 3. `python -m py_compile lab/backend/app/services/reservation_service.py`
 
 均通过。
+
+
+用户输入
+   ↓
+_extract_form_from_text（规则解析）
+   ↓
+_llm_extract_form（LLM补全表单）
+   ↓
+_llm_agent_decide（决定做什么）
+   ↓
+_auto_fill_params（补工具参数）
+   ↓
+_run_tool（执行工具）
+   ↓
+_tool_result（返回结果）

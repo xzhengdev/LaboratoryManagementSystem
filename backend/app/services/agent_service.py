@@ -120,34 +120,29 @@ AGENT_TOOL_SCHEMAS: Dict[str, Dict[str, Any]] = {
     },
 }
 
+# ==================== 会话存储 ====================
 AGENT_SESSIONS: Dict[int, Dict[str, Any]] = {}
 
-
+# ==================== 获取当前时间（带时区） ====================
 def _localized_now() -> datetime:
     tz_name = str(getattr(Config, "AGENT_TIMEZONE", DEFAULT_AGENT_TIMEZONE) or DEFAULT_AGENT_TIMEZONE)
     try:
         return datetime.now(ZoneInfo(tz_name))
     except Exception:
         return datetime.now()
-
-
+# ==================== 获取当前时间（无时区） ====================
 def _now() -> datetime:
     return datetime.now()
-
-
+# ==================== 获取今天日期 ====================
 def _today() -> date:
     return _localized_now().date()
-
-
+# ==================== 生成追踪ID ====================
 def _new_trace_id() -> str:
     return f"agt-{uuid4().hex[:12]}"
-
-
+# ==================== 是否开启调试日志 ====================
 def _debug_enabled() -> bool:
     raw = str(getattr(Config, "AGENT_DEBUG_TRACE", "") or "").strip().lower()
     return raw in {"1", "true", "yes", "on"}
-
-
 _DEBUG_EVENT_META: Dict[str, Tuple[str, str]] = {
     "chat_received": ("chat", "收到用户输入"),
     "chat_rejected": ("chat", "用户校验失败"),
@@ -170,15 +165,11 @@ _DEBUG_EVENT_META: Dict[str, Tuple[str, str]] = {
     "agent_loop_exception_fallback": ("chat", "Agent异常，进入兜底"),
     "fallback_exception_general_llm": ("chat", "兜底异常，转通用LLM"),
 }
-
-
 def _debug_clip(value: Any, limit: int = 60) -> str:
     text = str(value)
     if len(text) <= limit:
         return text
     return text[: limit - 3] + "..."
-
-
 def _debug_brief_payload(event: str, payload: Dict[str, Any]) -> str:
     if not payload:
         return ""
@@ -212,8 +203,6 @@ def _debug_brief_payload(event: str, payload: Dict[str, Any]) -> str:
             v = compact or v
         parts.append(f"{k}={_debug_clip(v)}")
     return " | ".join(parts)
-
-
 def _debug_log(trace_id: str, event: str, **payload: Any) -> None:
     if not _debug_enabled():
         return
@@ -225,18 +214,19 @@ def _debug_log(trace_id: str, event: str, **payload: Any) -> None:
     else:
         print(f"[AGENT][{now}][{trace_id}] {func_name} | {desc}")
 
-
+#=================================================================debug=================================
+ # 判断工具调用是否出现 ABAB 循环模式（防止 Agent 在两个工具之间反复调用形成死循环）
 def _is_abab_loop(history: List[Dict[str, Any]]) -> bool:
     if len(history) < 4:
         return False
     tools = [str(x.get("tool") or "") for x in history[-4:]]
     return tools[0] == tools[2] and tools[1] == tools[3] and tools[0] != tools[1]
 
-
+ # 构造工具调用指令，表示当前需要执行某个工具（由 Agent 返回给上层调度）
 def _tool_call(tool: str, params: Dict[str, Any], reply: str) -> Dict[str, Any]:
     return {"type": "tool_call", "tool": tool, "params": params, "reply": reply}
 
-
+ # 构造统一的工具执行结果格式，包含执行状态、返回数据及错误信息
 def _tool_result(
     tool: str,
     ok: bool,
@@ -260,11 +250,11 @@ def _tool_result(
         out.update(extra)
     return out
 
-
+ # 将参数统一规范为字典类型，避免 LLM 返回非 dict 导致错误
 def _normalize_params_shape(params: Any) -> Dict[str, Any]:
     return dict(params) if isinstance(params, dict) else {}
 
-
+# 安全地将参数转换为整数，转换失败返回 None（避免异常中断流程）
 def _safe_int(value: Any) -> Optional[int]:
     if value is None or value == "":
         return None
@@ -273,7 +263,7 @@ def _safe_int(value: Any) -> Optional[int]:
     except Exception:
         return None
 
-
+# 根据工具定义过滤并清洗参数，只保留合法字段并做类型转换
 def _sanitize_tool_params(tool: str, params: Dict[str, Any]) -> Dict[str, Any]:
     schema = AGENT_TOOL_SCHEMAS.get(tool) or {}
     keys = set(schema.get("required") or []).union(schema.get("optional") or [])
@@ -293,7 +283,7 @@ def _sanitize_tool_params(tool: str, params: Dict[str, Any]) -> Dict[str, Any]:
             cleaned[key] = str(value).strip()
     return cleaned
 
-
+ # 检查工具调用时缺失的必填参数字段
 def _missing_required_tool_fields(tool: str, params: Dict[str, Any]) -> List[str]:
     schema = AGENT_TOOL_SCHEMAS.get(tool) or {}
     missing = []
@@ -303,7 +293,7 @@ def _missing_required_tool_fields(tool: str, params: Dict[str, Any]) -> List[str
             missing.append(key)
     return missing
 
-
+# 根据缺失参数生成用户友好的提示信息，引导用户补充数据
 def _missing_fields_hint(tool: str, missing: List[str]) -> str:
     if tool == "create_reservation":
         label_map = {
@@ -322,7 +312,7 @@ def _missing_fields_hint(tool: str, missing: List[str]) -> str:
         return "请告诉我要取消的预约ID，例如：取消预约ID 23。"
     return "参数不完整，请补充必要信息后重试。"
 
-
+ # 获取预约规则上下文（优先读取配置，否则使用默认规则）
 def _rules_context() -> str:
     text = str(getattr(Config, "AGENT_RULES_CONTEXT", "") or "")
     if text.strip():
@@ -333,18 +323,18 @@ def _rules_context() -> str:
         "参与人数不可超过实验室容量; 同一用户不能重叠预约。"
     )
 
-
+# 从规则文本中提取“需提前多少天预约”的限制
 def _extract_min_advance_days(ctx: str) -> int:
     m = re.search(r"提前\s*(\d+)\s*天", ctx)
     if m:
         return int(m.group(1))
     return 0
 
-
+ # 判断规则中是否禁止重复或重叠预约
 def _forbid_duplicate(ctx: str) -> bool:
     return "重叠预约" in ctx or "重复预约" in ctx
 
-
+# 安全解析 JSON（支持去除 ``` 包裹，并容错提取 JSON 结构）
 def _safe_json_loads(text: str) -> Optional[Dict[str, Any]]:
     if not text:
         return None
@@ -372,29 +362,7 @@ def _safe_json_loads(text: str) -> Optional[Dict[str, Any]]:
 def _call_llm_messages(messages: List[Dict[str, str]], temperature: float = 0.1) -> str:
     """
     调用 LLM API 的核心函数 - 与大语言模型通信的统一接口
-    这是整个系统中与 LLM 通信的唯一入口，负责：
-    1. 验证 API 配置是否完整
-    2. 构建符合 OpenAI API 格式的请求
-    3. 发送 HTTP 请求并处理响应
-    4. 提取并返回模型生成的文本内容
-    
-    支持的 API 格式：
-    - OpenAI API 格式（兼容 DeepSeek、通义千问等）
-    - 标准 Chat Completion 接口
-    
-    Args:
-        messages: 消息列表，每个消息包含 role 和 content
-            格式: [
-                {"role": "system", "content": "系统提示词"},
-                {"role": "user", "content": "用户消息"},
-                {"role": "assistant", "content": "助手回复"}
-            ]
-            role 可选值: system, user, assistant
-        temperature: 温度参数，控制输出的随机性
-            - 0: 确定性输出（相同输入得到相同输出）
-            - 0.5: 中等随机性
-            - 1.0: 高随机性（创意性更强）
-            默认 0.1，平衡稳定性和多样性
+    这是整个系统中与 LLM 通信的唯一入口
     """
     # ==================== 1. 配置验证 ====================
     # 检查 API Key 是否已配置如果没有配置，提前抛出异常，避免无意义的网络请求
@@ -444,7 +412,7 @@ def _call_llm_messages(messages: List[Dict[str, str]], temperature: float = 0.1)
     # print(content)
     return content
 
-
+# 当 Agent 不走工具流程时，用这个函数直接和大模型聊天
 def _call_general_llm(user, message: str) -> str:
     if Config.AGENT_PROVIDER not in {"openai", "deepseek", "llm"} or not Config.LLM_API_KEY:
         return "我可以优先帮你处理实验室相关问题，比如查空闲时段、创建预约、取消预约。"
@@ -463,23 +431,6 @@ def _call_general_llm(user, message: str) -> str:
 def _clean_session(user_id: int) -> Dict[str, Any]:
     """
     清理或初始化用户会话
-    1. 检查会话是否过期（超过 SESSION_TTL_MINUTES 分钟无操作）
-    2. 过期则重置会话（清空所有数据）
-    3. 初始化会话的默认结构（预约表单、查询历史等）
-    4. 更新时间戳
-    会话过期机制可以防止内存无限增长，同时保留活跃用户的对话状态。
-    Args:
-        user_id: 用户ID，作为会话的唯一标识
-    Returns:
-        Dict[str, Any]: 用户会话对象，包含以下字段：
-            - reservation_form (dict): 预约表单，存储用户正在填写的预约信息
-            - last_labs (list): 最近查询的实验室列表（用于序号选择）
-            - last_reservations (list): 最近查询的预约列表（用于序号选择）
-            - updated_at (datetime): 最后更新时间戳
-    Example:
-        >>> session = _clean_session(12345)
-        >>> session["reservation_form"]["date"] = "2026-04-20"
-        >>> # 会话会自动管理过期，无需手动清理
     """
     # 获取当前时间（用于过期判断和时间戳更新）
     now = _now()
@@ -536,7 +487,7 @@ def _save_session(user_id: int, session: Dict[str, Any]) -> None:
     session["updated_at"] = _now()
     AGENT_SESSIONS[user_id] = session
 
-
+# 把当前会话里的预约表单恢复成“初始空状态”
 def _reset_form(session: Dict[str, Any]) -> None:
     session["reservation_form"] = {
         "date": "",
@@ -552,7 +503,7 @@ def _reset_form(session: Dict[str, Any]) -> None:
     session["last_labs"] = []
     session["pending_action"] = None
 
-
+# 识别“今天/明天/后天”等相对日期，并转换为对应的天数偏移
 def _relative_day_offset(text: str) -> Optional[int]:
     msg = text or ""
     if "后天" in msg:
@@ -563,14 +514,14 @@ def _relative_day_offset(text: str) -> Optional[int]:
         return 0
     return None
 
-
+# 将相对日期转换为具体日期字符串（YYYY-MM-DD）
 def _resolve_relative_date(text: str) -> Optional[str]:
     offset = _relative_day_offset(text)
     if offset is None:
         return None
     return (_today() + timedelta(days=offset)).isoformat()
 
-
+# 从用户输入中提取日期，支持相对日期、标准日期和中文日期格式
 def _detect_date(text: str) -> Optional[str]:
     msg = text or ""
     today = _today()
@@ -592,7 +543,7 @@ def _detect_date(text: str) -> Optional[str]:
             return None
     return None
 
-
+ # 将中文时间表达规范化为 24 小时制时间字符串（HH:MM）
 def _normalize_clock(hour: int, minute: int, period: Optional[str]) -> str:
     h = max(0, min(23, hour))
     m = max(0, min(59, minute))
@@ -604,7 +555,7 @@ def _normalize_clock(hour: int, minute: int, period: Optional[str]) -> str:
         h = 0
     return f"{h:02d}:{m:02d}"
 
-
+# 从用户输入中提取时间范围，支持“14:00-16:00”和“下午2点到4点”两种格式
 def _detect_time_range(text: str) -> Tuple[Optional[str], Optional[str]]:
     msg = text or ""
     m = re.search(r"(\d{1,2}:\d{2})\s*(?:-|到|至)\s*(\d{1,2}:\d{2})", msg)
@@ -619,14 +570,14 @@ def _detect_time_range(text: str) -> Tuple[Optional[str], Optional[str]]:
         return _normalize_clock(int(h1), int(m1 or 0), p1), _normalize_clock(int(h2), int(m2_ or 0), p2)
     return None, None
 
-
+ # 从用户输入中提取参与人数
 def _detect_participant_count(text: str) -> Optional[int]:
     m = re.search(r"(\d{1,3})\s*人", text or "")
     if m:
         return int(m.group(1))
     return None
 
-
+# 从用户输入中提取预约用途说明
 def _detect_purpose(text: str) -> Optional[str]:
     msg = (text or "").strip()
     m = re.search(r"(?:用途|用于|目的)[:：]?\s*(.+)$", msg)
@@ -634,12 +585,26 @@ def _detect_purpose(text: str) -> Optional[str]:
         return m.group(1).strip()[:120]
     return None
 
-
+# 从用户输入中识别校区信息
 def _detect_campus(text: str) -> str:
     msg = text or ""
-    for key in ["海淀", "丰台", "海南", "校本部", "校区"]:
-        if key in msg:
-            return key
+    
+    patterns = [
+        r"(海淀|丰台|海南)校区",  # 完整：丰台校区
+        r"(海淀|丰台|海南)的",   # 口语：丰台的
+        r"(海淀|丰台|海南)(?= |$|，|。)",  # 单独的"丰台"
+        r"校本部",
+    ]
+    
+    for pattern in patterns:
+        m = re.search(pattern, msg)
+        if m:
+            campus = m.group(1) if m.group(1) else m.group(0)
+            # 标准化返回
+            if campus in ["海淀", "丰台", "海南"]:
+                return f"{campus}校区"
+            return campus
+    
     return ""
 
 
@@ -673,7 +638,7 @@ def _detect_lab_id_or_choice(text: str, session: Dict[str, Any]) -> Optional[int
             return int(labs[idx - 1]["id"])
     return None
 
-
+# 这个函数是用来把用户的模糊表达（第几个）转成具体 reservation_id，方便后端执行操作
 def _detect_reservation_id_or_choice(text: str, session: Dict[str, Any]) -> Optional[int]:
     msg = (text or "").strip()
     m = re.search(r"(?:reservation_id|预约ID|预约id|ID)[:：#\s]*(\d+)", msg, re.IGNORECASE)
@@ -692,7 +657,7 @@ def _to_minutes(hhmm: str) -> int:
     h, m = [int(i) for i in hhmm.split(":")]
     return h * 60 + m
 
-
+# 让大模型从用户输入中提取预约表单字段（补全信息）
 def _llm_extract_form(text: str, form: Dict[str, Any]) -> Dict[str, Any]:
     if not Config.LLM_API_KEY:
         return form
@@ -728,24 +693,119 @@ def _llm_extract_form(text: str, form: Dict[str, Any]) -> Dict[str, Any]:
 
 def _extract_intent(text: str) -> str:
     msg = (text or "").strip().lower()
-    if any(k in msg for k in ["取消预约", "cancel reservation", "cancel_reservation"]):
+    # ===== 取消预约 =====
+    if any(k in msg for k in [
+        "取消预约", "撤销预约", "删除预约", "不去这个预约了", "取消这个预约",
+        "cancel reservation", "cancel_reservation"
+    ]):
         return "cancel_reservation"
-    if any(k in msg for k in ["不需要预约", "不用预约", "先不预约", "不约了", "取消当前预约", "退出预约"]):
+    # ===== 取消当前预约流程 =====
+    if any(k in msg for k in [
+        "不需要预约", "不用预约", "先不预约", "不约了", "取消当前预约",
+        "退出预约", "结束预约", "停止预约", "先这样吧", "算了不约了"
+    ]):
         return "cancel_flow"
-    if any(k in msg for k in ["去预约页面", "去排期页面", "跳转", "打开页面", "进入页面"]):
+    # ===== 修改预约 =====
+    if any(k in msg for k in [
+        "修改预约", "更改预约", "调整预约", "改预约", "改一下预约",
+        "修改时间", "更改时间", "调整时间", "改时间", "换时间",
+        "改日期", "改实验室", "重新预约时间", "update reservation",
+        "update_reservation"
+    ]):
+        return "update_reservation"
+    # ===== 页面跳转 =====
+    if any(k in msg for k in [
+        "去预约页面", "去排期页面", "跳转", "打开页面", "进入页面",
+        "带我去", "前往", "打开预约页", "打开实验室页面", "去实验室页面",
+        "进入预约", "进入实验室", "打开我的预约", "去我的预约"
+    ]):
         return "navigate"
-    if any(k in msg for k in ["我的预约", "我有哪些预约", "预约列表"]):
+    # ===== 我的预约 =====
+    if any(k in msg for k in [
+        "我的预约", "我有哪些预约", "预约列表", "查看预约", "查看我的预约",
+        "我的预约记录", "预约记录", "我预约了什么", "我都约了什么",
+        "我的实验室预约", "已预约"
+    ]):
         return "my_reservations"
-    if any(k in msg for k in ["推荐时间", "什么时候有空", "什么时候空", "帮我推荐时间"]):
+    # ===== 推荐时间 =====
+    if any(k in msg for k in [
+        "推荐时间", "什么时候有空", "什么时候空", "帮我推荐时间",
+        "推荐一个时间", "推荐时段", "哪个时间合适", "什么时间合适",
+        "什么时候能约", "什么时候可以预约", "哪天有空", "哪个时段空闲",
+        "推荐一下时间", "给我推荐个时间"
+    ]):
         return "recommend_time"
-    if any(k in msg for k in ["排期", "有没有空", "是否空闲", "schedule"]):
+    # ===== 推荐实验室 =====
+    if any(k in msg for k in [
+        "推荐实验室", "帮我推荐实验室", "推荐一个实验室", "哪个实验室好",
+        "适合的实验室", "给我推荐实验室", "有什么推荐的实验室",
+        "哪间实验室合适", "哪个实验室适合", "适合8个人的实验室",
+        "有推荐吗", "推荐一下实验室", "哪个实验室更好"
+    ]):
+        return "recommend_lab"
+    # ===== 查询排期 =====
+    if any(k in msg for k in [
+        "排期", "查看排期", "实验室排期", "查排期", "当天排期",
+        "有没有空", "是否空闲", "空闲吗", "有空吗", "schedule",
+        "查询空闲时间", "空闲时段", "当天有没有人约", "今天能不能用",
+        "某天能不能用", "这个实验室明天有空吗"
+    ]):
         return "query_schedule"
-    if any(k in msg for k in ["预约", "预定"]):
+    # ===== 检查可用性 =====
+    if any(k in msg for k in [
+        "能不能约", "是否可以预约", "可以预约吗", "这个时间可以吗",
+        "这个时间能约吗", "有没有冲突", "是否冲突", "时间冲突",
+        "这个时段行吗", "这个时间段行吗", "这个实验室这个时间能用吗",
+        "check availability", "check_availability"
+    ]):
+        return "check_availability"
+    # ===== 获取实验室详情 =====
+    if any(k in msg for k in [
+        "实验室详情", "实验室信息", "实验室介绍", "实验室情况",
+        "这个实验室怎么样", "介绍一下实验室", "查看实验室详情",
+        "实验室位置", "实验室容量", "实验室设备", "有什么设备",
+        "这个实验室能坐多少人", "实验室在哪", "实验室具体信息"
+    ]):
+        return "get_lab_detail"
+    # ===== 创建预约 =====
+    if any(k in msg for k in [
+        "预约", "预定", "我要预约", "帮我预约", "创建预约",
+        "提交预约", "约实验室", "订实验室", "预约实验室",
+        "我要预定", "帮我定一个实验室", "创建一个预约",
+        "create reservation", "create_reservation"
+    ]):
         return "create_reservation"
-    if any(k in msg for k in ["有哪些实验室", "查询实验室", "可用实验室", "空闲实验室", "实验室", "lab"]):
+    # ===== 查询实验室 =====
+    if any(k in msg for k in [
+        "有哪些实验室", "查询实验室", "查实验室", "实验室列表",
+        "可用实验室", "空闲实验室", "实验室", "lab",
+        "有哪些可用实验室", "还有哪些实验室", "有什么实验室",
+        "查看实验室", "找实验室", "搜实验室", "有哪些空实验室"
+    ]):
         return "query_labs"
+    # ===== 规则解释 =====
+    if any(k in msg for k in [
+        "为什么不能预约", "预约规则", "规则", "限制", "规则说明",
+        "为什么约不了", "为什么不能约", "有什么限制", "预约要求",
+        "预约条件", "实验室预约规则", "预约须知", "不能预约的原因",
+        "规则是什么", "怎么规定的", "为什么冲突"
+    ]):
+        return "explain_rules"
+    # ===== 自动填表 =====
+    if any(k in msg for k in [
+        "填写表单", "帮我填", "自动填", "填一下表单",
+        "帮我填写预约表单", "自动填写", "填表", "把表单填好"
+    ]):
+        return "fill_form"
+    # ===== 提交表单 =====
+    if any(k in msg for k in [
+        "提交表单", "确认提交", "提交预约", "提交吧",
+        "帮我提交", "确认预约", "现在提交", "直接提交",
+        "submit form", "submit_form"
+    ]):
+        return "submit_form"
+    # ===== 默认普通对话 =====
     return "general"
-
 
 def _is_lab_related(text: str) -> bool:
     msg = (text or "").lower()
