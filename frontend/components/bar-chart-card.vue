@@ -18,7 +18,7 @@ export default {
     // 图表标题与说明通常出现在管理端统计、控制台页面。
     title: { type: String, default: '' },
     subtitle: { type: String, default: '' },
-    // data 格式示例：[{ label: '主校区', value: 12 }]
+    // data format example: [{ label: '海淀校区', value: 12 }]
     data: { type: Array, default: () => [] }
   },
   computed: {

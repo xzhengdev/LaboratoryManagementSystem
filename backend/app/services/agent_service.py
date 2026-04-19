@@ -11,8 +11,8 @@ from app.services.reservation_service import cancel_reservation, create_reservat
 from app.utils.exceptions import AppError
 
 
-ACTIVE_RESERVATION_STATUSES = {"pending", "approved"}
-SESSION_TTL_MINUTES = 60
+ACTIVE_RESERVATION_STATUSES = {"pending", "approved"} #预约状态控制，判断预约时间是否冲突
+SESSION_TTL_MINUTES = 60                              #用户会话保留 60 分钟
 MAX_AGENT_STEPS = 5
 MAX_TOOL_REPEAT_STEPS = 2
 MAX_HISTORY_SUMMARY_CHARS = 280
@@ -637,7 +637,7 @@ def _detect_purpose(text: str) -> Optional[str]:
 
 def _detect_campus(text: str) -> str:
     msg = text or ""
-    for key in ["海淀", "朝阳", "通州", "新校区", "校本部", "丰台", "校区"]:
+    for key in ["海淀", "丰台", "海南", "校本部", "校区"]:
         if key in msg:
             return key
     return ""
@@ -923,7 +923,7 @@ def _build_date_time_reply(text: str = "") -> str:
         label = "你问的日期"
 
     return f"{label}是 {target.strftime('%Y-%m-%d')}（{weekday}）。"
-
+#=======================================================工具实现函数========================================
 def _query_labs(date_text: str, campus: str, lab_type: str, participant_count: Optional[int] = None) -> List[Laboratory]:
     labs = Laboratory.query.filter_by(status="active").order_by(Laboratory.id.asc()).all()
     if campus:
@@ -1349,10 +1349,179 @@ def _auto_fill_params(tool: str, user, params: Dict[str, Any], form: Dict[str, A
 
 
 
+def _handle_query_labs(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    labs = _query_labs(
+        params.get("date") or "",
+        params.get("campus") or "",
+        params.get("type") or "",
+        _safe_int(params.get("participant_count")),
+    )
+    session["last_labs"] = [{"id": lab.id, "name": lab.lab_name} for lab in labs[:8]]
+    return _tool_result(tool, True, _labs_to_text(labs), extra={"labs_count": len(labs)})
+
+
+def _handle_query_schedule(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    result = _query_schedule(params.get("date"), _safe_int(params.get("lab_id")))
+    return _tool_result(
+        tool,
+        bool(result.get("ok")),
+        _schedule_result_to_text(result),
+        error_code="query_failed" if not result.get("ok") else "",
+        raw=result,
+    )
+
+
+def _handle_check_availability(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    lab_id = _safe_int(params.get("lab_id"))
+    lab = Laboratory.query.get(lab_id)
+    if not lab:
+        return _tool_result(tool, False, "实验室不存在", error_code="not_found")
+    schedule = get_lab_schedule(lab, datetime.strptime(params["date"], "%Y-%m-%d").date())
+    rows = schedule.get("reservations") or []
+    st = _to_minutes(params["start_time"])
+    et = _to_minutes(params["end_time"])
+    for r in rows:
+        s = _to_minutes(r["start_time"][:5])
+        e = _to_minutes(r["end_time"][:5])
+        if not (et <= s or st >= e):
+            return _tool_result(tool, False, "该时间段已被占用", error_code="conflict")
+    return _tool_result(tool, True, "该时间段可以预约")
+
+
+def _handle_recommend_time(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    reply, pick = _recommend_time(
+        params.get("date"),
+        _safe_int(params.get("lab_id")),
+        str(params.get("preference") or ""),
+    )
+    return _tool_result(
+        tool,
+        pick is not None,
+        reply,
+        error_code="no_slot" if pick is None else "",
+        extra={"pick": pick},
+    )
+
+
+def _handle_recommend_lab(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    labs = _query_labs(
+        params.get("date"),
+        params.get("campus"),
+        params.get("type"),
+        _safe_int(params.get("participant_count")),
+    )
+    if not labs:
+        return _tool_result(tool, False, "没有合适实验室", error_code="not_found")
+    lab = labs[0]
+    return _tool_result(tool, True, f"推荐实验室：{lab.lab_name}（容量{lab.capacity}）", extra={"lab_id": lab.id})
+
+
+def _handle_get_lab_detail(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    lab = Laboratory.query.get(_safe_int(params.get("lab_id")))
+    if not lab:
+        return _tool_result(tool, False, "实验室不存在", error_code="not_found")
+    text = f"{lab.lab_name}，容量{lab.capacity}，位置{lab.location}"
+    return _tool_result(tool, True, text, raw={"lab_id": lab.id})
+
+
+def _handle_create_reservation(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    payload = {
+        "lab_id": _safe_int(params.get("lab_id")),
+        "reservation_date": params.get("date"),
+        "start_time": params.get("start_time"),
+        "end_time": params.get("end_time"),
+        "participant_count": _safe_int(params.get("participant_count")) or 1,
+        "purpose": params.get("purpose"),
+    }
+    lab = Laboratory.query.get(payload["lab_id"])
+    if not lab:
+        return _tool_result(tool, False, "实验室不存在", error_code="not_found")
+    payload["campus_id"] = lab.campus_id
+    try:
+        created = create_reservation(user, payload)
+        _reset_form(session)
+        return _tool_result(
+            tool,
+            True,
+            f"预约成功：{created.get('lab_name')} {created.get('reservation_date')} "
+            f"{str(created.get('start_time'))[:5]}-{str(created.get('end_time'))[:5]}",
+            raw=created,
+        )
+    except AppError as exc:
+        return _tool_result(tool, False, f"预约失败：{exc.message}", error_code="business_rule")
+
+
+def _handle_update_reservation(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    reservation = Reservation.query.get(_safe_int(params.get("reservation_id")))
+    if not reservation:
+        return _tool_result(tool, False, "预约不存在", error_code="not_found")
+    if params.get("date"):
+        reservation.reservation_date = params["date"]
+    if params.get("start_time"):
+        reservation.start_time = params["start_time"]
+    if params.get("end_time"):
+        reservation.end_time = params["end_time"]
+    return _tool_result(tool, True, "预约已更新")
+
+
+def _handle_my_reservations(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    rows = Reservation.query.filter_by(user_id=user.id).limit(8).all()
+    if not rows:
+        return _tool_result(tool, True, "暂无预约记录")
+    session["last_reservations"] = [{"id": r.id} for r in rows]
+    text = "\n".join([f"{r.id} | {r.lab.lab_name if r.lab else '-'} | {r.reservation_date}" for r in rows])
+    return _tool_result(tool, True, text)
+
+
+def _handle_cancel_reservation(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    reservation = Reservation.query.get(_safe_int(params.get("reservation_id")))
+    if not reservation:
+        return _tool_result(tool, False, "预约不存在", error_code="not_found")
+    try:
+        updated = cancel_reservation(user, reservation)
+        return _tool_result(tool, True, f"已取消预约 {updated.get('id')}", raw=updated)
+    except AppError as exc:
+        return _tool_result(tool, False, f"取消失败：{exc.message}")
+
+
+def _handle_explain_rules(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    return _tool_result(tool, True, _rules_context())
+
+
+def _handle_navigate(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    return _tool_result(tool, True, _normalize_nav_path(params.get("path")))
+
+
+def _handle_fill_form(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    return _tool_result(tool, True, "已填写表单", raw={"form": params.get("form")})
+
+
+def _handle_submit_form(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    return _tool_result(tool, True, "表单已提交")
+
+
+TOOL_HANDLERS = {
+    "query_labs": _handle_query_labs,
+    "query_schedule": _handle_query_schedule,
+    "check_availability": _handle_check_availability,
+    "recommend_time": _handle_recommend_time,
+    "recommend_lab": _handle_recommend_lab,
+    "get_lab_detail": _handle_get_lab_detail,
+    "create_reservation": _handle_create_reservation,
+    "update_reservation": _handle_update_reservation,
+    "my_reservations": _handle_my_reservations,
+    "cancel_reservation": _handle_cancel_reservation,
+    "explain_rules": _handle_explain_rules,
+    "navigate": _handle_navigate,
+    "fill_form": _handle_fill_form,
+    "submit_form": _handle_submit_form,
+}
+
+
 def _run_tool(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
     trace_id = str(session.get("_debug_trace_id") or "")
     _debug_log(trace_id, "run_tool_enter", tool=tool, params=params)
-    # ===== 参数校验 =====
+
     missing = _missing_required_tool_fields(tool, params)
     if missing:
         _debug_log(trace_id, "run_tool_missing_fields", tool=tool, missing=missing)
@@ -1365,183 +1534,11 @@ def _run_tool(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) 
             extra={"missing_fields": missing},
         )
 
-    # ===== 查询实验室 =====
-    if tool == "query_labs":
-        labs = _query_labs(
-            params.get("date") or "",
-            params.get("campus") or "",
-            params.get("type") or "",
-            _safe_int(params.get("participant_count")),
-        )
-        session["last_labs"] = [{"id": lab.id, "name": lab.lab_name} for lab in labs[:8]]
-
-        return _tool_result(tool, True, _labs_to_text(labs), extra={"labs_count": len(labs)})
-
-    # ===== 查询排期 =====
-    if tool == "query_schedule":
-        result = _query_schedule(params.get("date"), _safe_int(params.get("lab_id")))
-        return _tool_result(
-            tool,
-            bool(result.get("ok")),
-            _schedule_result_to_text(result),
-            error_code="query_failed" if not result.get("ok") else "",
-            raw=result,
-        )
-
-    # ===== 检查是否可预约 =====
-    if tool == "check_availability":
-        lab_id = _safe_int(params.get("lab_id"))
-        lab = Laboratory.query.get(lab_id)
-        if not lab:
-            return _tool_result(tool, False, "实验室不存在", error_code="not_found")
-
-        schedule = get_lab_schedule(lab, datetime.strptime(params["date"], "%Y-%m-%d").date())
-        rows = schedule.get("reservations") or []
-
-        st = _to_minutes(params["start_time"])
-        et = _to_minutes(params["end_time"])
-
-        for r in rows:
-            s = _to_minutes(r["start_time"][:5])
-            e = _to_minutes(r["end_time"][:5])
-            if not (et <= s or st >= e):
-                return _tool_result(tool, False, "该时间段已被占用", error_code="conflict")
-
-        return _tool_result(tool, True, "该时间段可以预约")
-
-    # ===== 推荐时间 =====
-    if tool == "recommend_time":
-        reply, pick = _recommend_time(
-            params.get("date"),
-            _safe_int(params.get("lab_id")),
-            str(params.get("preference") or ""),
-        )
-        return _tool_result(
-            tool,
-            pick is not None,
-            reply,
-            error_code="no_slot" if pick is None else "",
-            extra={"pick": pick},
-        )
-
-    # ===== 推荐实验室 =====
-    if tool == "recommend_lab":
-        labs = _query_labs(
-            params.get("date"),
-            params.get("campus"),
-            params.get("type"),
-            _safe_int(params.get("participant_count")),
-        )
-        if not labs:
-            return _tool_result(tool, False, "没有合适实验室", error_code="not_found")
-
-        lab = labs[0]
-        return _tool_result(
-            tool,
-            True,
-            f"推荐实验室：{lab.lab_name}（容量{lab.capacity}）",
-            extra={"lab_id": lab.id},
-        )
-
-    # ===== 获取实验室详情 =====
-    if tool == "get_lab_detail":
-        lab = Laboratory.query.get(_safe_int(params.get("lab_id")))
-        if not lab:
-            return _tool_result(tool, False, "实验室不存在", error_code="not_found")
-
-        text = f"{lab.lab_name}，容量{lab.capacity}，位置{lab.location}"
-        return _tool_result(tool, True, text, raw={"lab_id": lab.id})
-
-    # ===== 创建预约 =====
-    if tool == "create_reservation":
-        payload = {
-            "lab_id": _safe_int(params.get("lab_id")),
-            "reservation_date": params.get("date"),
-            "start_time": params.get("start_time"),
-            "end_time": params.get("end_time"),
-            "participant_count": _safe_int(params.get("participant_count")) or 1,
-            "purpose": params.get("purpose"),
-        }
-
-        lab = Laboratory.query.get(payload["lab_id"])
-        if not lab:
-            return _tool_result(tool, False, "实验室不存在", error_code="not_found")
-
-        payload["campus_id"] = lab.campus_id
-
-        try:
-            created = create_reservation(user, payload)
-            _reset_form(session)
-            return _tool_result(
-                tool,
-                True,
-                f"预约成功：{created.get('lab_name')} {created.get('reservation_date')} "
-                f"{str(created.get('start_time'))[:5]}-{str(created.get('end_time'))[:5]}",
-                raw=created,
-            )
-        except AppError as exc:
-            return _tool_result(tool, False, f"预约失败：{exc.message}", error_code="business_rule")
-
-    # ===== 修改预约 =====
-    if tool == "update_reservation":
-        reservation = Reservation.query.get(_safe_int(params.get("reservation_id")))
-        if not reservation:
-            return _tool_result(tool, False, "预约不存在", error_code="not_found")
-
-        if params.get("date"):
-            reservation.reservation_date = params["date"]
-        if params.get("start_time"):
-            reservation.start_time = params["start_time"]
-        if params.get("end_time"):
-            reservation.end_time = params["end_time"]
-
-        return _tool_result(tool, True, "预约已更新")
-
-    # ===== 我的预约 =====
-    if tool == "my_reservations":
-        rows = Reservation.query.filter_by(user_id=user.id).limit(8).all()
-        if not rows:
-            return _tool_result(tool, True, "暂无预约记录")
-
-        session["last_reservations"] = [{"id": r.id} for r in rows]
-
-        text = "\n".join([
-            f"{r.id} | {r.lab.lab_name if r.lab else '-'} | {r.reservation_date}"
-            for r in rows
-        ])
-
-        return _tool_result(tool, True, text)
-
-    # ===== 取消预约 =====
-    if tool == "cancel_reservation":
-        reservation = Reservation.query.get(_safe_int(params.get("reservation_id")))
-        if not reservation:
-            return _tool_result(tool, False, "预约不存在", error_code="not_found")
-
-        try:
-            updated = cancel_reservation(user, reservation)
-            return _tool_result(tool, True, f"已取消预约 {updated.get('id')}", raw=updated)
-        except AppError as exc:
-            return _tool_result(tool, False, f"取消失败：{exc.message}")
-
-    # ===== 规则解释 =====
-    if tool == "explain_rules":
-        return _tool_result(tool, True, _rules_context())
-
-    # ===== 页面跳转 =====
-    if tool == "navigate":
-        return _tool_result(tool, True, _normalize_nav_path(params.get("path")))
-
-    # ===== 自动填表 =====
-    if tool == "fill_form":
-        return _tool_result(tool, True, "已填写表单", raw={"form": params.get("form")})
-
-    # ===== 提交表单 =====
-    if tool == "submit_form":
-        return _tool_result(tool, True, "表单已提交")
-
-    _debug_log(trace_id, "run_tool_unknown", tool=tool)
-    return _tool_result(tool, False, f"未知工具：{tool}", error_code="unknown_tool")
+    handler = TOOL_HANDLERS.get(tool)
+    if not handler:
+        _debug_log(trace_id, "run_tool_unknown", tool=tool)
+        return _tool_result(tool, False, f"未知工具：{tool}", error_code="unknown_tool")
+    return handler(tool, params, user, session)
 
 
 def _fallback_rule_chat(user, text: str, session: Dict[str, Any]) -> Any:
