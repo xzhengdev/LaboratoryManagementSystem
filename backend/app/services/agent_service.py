@@ -1061,8 +1061,6 @@ def _query_schedule(date_text: str, lab_id: Optional[int]) -> Dict[str, Any]:
 
 
 def _recommend_time(date_text: str, lab_id: Optional[int], preference: str) -> Tuple[str, Optional[Dict[str, Any]]]:
-    print("执行推荐时间函数")
-    print("执行推荐时间函数")
     result = _query_schedule(date_text, lab_id)
     if not result.get("ok"):
         return result.get("message") or "无法查询排期。", None
@@ -1339,6 +1337,7 @@ def _llm_agent_decide(context: str, history: List[Dict[str, Any]], form: Dict[st
 
 
 def _labs_to_text(labs: List[Laboratory]) -> str:
+    # 将实验室对象列表转换为可直接展示给用户的文本结果
     if not labs:
         return "没有找到符合条件的实验室。"
     lines = []
@@ -1349,6 +1348,7 @@ def _labs_to_text(labs: List[Laboratory]) -> str:
 
 
 def _schedule_result_to_text(result: Dict[str, Any]) -> str:
+    # 将排期查询结果转换为用户可读的文本格式
     if not result.get("ok"):
         return result.get("message", "查询排期失败。")
     parts = []
@@ -1364,6 +1364,7 @@ def _schedule_result_to_text(result: Dict[str, Any]) -> str:
 
 
 def _normalize_nav_path(path: str) -> str:
+    # 规范化前端页面路径，避免旧路径或别名路径导致跳转错误
     raw = str(path or "").strip()
     if not raw:
         return "/pages/agent/agent"
@@ -1380,6 +1381,7 @@ def _normalize_nav_path(path: str) -> str:
 def _tool_reply_prefer_facts(
     tool: str, tool_result: Dict[str, Any], planner_reply: str, params: Dict[str, Any]
 ) -> str:
+    # 优先使用工具返回的真实结果文本，避免 LLM 回复与实际数据不一致
     factual = str(tool_result.get("data") or "").strip()
     if tool in {"query_labs", "query_schedule", "recommend_time"}:
         # For date/schedule related tools, trust tool output first.
@@ -1392,6 +1394,7 @@ def _tool_reply_prefer_facts(
 
 
 def _sync_form_from_tool_result(form: Dict[str, Any], tool: str, tool_result: Dict[str, Any]) -> Dict[str, Any]:
+    # 根据工具执行结果回填表单字段，便于后续多轮对话继续使用
     if not isinstance(form, dict):
         return {}
     if not isinstance(tool_result, dict) or not tool_result.get("ok"):
@@ -1419,6 +1422,7 @@ def _sync_form_from_tool_result(form: Dict[str, Any], tool: str, tool_result: Di
 
 
 def _auto_fill_params(tool: str, user, params: Dict[str, Any], form: Dict[str, Any], text: str, session: Dict[str, Any]) -> Dict[str, Any]:
+    # 综合用户输入、当前表单和上下文信息，自动补全工具调用所需参数
     merged = _extract_form_from_text(user, text, form, session)
     pref = _detect_preference(text)
     if pref:
@@ -1441,8 +1445,8 @@ def _auto_fill_params(tool: str, user, params: Dict[str, Any], form: Dict[str, A
     return sanitized
 
 
-
 def _handle_query_labs(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    # 处理实验室查询工具，筛选实验室并保存最近查询结果
     labs = _query_labs(
         params.get("date") or "",
         params.get("campus") or "",
@@ -1454,6 +1458,7 @@ def _handle_query_labs(tool: str, params: Dict[str, Any], user, session: Dict[st
 
 
 def _handle_query_schedule(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    # 处理排期查询工具，将排期结果转换为统一返回格式
     result = _query_schedule(params.get("date"), _safe_int(params.get("lab_id")))
     return _tool_result(
         tool,
@@ -1465,6 +1470,7 @@ def _handle_query_schedule(tool: str, params: Dict[str, Any], user, session: Dic
 
 
 def _handle_check_availability(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    # 处理可用性检查工具，判断指定实验室在目标时间段是否存在冲突
     lab_id = _safe_int(params.get("lab_id"))
     lab = Laboratory.query.get(lab_id)
     if not lab:
@@ -1482,6 +1488,7 @@ def _handle_check_availability(tool: str, params: Dict[str, Any], user, session:
 
 
 def _handle_recommend_time(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    # 处理时间推荐工具，返回推荐时段及对应实验室信息
     reply, pick = _recommend_time(
         params.get("date"),
         _safe_int(params.get("lab_id")),
@@ -1497,6 +1504,7 @@ def _handle_recommend_time(tool: str, params: Dict[str, Any], user, session: Dic
 
 
 def _handle_recommend_lab(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    # 处理实验室推荐工具，从符合条件的实验室中返回推荐结果
     labs = _query_labs(
         params.get("date"),
         params.get("campus"),
@@ -1510,6 +1518,7 @@ def _handle_recommend_lab(tool: str, params: Dict[str, Any], user, session: Dict
 
 
 def _handle_get_lab_detail(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    # 处理实验室详情查询工具，返回指定实验室的基本信息
     lab = Laboratory.query.get(_safe_int(params.get("lab_id")))
     if not lab:
         return _tool_result(tool, False, "实验室不存在", error_code="not_found")
@@ -1518,6 +1527,7 @@ def _handle_get_lab_detail(tool: str, params: Dict[str, Any], user, session: Dic
 
 
 def _handle_create_reservation(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    # 处理预约创建工具，组装预约参数并调用预约服务完成创建
     payload = {
         "lab_id": _safe_int(params.get("lab_id")),
         "reservation_date": params.get("date"),
@@ -1545,6 +1555,7 @@ def _handle_create_reservation(tool: str, params: Dict[str, Any], user, session:
 
 
 def _handle_update_reservation(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    # 处理预约修改工具，更新已有预约的日期或时间信息
     reservation = Reservation.query.get(_safe_int(params.get("reservation_id")))
     if not reservation:
         return _tool_result(tool, False, "预约不存在", error_code="not_found")
@@ -1558,6 +1569,7 @@ def _handle_update_reservation(tool: str, params: Dict[str, Any], user, session:
 
 
 def _handle_my_reservations(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    # 处理“我的预约”查询工具，并保存最近预约列表用于后续选择操作
     rows = Reservation.query.filter_by(user_id=user.id).limit(8).all()
     if not rows:
         return _tool_result(tool, True, "暂无预约记录")
@@ -1567,6 +1579,7 @@ def _handle_my_reservations(tool: str, params: Dict[str, Any], user, session: Di
 
 
 def _handle_cancel_reservation(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    # 处理预约取消工具，调用取消服务撤销指定预约
     reservation = Reservation.query.get(_safe_int(params.get("reservation_id")))
     if not reservation:
         return _tool_result(tool, False, "预约不存在", error_code="not_found")
@@ -1578,18 +1591,22 @@ def _handle_cancel_reservation(tool: str, params: Dict[str, Any], user, session:
 
 
 def _handle_explain_rules(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    # 处理规则解释工具，返回当前实验室预约规则说明
     return _tool_result(tool, True, _rules_context())
 
 
 def _handle_navigate(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    # 处理页面跳转工具，返回规范化后的目标页面路径
     return _tool_result(tool, True, _normalize_nav_path(params.get("path")))
 
 
 def _handle_fill_form(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    # 处理表单填写工具，返回已填充的表单数据
     return _tool_result(tool, True, "已填写表单", raw={"form": params.get("form")})
 
 
 def _handle_submit_form(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
+    # 处理表单提交工具，返回表单提交流程结果
     return _tool_result(tool, True, "表单已提交")
 
 
