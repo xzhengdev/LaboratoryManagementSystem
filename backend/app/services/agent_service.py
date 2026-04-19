@@ -329,6 +329,9 @@ def _rules_context() -> str:
         "实验室预约规则: 预约必须在实验室开放时间内，开始时间早于结束时间; "
         "预约开始至少晚于当前时间30分钟，预约日期不能超过未来7天; "
         "参与人数不可超过实验室容量; 同一用户不能重叠预约。"
+        "如果当前工具结果已经足以直接回答用户问题，不要再调用其他工具，直接 done=true。"
+        "对“查询空闲实验室/查看实验室列表”这类请求，query_labs 成功后通常即可结束。"
+        "不要为了重复验证而再次调用 query_schedule，除非用户明确要求查看排期。"
     )
 
 # 从规则文本中提取“需提前多少天预约”的限制
@@ -1971,6 +1974,33 @@ def _continue_pending_action(user, text: str, session: Dict[str, Any], trace_id:
     }
 
 
+def _should_fast_return_tool(tool: str, user_input: str, tool_result: Dict[str, Any]) -> bool:
+    """
+    哪些工具在成功执行后可以直接返回，不必再让 LLM 继续规划下一步
+    """
+    if not tool_result.get("ok"):
+        return False
+
+    # 查询类工具：通常一步足够回答
+    fast_tools = {
+        "query_labs",
+        "query_schedule",
+        "get_lab_detail",
+        "my_reservations",
+        "explain_rules",
+        "recommend_lab",
+        "recommend_time",
+    }
+
+    if tool in fast_tools:
+        return True
+
+    # 导航 / 前端动作类也适合直接返回
+    if tool in {"navigate", "fill_form", "submit_form", "cancel_reservation"}:
+        return True
+
+    return False
+
 # 开始
 #   ↓
 # LLM API 可用？ ─No→ 规则引擎降级
@@ -1993,280 +2023,7 @@ def _continue_pending_action(user, text: str, session: Dict[str, Any], trace_id:
 # 达到最大步数 → 规则引擎降级
 #   ↓
 # 返回结果
-def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -> Any:
-    """
-    Agent 主循环 - LLM 驱动的智能对话处理核心
-    这是整个 Agent 系统的决策和执行引擎，负责：
-    1. 使用 LLM 决策下一步调用哪个工具
-    2. 自动填充缺失的参数（从用户输入和表单中）
-    3. 执行工具并处理结果
-    4. 循环执行直到任务完成或达到限制
-    
-    循环终止条件：
-    - LLM 标记 done=true 且无工具调用
-    - 没有可用的工具
-    - 同一工具重复调用超过限制
-    - 达到最大步数限制
-    - 遇到无法恢复的错误
-    
-    Args:
-        user: 当前用户对象
-        user_input: 用户原始输入文本
-        session: 用户会话数据（包含表单、历史等）
-        trace_id: 追踪ID，用于日志关联
-    
-    Returns:
-        Any: 标准化响应（经过 _normalize_chat_result 处理）
-    """
-    
-    # ==================== 1. 降级检查 ====================
-    # 如果 LLM API 未配置，直接使用规则引擎降级
-    # 这是系统的第一道防线
-    session["_debug_trace_id"] = trace_id
-    _debug_log(trace_id, "agent_loop_start", user_input=user_input)
-    if not Config.LLM_API_KEY:
-        _debug_log(trace_id, "fallback_rule", reason="missing_llm_api_key")
-        return _normalize_chat_result(
-            _fallback_rule_chat(user, user_input, session), 
-            trace_id
-        )
-    
-    # ==================== 2. 初始化循环状态 ====================
-    context = user_input                    # 上下文（逐步累积）
-    history: List[Dict[str, Any]] = []     # 执行历史（供 LLM 决策参考）
-    
-    # 获取当前预约表单（用户已填写的信息）
-    form = dict(session.get("reservation_form") or {})
-    
-    # 从用户输入中提取信息，更新表单
-    form = _extract_form_from_text(user, user_input, form, session)
-    session["reservation_form"] = form
-    _debug_log(trace_id, "form_initialized", form=form)
-    
-    # 工具重复调用检测（防止死循环）
-    last_tool, same_tool_count = "", 0
-    
-    # ==================== 3. Agent 主循环 ====================
-    # 循环执行，最多 MAX_AGENT_STEPS 步
-    for step in range(1, MAX_AGENT_STEPS + 1):
-        
-        # ----- 3.1 LLM 决策：下一步做什么 -----
-        # 调用 LLM 分析当前状态，决定调用哪个工具或结束
-        decision = _llm_agent_decide(context, history, form)
-        tool = str(decision.get("tool") or "").strip()
-        params = _normalize_params_shape(decision.get("params"))
-        planner_reply = str(decision.get("reply") or "").strip()
-        done = bool(decision.get("done", False))
-        _debug_log(trace_id, "llm_decision", step=step, tool=tool, done=done, params=params)
-        
-        # ----- 3.2 终止条件判断 -----
-        # 情况1：LLM 认为任务完成且不需要调用工具
-        if done and not tool:
-            return {
-                "reply": planner_reply or "处理完成。",
-                "actions": [],
-                "trace_id": trace_id
-            }
-        
-        # 情况2：LLM 没有选择任何工具（可能无法理解）
-        if not tool:
-            return {
-                "reply": planner_reply or "请补充更多信息。",
-                "actions": [],
-                "trace_id": trace_id
-            }
-        
-        # ----- 3.3 参数自动填充 -----
-        # 从用户输入和表单中补充缺失的参数
-        # 例如：用户说了"明天下午3点"，自动填充 date、start_time
-        params = _auto_fill_params(tool, user, params, form, context, session)
-        _debug_log(trace_id, "params_filled", step=step, tool=tool, params=params)
-        
-        # 将成功填充的参数同步回表单（持久化）
-        for key in ["date", "participant_count", "start_time", "end_time", 
-                    "purpose", "campus", "type", "lab_id", "preference"]:
-            if params.get(key) not in [None, ""]:
-                form[key] = params.get(key)
-        session["reservation_form"] = form
-        
-        # ----- 3.4 执行工具 -----
-        tool_result = _run_tool(tool, params, user, session)
-        _debug_log(
-            trace_id,
-            "tool_executed",
-            step=step,
-            tool=tool,
-            ok=bool(tool_result.get("ok")),
-            error_code=tool_result.get("error_code"),
-            data_preview=str(tool_result.get("data") or "")[:120],
-        )
-        form = _sync_form_from_tool_result(form, tool, tool_result)
-        session["reservation_form"] = form
-        _debug_log(trace_id, "form_synced_by_tool", step=step, tool=tool, form=form)
-        
-        # ----- 3.5 记录执行历史 -----
-        # 供 LLM 在下一步决策时参考
-        history.append(
-            {
-                "step": step,
-                "tool": tool,
-                "params": params,
-                "ok": bool(tool_result.get("ok")),
-                "result_summary": str(tool_result.get("data") or "")[:MAX_HISTORY_SUMMARY_CHARS],
-                "error_code": tool_result.get("error_code"),
-            }
-        )
 
-        # ----- 3.5a 冲突后硬规则：清空原时段并优先推荐新时段 -----
-        if tool == "check_availability" and not tool_result.get("ok") and tool_result.get("error_code") == "conflict":
-            form["start_time"] = ""
-            form["end_time"] = ""
-            session["reservation_form"] = form
-            rec_params: Dict[str, Any] = {"date": form.get("date"), "preference": form.get("preference") or ""}
-            if form.get("lab_id"):
-                rec_params["lab_id"] = form.get("lab_id")
-            rec_params = _sanitize_tool_params("recommend_time", rec_params)
-            _debug_log(trace_id, "run_tool_enter", tool="recommend_time(auto_after_conflict)", params=rec_params)
-            rec_result = _run_tool("recommend_time", rec_params, user, session)
-            _debug_log(
-                trace_id,
-                "tool_executed",
-                step=step,
-                tool="recommend_time(auto_after_conflict)",
-                ok=bool(rec_result.get("ok")),
-                error_code=rec_result.get("error_code"),
-                data_preview=str(rec_result.get("data") or "")[:120],
-            )
-            # 若限定实验室无可用时段，则自动放宽到不限实验室再试一次
-            if (
-                not rec_result.get("ok")
-                and rec_result.get("error_code") == "no_slot"
-                and rec_params.get("lab_id") is not None
-            ):
-                rec_params.pop("lab_id", None)
-                _debug_log(trace_id, "run_tool_enter", tool="recommend_time(auto_relax_lab)", params=rec_params)
-                rec_result = _run_tool("recommend_time", rec_params, user, session)
-                _debug_log(
-                    trace_id,
-                    "tool_executed",
-                    step=step,
-                    tool="recommend_time(auto_relax_lab)",
-                    ok=bool(rec_result.get("ok")),
-                    error_code=rec_result.get("error_code"),
-                    data_preview=str(rec_result.get("data") or "")[:120],
-                )
-            if rec_result.get("ok"):
-                form = _sync_form_from_tool_result(form, "recommend_time", rec_result)
-                session["reservation_form"] = form
-                _debug_log(trace_id, "form_synced_by_tool", step=step, tool="recommend_time(auto)", form=form)
-                return {
-                    "reply": str(rec_result.get("data") or "该时段冲突，已为你推荐其他可用时间。"),
-                    "actions": [],
-                    "trace_id": trace_id,
-                }
-            return {
-                "reply": "你选择的时段已被占用，暂时没有找到合适替代时段。你可以告诉我新的时间范围（例如 14:00-16:00）。",
-                "actions": [],
-                "trace_id": trace_id,
-            }
-        
-        # ----- 3.6 工具重复调用检测 -----
-        # 防止 Agent 陷入同一工具的循环调用
-        same_tool_count = same_tool_count + 1 if tool == last_tool else 1
-        last_tool = tool
-        if same_tool_count > MAX_TOOL_REPEAT_STEPS:
-            return {
-                "reply": "同一步骤重复尝试过多次。请补充更具体信息后我再继续。",
-                "actions": [],
-                "trace_id": trace_id
-            }
-        
-        # ==================== 4. 特殊工具快速返回 ====================
-        
-        # ----- 4.1 导航工具：立即跳转页面 -----
-        if tool == "navigate":
-            return {
-                "reply": planner_reply or "我带你进入对应页面。",
-                "actions": [{"label": "前往页面", "path": str(tool_result.get("data") or "/pages/agent/agent")}],
-                "trace_id": trace_id
-            }
-        
-        # ----- 4.2 预约查询/取消：返回结果并提供快捷入口 -----
-        if tool in {"my_reservations", "cancel_reservation"}:
-            return {
-                "reply": str(tool_result.get("data") or "处理完成。"),
-                "actions": [{"label": "查看我的预约", "path": "/pages/my-reservations/my-reservations"}],
-                "trace_id": trace_id
-            }
-        
-        # ----- 4.3 创建预约：成功或失败都立即返回 -----
-        if tool == "create_reservation":
-            if tool_result.get("ok"):
-                return {
-                    "reply": f"已帮你完成预约: {tool_result.get('data')}",
-                    "actions": [{"label": "查看我的预约", "path": "/pages/my-reservations/my-reservations"}],
-                    "trace_id": trace_id
-                }
-            return {
-                "reply": str(tool_result.get("data") or "预约失败。"),
-                "actions": [],
-                "trace_id": trace_id
-            }
-        
-        # ----- 4.4 LLM 标记完成：返回结果 -----
-        if done:
-            final_reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params)
-            _debug_log(trace_id, "done_return", step=step, reply_preview=final_reply[:120])
-            return {
-                "reply": final_reply,
-                "actions": [],
-                "trace_id": trace_id
-            }
-        
-        # ----- 4.5 不可恢复的错误：立即返回 -----
-        # 这些错误类型表示无法通过继续循环解决
-        if not tool_result.get("ok") and tool_result.get("error_code") in {
-            "missing_fields",   # 缺少必需参数
-            "invalid_params",   # 参数无效
-            "not_found",        # 资源不存在
-            "business_rule"     # 违反业务规则
-        }:
-            if tool == "create_reservation" and tool_result.get("error_code") == "missing_fields":
-                missing = tool_result.get("missing_fields") or []
-                session["pending_action"] = {"tool": "create_reservation", "missing": missing}
-                _debug_log(trace_id, "pending_action_set", tool="create_reservation", missing=missing)
-            return {
-                "reply": str(tool_result.get("data") or "处理失败。"),
-                "actions": [],
-                "trace_id": trace_id
-            }
-        if _is_abab_loop(history):
-            return {
-                "reply": "我检测到策略在重复尝试（如查冲突/换实验室来回循环）。请告诉我你更倾向的新时间范围，我马上按新范围推荐。",
-                "actions": [],
-                "trace_id": trace_id,
-            }
-        
-        # ==================== 5. 继续下一轮循环 ====================
-        # 更新上下文，让 LLM 了解上一步的执行结果
-        # 这样 LLM 可以基于实际情况做出下一步决策
-        context = (
-            f"USER_REQUEST: {user_input}\n"
-            f"STEP: {step}\n"
-            f"TOOL: {tool}\n"
-            f"TOOL_PARAMS: {json.dumps(params, ensure_ascii=False)}\n"
-            f"TOOL_OK: {tool_result.get('ok')}\n"
-            f"TOOL_RESULT: {str(tool_result.get('data') or '')[:MAX_HISTORY_SUMMARY_CHARS]}\n"
-            f"CURRENT_FORM: {json.dumps(form, ensure_ascii=False)}\n"
-            "继续选择下一步。若已满足需求，请 done=true。"
-        )
-    
-    # ==================== 6. 超过最大步数 ====================
-    # 如果循环超过 MAX_AGENT_STEPS 仍未完成，降级到规则引擎
-    return _normalize_chat_result(
-        _fallback_rule_chat(user, user_input, session), 
-        trace_id
-    )
 
 def chat(user, message):
     print("=========================================================下一轮对话============================================================")
