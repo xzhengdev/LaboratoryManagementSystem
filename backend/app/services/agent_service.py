@@ -311,6 +311,12 @@ def _missing_fields_hint(tool: str, missing: List[str]) -> str:
         labels = [common_label_map.get(x, x) for x in missing]
         return "还缺少这些信息: " + "、".join(labels) + "。"
 
+    if tool == "recommend_lab":
+        return "为了更准确推荐实验室，请告诉我日期，并尽量补充校区、人数和实验室类型偏好。"
+
+    if tool == "recommend_time":
+        return "请先告诉我日期；如果有指定实验室或上午/下午偏好也可以一起说。"
+
     if tool == "query_schedule":
         return "请先告诉我日期，例如 2026-04-20。"
 
@@ -488,6 +494,7 @@ def _clean_session(user_id: int) -> Dict[str, Any]:
     # 3.3 最近查询的预约列表
     # 用于支持用户通过序号取消预约（例如："取消第2个"）
     session.setdefault("last_reservations", [])
+    session.setdefault("last_recommended_time", {})
     session.setdefault("pending_action", None)
     # 3.4 最后更新时间戳
     # 用于会话过期判断，每次操作都会更新
@@ -518,6 +525,7 @@ def _reset_form(session: Dict[str, Any]) -> None:
         "preference": "",
     }
     session["last_labs"] = []
+    session["last_recommended_time"] = {}
     session["last_choice_type"] = ""
     session["pending_action"] = None
 
@@ -586,7 +594,33 @@ def _detect_time_range(text: str) -> Tuple[Optional[str], Optional[str]]:
     if m2:
         p1, h1, m1, p2, h2, m2_ = m2.groups()
         return _normalize_clock(int(h1), int(m1 or 0), p1), _normalize_clock(int(h2), int(m2_ or 0), p2)
+    m3 = re.search(r"(\d{1,2}:\d{2})\s*(?:开始|开[始场]|起)", msg)
+    if m3:
+        return m3.group(1), None
+    m4 = re.search(r"(上午|下午|晚上|中午)?\s*(\d{1,2})点(?:([0-5]?\d)分?)?\s*(?:开始|开[始场]|起)", msg)
+    if m4:
+        p, h, mm = m4.groups()
+        return _normalize_clock(int(h), int(mm or 0), p), None
     return None, None
+
+
+def _detect_duration_minutes(text: str) -> Optional[int]:
+    msg = text or ""
+    m_hour = re.search(r"(\d{1,2})\s*(?:个)?小时", msg)
+    if m_hour:
+        return int(m_hour.group(1)) * 60
+    if "半小时" in msg:
+        return 30
+    m_minute = re.search(r"(\d{1,3})\s*分钟", msg)
+    if m_minute:
+        return int(m_minute.group(1))
+    return None
+
+
+def _add_minutes(hhmm: str, delta_minutes: int) -> str:
+    base = _to_minutes(hhmm)
+    total = max(0, min(23 * 60 + 59, base + delta_minutes))
+    return f"{total // 60:02d}:{total % 60:02d}"
 
  # 从用户输入中提取参与人数
 def _detect_participant_count(text: str) -> Optional[int]:
@@ -601,6 +635,13 @@ def _detect_purpose(text: str) -> Optional[str]:
     m = re.search(r"(?:用途|用于|目的)[:：]?\s*(.+)$", msg)
     if m:
         return m.group(1).strip()[:120]
+    for key in ["课程实验", "项目讨论", "上课", "答辩", "开会", "做实验", "做项目"]:
+        if key in msg:
+            if key == "做实验":
+                return "课程实验"
+            if key == "做项目":
+                return "项目讨论"
+            return key
     return None
 
 # 从用户输入中识别校区信息
@@ -636,7 +677,9 @@ def _detect_type(text: str) -> str:
 
 def _detect_preference(text: str) -> str:
     msg = text or ""
-    if "下午" in msg or "晚上" in msg:
+    if "晚上" in msg or "晚间" in msg:
+        return "晚上"
+    if "下午" in msg:
         return "下午"
     if "上午" in msg or "早上" in msg:
         return "上午"
@@ -657,12 +700,39 @@ def _detect_lab_id_or_choice(text: str, session: Dict[str, Any]) -> Optional[int
     if m:
         return int(m.group(1))
 
+    form = session.get("reservation_form") if isinstance(session.get("reservation_form"), dict) else {}
+    current_lab_id = _safe_int((form or {}).get("lab_id"))
+    if current_lab_id is not None and re.search(r"(这个实验室|该实验室|就这个|就它|那个实验室|推荐的那个)", msg):
+        return current_lab_id
+
+    labs = session.get("last_labs") or []
+
+    idx_map = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5}
+    choice_idx: Optional[int] = None
+    m_idx = re.search(r"第\s*([1-9]|[一二三四五])\s*个", msg)
+    if m_idx:
+        token = m_idx.group(1)
+        choice_idx = int(token) if token.isdigit() else idx_map.get(token)
+    elif "第一个" in msg or "第1个" in msg or "第1间" in msg:
+        choice_idx = 1
+    elif "第二个" in msg or "第2个" in msg:
+        choice_idx = 2
+    elif "第三个" in msg or "第3个" in msg:
+        choice_idx = 3
+
     # 只有在刚展示过实验室列表时，才把纯数字解释为“选第几个”
     if _can_treat_as_choice(session, "lab") and re.fullmatch(r"\d{1,2}", msg):
         idx = int(msg)
-        labs = session.get("last_labs") or []
         if 1 <= idx <= len(labs):
             return int(labs[idx - 1]["id"])
+
+    if _can_treat_as_choice(session, "lab") and choice_idx is not None:
+        if 1 <= choice_idx <= len(labs):
+            return int(labs[choice_idx - 1]["id"])
+
+    if _can_treat_as_choice(session, "lab") and re.search(r"^(这个|就它|就这个|那个|推荐的那个)$", msg):
+        if labs:
+            return int(labs[0]["id"])
 
     return None
 
@@ -677,12 +747,29 @@ def _detect_reservation_id_or_choice(text: str, session: Dict[str, Any]) -> Opti
     if m:
         return int(m.group(1))
 
+    rows = session.get("last_reservations") or []
+    idx_map = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5}
+    choice_idx: Optional[int] = None
+    m_idx = re.search(r"第\s*([1-9]|[一二三四五])\s*(?:个|条)", msg)
+    if m_idx:
+        token = m_idx.group(1)
+        choice_idx = int(token) if token.isdigit() else idx_map.get(token)
+    elif "第一个" in msg or "第1个" in msg or "第一条" in msg:
+        choice_idx = 1
+
     # 只有在刚展示过预约列表时，才把纯数字解释为“选第几个”
     if _can_treat_as_choice(session, "reservation") and re.fullmatch(r"\d{1,2}", msg):
         idx = int(msg)
-        rows = session.get("last_reservations") or []
         if 1 <= idx <= len(rows):
             return int(rows[idx - 1]["id"])
+
+    if _can_treat_as_choice(session, "reservation") and choice_idx is not None:
+        if 1 <= choice_idx <= len(rows):
+            return int(rows[choice_idx - 1]["id"])
+
+    if _can_treat_as_choice(session, "reservation") and re.search(r"^(这个|这条|就这个|那个)$", msg):
+        if rows:
+            return int(rows[0]["id"])
 
     return None
 
@@ -807,7 +894,7 @@ def _extract_intent(text: str) -> str:
     # 5. 创建预约
     if _contains_any(msg, [
         "我要预约", "帮我预约", "创建预约", "约实验室",
-        "订实验室", "预约实验室", "创建一个预约", "我要预定"
+        "订实验室", "预约实验室", "创建一个预约", "我要预定", "帮我直接创建", "直接创建预约"
     ]):
         return "create_reservation"
 
@@ -1236,6 +1323,10 @@ def _extract_form_from_text(user, text: str, form: Dict[str, Any], session: Dict
         merged["start_time"] = st
     if et:
         merged["end_time"] = et
+    if st and not et:
+        duration = _detect_duration_minutes(text)
+        if duration:
+            merged["end_time"] = _add_minutes(st, duration)
 
     c = _detect_participant_count(text)
     if c is not None:
@@ -1261,6 +1352,16 @@ def _extract_form_from_text(user, text: str, form: Dict[str, Any], session: Dict
     if lab_id is not None:
         merged["lab_id"] = lab_id
 
+    if re.search(r"(这个时间|该时间|就这个时间|推荐的时间|这个时段)", text or ""):
+        last_pick = session.get("last_recommended_time")
+        if isinstance(last_pick, dict):
+            for key in ["date", "start_time", "end_time"]:
+                if last_pick.get(key):
+                    merged[key] = last_pick.get(key)
+            rid = _safe_int(last_pick.get("lab_id"))
+            if rid is not None:
+                merged["lab_id"] = rid
+
     merged = _llm_extract_form(text, merged)
 
     # 相对日期优先，防止 LLM 覆盖错
@@ -1275,37 +1376,7 @@ def _normalize_chat_result(result: Any, trace_id: str = "") -> Dict[str, Any]:
     """
     标准化聊天结果为统一格式
     这是响应格式的统一出口，确保所有返回给前端的数据结构一致。
-    主要功能：
-    1. 将各种输入格式（字符串、字典、工具调用等）统一为 {reply, actions, trace_id}
-    2. 为特定工具调用添加快捷操作按钮（actions）
-    3. 确保 trace_id 存在（用于日志追踪）
-    为什么要标准化？
-    - 前端只需要处理一种数据格式
-    - 便于添加统一的日志、监控逻辑
-    - 避免因返回格式不一致导致的 UI 错误
-    
-    Args:
-        result: 原始结果，可以是以下类型：
-            - str: 纯文本回复
-            - dict: 可能包含 reply, actions, type, tool, params 等字段
-            - None: 空结果
-        trace_id: 可选的追踪ID，如果 result 中没有则会使用此值或生成新值
-    
-    Returns:
-        Dict[str, Any]: 标准化后的响应，包含：
-            - reply (str): 返回给用户的文本内容
-            - actions (list): 快捷操作按钮列表，每个按钮包含 label 和 path
-            - trace_id (str): 唯一追踪ID
-    Example:
-        >>> # 输入字符串
-        >>> _normalize_chat_result("你好", "trace-123")
-        {"reply": "你好", "actions": [], "trace_id": "trace-123"}
-        
-        >>> # 输入工具调用
-        >>> _normalize_chat_result({"type": "tool_call", "tool": "navigate", "params": {"path": "/home"}})
-        {"reply": "", "actions": [{"label": "前往页面", "path": "/home"}], "trace_id": "xxx"}
     """
-    
     # ==================== 1. 基础格式转换 ====================
     # 确保 result 是字典格式
     # - 如果已经是 dict，直接使用
@@ -1476,7 +1547,7 @@ def _labs_to_text(labs: List[Laboratory]) -> str:
     if not labs:
         return "没有找到符合条件的实验室。"
     lines = []
-    for i, lab in enumerate(labs[:8], start=1):
+    for i, lab in enumerate(labs, start=1):
         campus_name = getattr(lab.campus, "campus_name", "") if getattr(lab, "campus", None) else ""
         lines.append(f"{i}. ID={lab.id} | {lab.lab_name} | 容量={lab.capacity} | 校区={campus_name}")
     return "\n".join(lines)
@@ -1565,6 +1636,92 @@ def _wants_create_flow(user_input: str) -> bool:
     return any(k in msg for k in ["帮我预约", "创建预约", "直接预约", "下预约"])
 
 
+def _wants_recommend_lab_flow(user_input: str) -> bool:
+    intent = _extract_intent(user_input or "")
+    if intent == "recommend_lab":
+        return True
+    msg = user_input or ""
+    return any(k in msg for k in ["推荐实验室", "推荐一个实验室", "哪个实验室合适", "推荐个实验室"])
+
+
+def _wants_recommend_time_flow(user_input: str) -> bool:
+    intent = _extract_intent(user_input or "")
+    if intent == "recommend_time":
+        return True
+    msg = user_input or ""
+    return any(k in msg for k in ["推荐时间", "推荐时段", "什么时候能约", "哪个时间合适"])
+
+
+def _has_relaxed_preference(text: str) -> bool:
+    msg = text or ""
+    return any(k in msg for k in ["随便", "都可以", "都行", "不限", "任意"])
+
+
+def _recommend_lab_missing_fields(form: Dict[str, Any], user_input: str) -> List[str]:
+    current = dict(form or {})
+    missing: List[str] = []
+    if not current.get("date"):
+        missing.append("date")
+    has_key_pref = any(
+        [
+            bool(current.get("campus")),
+            current.get("participant_count") not in [None, "", 0],
+            bool(current.get("type")),
+            bool(current.get("preference")),
+        ]
+    )
+    if not has_key_pref and not _has_relaxed_preference(user_input):
+        missing.append("key_preference")
+    return missing
+
+
+def _recommend_time_missing_fields(form: Dict[str, Any], user_input: str) -> List[str]:
+    current = dict(form or {})
+    missing: List[str] = []
+    if not current.get("date"):
+        missing.append("date")
+    has_time = bool(current.get("start_time") and current.get("end_time"))
+    has_pref = bool(current.get("preference"))
+    has_lab = current.get("lab_id") not in [None, ""]
+    if not has_time and not has_pref and not has_lab and not _has_relaxed_preference(user_input):
+        missing.append("lab_or_preference")
+    return missing
+
+
+def _needs_recommend_lab_clarification(form: Dict[str, Any], user_input: str) -> List[str]:
+    if not _wants_recommend_lab_flow(user_input):
+        return []
+    return _recommend_lab_missing_fields(form, user_input)
+
+
+def _needs_recommend_time_clarification(form: Dict[str, Any], user_input: str) -> List[str]:
+    if not _wants_recommend_time_flow(user_input):
+        return []
+    return _recommend_time_missing_fields(form, user_input)
+
+
+def _build_recommend_lab_clarification(missing: List[str]) -> str:
+    if not missing:
+        return ""
+    parts: List[str] = []
+    if "date" in missing:
+        parts.append("哪一天")
+    if "key_preference" in missing:
+        parts.append("你更偏向哪个校区、几个人使用（也可以补充实验室类型或上午/下午偏好）")
+    return "为了推荐得更准确，我先确认一下：" + "，".join(parts) + "。"
+
+
+def _build_recommend_time_clarification(missing: List[str]) -> str:
+    if not missing:
+        return ""
+    parts: List[str] = []
+    if "date" in missing:
+        parts.append("你想约哪一天")
+    if "lab_or_preference" in missing:
+        parts.append("有指定实验室吗（没有的话告诉我上午/下午/晚上偏好也行）")
+    return "我先补两点信息再给你推荐时间：" + "，".join(parts) + "。"
+
+
 def _needs_create_flow_clarification(form: Dict[str, Any], user_input: str) -> List[str]:
     """
     用户明确要创建预约时，先判断是否缺少“规划阶段”必须的信息。
@@ -1601,10 +1758,10 @@ def _needs_create_flow_clarification(form: Dict[str, Any], user_input: str) -> L
 def _build_create_flow_clarification(missing: List[str], form: Dict[str, Any]) -> str:
     parts: List[str] = []
 
-    if "campus" in missing:
-        parts.append("想预约哪个校区")
     if "date" in missing:
         parts.append("预约哪一天")
+    if "campus" in missing:
+        parts.append("想预约哪个校区")
     if "time_range" in missing:
         parts.append("具体几点到几点")
     if "time_range_detail" in missing:
@@ -1683,7 +1840,7 @@ def _handle_query_labs(tool: str, params: Dict[str, Any], user, session: Dict[st
         params.get("type") or "",
         _safe_int(params.get("participant_count")),
     )
-    session["last_labs"] = [{"id": lab.id, "name": lab.lab_name} for lab in labs[:8]]
+    session["last_labs"] = [{"id": lab.id, "name": lab.lab_name} for lab in labs]
     session["last_choice_type"] = "lab_list"
     return _tool_result(tool, True, _labs_to_text(labs), extra={"labs_count": len(labs)})
 
@@ -1766,6 +1923,14 @@ def _handle_recommend_time(tool: str, params: Dict[str, Any], user, session: Dic
         _safe_int(params.get("lab_id")),
         str(params.get("preference") or ""),
     )
+    if isinstance(pick, dict):
+        session["last_recommended_time"] = {
+            "lab_id": pick.get("lab_id"),
+            "date": pick.get("date"),
+            "start_time": pick.get("start_time"),
+            "end_time": pick.get("end_time"),
+        }
+        session["last_choice_type"] = "time_recommendation"
     return _tool_result(
         tool,
         pick is not None,
@@ -1786,6 +1951,8 @@ def _handle_recommend_lab(tool: str, params: Dict[str, Any], user, session: Dict
     if not labs:
         return _tool_result(tool, False, "没有合适实验室", error_code="not_found")
     lab = labs[0]
+    session["last_labs"] = [{"id": item.id, "name": item.lab_name} for item in labs[:8]]
+    session["last_choice_type"] = "lab_list"
     return _tool_result(tool, True, f"推荐实验室：{lab.lab_name}（容量{lab.capacity}）", extra={"lab_id": lab.id})
 
 
@@ -2018,20 +2185,72 @@ def _fallback_rule_chat(user, text: str, session: Dict[str, Any]) -> Any:
         return _tool_call("query_labs", {}, "我来帮你查实验室。")
     if intent == "query_schedule":
         d = _detect_date(text)
+        lid = _detect_lab_id_or_choice(text, session)
         params = {"date": d} if d else {}
+        if lid is not None:
+            params["lab_id"] = lid
         return _tool_call("query_schedule", params, "我来帮你查排期。")
     if intent == "create_reservation":
         return _tool_call("create_reservation", {}, "我来帮你创建预约。")
+    if intent == "update_reservation":
+        rid = _detect_reservation_id_or_choice(text, session)
+        params = {"reservation_id": rid} if rid else {}
+        d = _detect_date(text)
+        if d:
+            params["date"] = d
+        st, et = _detect_time_range(text)
+        if st:
+            params["start_time"] = st
+        if et:
+            params["end_time"] = et
+        return _tool_call("update_reservation", params, "我来帮你修改预约。")
     if intent == "my_reservations":
         return _tool_call("my_reservations", {}, "我帮你查询你的预约记录。")
     if intent == "cancel_reservation":
         rid = _detect_reservation_id_or_choice(text, session)
         params = {"reservation_id": rid} if rid else {}
         return _tool_call("cancel_reservation", params, "我来帮你取消该预约。")
+    if intent == "recommend_lab":
+        d = _detect_date(text)
+        params: Dict[str, Any] = {}
+        if d:
+            params["date"] = d
+        campus = _detect_campus(text)
+        if campus:
+            params["campus"] = campus
+        c = _detect_participant_count(text)
+        if c is not None:
+            params["participant_count"] = c
+        lab_type = _detect_type(text)
+        if lab_type:
+            params["type"] = lab_type
+        return _tool_call("recommend_lab", params, "我先帮你推荐实验室。")
     if intent == "recommend_time":
         d = _detect_date(text)
         params = {"date": d} if d else {}
+        lid = _detect_lab_id_or_choice(text, session)
+        if lid is not None:
+            params["lab_id"] = lid
+        pref = _detect_preference(text)
+        if pref:
+            params["preference"] = pref
         return _tool_call("recommend_time", params, "我帮你推荐时间。")
+    if intent == "check_availability":
+        d = _detect_date(text)
+        st, et = _detect_time_range(text)
+        lid = _detect_lab_id_or_choice(text, session)
+        params = {}
+        if lid is not None:
+            params["lab_id"] = lid
+        if d:
+            params["date"] = d
+        if st:
+            params["start_time"] = st
+        if et:
+            params["end_time"] = et
+        return _tool_call("check_availability", params, "我来帮你检查这个时段是否可预约。")
+    if intent == "explain_rules":
+        return _tool_call("explain_rules", {}, "我来说明一下预约规则。")
     if intent == "navigate":
         return _tool_call("navigate", {"path": "/pages/labs/labs"}, "我带你进入对应页面。")
     return _call_general_llm(user, text)
@@ -2072,6 +2291,36 @@ def _continue_pending_action(user, text: str, session: Dict[str, Any], trace_id:
         session["pending_action"] = None
         _debug_log(trace_id, "pending_action_cleared", tool=tool)
         return None
+
+    if tool == "recommend_lab":
+        missing = _recommend_lab_missing_fields(form, text)
+        if missing:
+            session["pending_action"] = {
+                "tool": tool,
+                "missing": missing,
+                "params": pending.get("params") or {},
+            }
+            _debug_log(trace_id, "pending_action_set", tool=tool, missing=missing)
+            return {
+                "reply": _build_recommend_lab_clarification(missing),
+                "actions": [],
+                "trace_id": trace_id,
+            }
+
+    if tool == "recommend_time":
+        missing = _recommend_time_missing_fields(form, text)
+        if missing:
+            session["pending_action"] = {
+                "tool": tool,
+                "missing": missing,
+                "params": pending.get("params") or {},
+            }
+            _debug_log(trace_id, "pending_action_set", tool=tool, missing=missing)
+            return {
+                "reply": _build_recommend_time_clarification(missing),
+                "actions": [],
+                "trace_id": trace_id,
+            }
 
     params = _auto_fill_params(tool, user, pending.get("params") or {}, form, text, session)
     result = _run_tool(tool, params, user, session)
@@ -2195,6 +2444,36 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
             "params": {},
         }
         _debug_log(trace_id, "pending_action_set", tool="create_reservation", missing=create_flow_missing)
+        return {
+            "reply": reply,
+            "actions": [],
+            "trace_id": trace_id,
+        }
+
+    recommend_lab_missing = _needs_recommend_lab_clarification(form, user_input)
+    if recommend_lab_missing:
+        reply = _build_recommend_lab_clarification(recommend_lab_missing)
+        session["pending_action"] = {
+            "tool": "recommend_lab",
+            "missing": recommend_lab_missing,
+            "params": {},
+        }
+        _debug_log(trace_id, "pending_action_set", tool="recommend_lab", missing=recommend_lab_missing)
+        return {
+            "reply": reply,
+            "actions": [],
+            "trace_id": trace_id,
+        }
+
+    recommend_time_missing = _needs_recommend_time_clarification(form, user_input)
+    if recommend_time_missing:
+        reply = _build_recommend_time_clarification(recommend_time_missing)
+        session["pending_action"] = {
+            "tool": "recommend_time",
+            "missing": recommend_time_missing,
+            "params": {},
+        }
+        _debug_log(trace_id, "pending_action_set", tool="recommend_time", missing=recommend_time_missing)
         return {
             "reply": reply,
             "actions": [],
@@ -2539,18 +2818,6 @@ def chat(user, message):
     2. 用户会话管理
     3. 意图路由（实验室相关 / 通用问题）
     4. 错误处理和降级方案
-    Args:
-        user: 用户对象，包含用户信息（必须有 id 属性或字典格式）
-        message: 用户输入的消息文本
-    Returns:
-        Dict: 标准化响应，包含以下字段：
-            - reply (str): 返回给用户的回复文本
-            - actions (list): 快捷操作按钮列表（如页面跳转）
-            - trace_id (str): 追踪ID，用于日志和问题排查
-    Example:
-        >>> response = chat(user, "帮我查一下明天下午的实验室")
-        >>> print(response["reply"])
-        "我来帮你查排期..."
     """
     # ==================== 1. 消息预处理 ====================
     # 将用户输入转换为字符串并去除首尾空格
@@ -2594,7 +2861,7 @@ def chat(user, message):
         # ----- 4.1 退出预约流程（最高优先级）-----
         # 检查用户是否想要退出当前的预约创建流程
         # 关键词：不需要预约、不用预约、先不预约、不约了等
-        if _is_cancel_flow_message(text):
+        if _is_cancel_flow_message(text) and isinstance(session.get("pending_action"), dict):
             _debug_log(trace_id, "route", target="cancel_flow")
             _reset_form(session)           # 清空预约表单
             _save_session(user_id, session) # 保存会话状态
@@ -2607,7 +2874,7 @@ def chat(user, message):
         if pending_result is not None:
             _save_session(user_id, session)
             return _normalize_chat_result(pending_result, trace_id)
-        
+
         # ----- 4.2 实验室相关问题 vs 通用问题 -----
         # 判断用户问题是否与实验室预约相关
         # 相关关键词：实验室、预约、排期、空闲、lab、schedule等
