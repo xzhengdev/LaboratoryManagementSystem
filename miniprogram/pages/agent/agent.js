@@ -39,6 +39,33 @@ Page({
     this.loadUserProfile()
   },
 
+  stripMarkdownSyntax(content) {
+    const text = String(content || '')
+    return text
+      .replace(/```[\s\S]*?```/g, (block) => block.replace(/```/g, ''))
+      .replace(/^#{1,6}\s*/gm, '')
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/^\s*([-*_])\1{2,}\s*$/gm, '')
+      .replace(/^\s*[-*+]\s+/gm, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  },
+
+  normalizeStatusText(content) {
+    const text = String(content || '')
+    return text
+      .replace(/\bpending\b/gi, '待审批')
+      .replace(/\bapproved\b/gi, '已通过')
+      .replace(/\bcancelled\b/gi, '已取消')
+      .replace(/\bcanceled\b/gi, '已取消')
+  },
+
+  normalizeAssistantText(content) {
+    return this.normalizeStatusText(this.stripMarkdownSyntax(content))
+  },
+
   bootstrap() {
     this.setData({
       messages: [
@@ -124,6 +151,7 @@ Page({
         content: (res && res.reply) || '已收到你的问题。',
         actions: (res && res.actions) || []
       }
+      assistantMessage.content = this.normalizeAssistantText(assistantMessage.content)
       this.appendMessage(assistantMessage)
     } catch (err) {
       const fallbackMessage = {

@@ -62,6 +62,30 @@ export default {
     }
   },
   methods: {
+    stripMarkdownSyntax(content) {
+      const text = String(content || '')
+      return text
+        .replace(/```[\s\S]*?```/g, (block) => block.replace(/```/g, ''))
+        .replace(/^#{1,6}\s*/gm, '')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/^\s*([-*_])\1{2,}\s*$/gm, '')
+        .replace(/^\s*[-*+]\s+/gm, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    },
+    normalizeStatusText(content) {
+      const text = String(content || '')
+      return text
+        .replace(/\bpending\b/gi, '待审批')
+        .replace(/\bapproved\b/gi, '已通过')
+        .replace(/\bcancelled\b/gi, '已取消')
+        .replace(/\bcanceled\b/gi, '已取消')
+    },
+    normalizeAssistantText(content) {
+      return this.normalizeStatusText(this.stripMarkdownSyntax(content))
+    },
     toggleWindow() {
       this.visible = !this.visible
     },
@@ -76,7 +100,7 @@ export default {
       try {
         const res = await api.agentChat(message)
         // 后端返回 reply 文本和 actions 跳转建议，两者都展示在窗口中。
-        this.messages.push({ role: 'assistant', content: res.reply })
+        this.messages.push({ role: 'assistant', content: this.normalizeAssistantText(res.reply) })
         this.lastActions = res.actions || []
       } catch (error) {
         this.messages.push({ role: 'assistant', content: '助手暂时不可用，请稍后再试。' })
