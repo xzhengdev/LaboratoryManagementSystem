@@ -212,17 +212,35 @@ export default {
       return `${start} - ${end}`
     },
     formatDateTimeMinute(value) {
-      const text = String(value || '').trim()
-      if (!text) return '--'
-      if (text.includes('T')) return text.replace('T', ' ').slice(0, 16)
-      return text.slice(0, 16)
+      const date = this.parseSubmitDate(value)
+      if (!date) return '--'
+      const y = date.getFullYear()
+      const m = String(date.getMonth() + 1).padStart(2, '0')
+      const d = String(date.getDate()).padStart(2, '0')
+      const h = String(date.getHours()).padStart(2, '0')
+      const mm = String(date.getMinutes()).padStart(2, '0')
+      return `${y}-${m}-${d} ${h}:${mm}`
     },
     getSubmitMinute(item) {
-      const raw = String(item?.created_at || '').trim()
-      if (!raw) return Number.MIN_SAFE_INTEGER
-      const value = Date.parse(raw)
+      const date = this.parseSubmitDate(item?.created_at)
+      if (!date) return Number.MIN_SAFE_INTEGER
+      const value = date.getTime()
       if (!Number.isNaN(value)) return Math.floor(value / 60000)
       return Number.MIN_SAFE_INTEGER
+    },
+    parseSubmitDate(value) {
+      const text = String(value || '').trim()
+      if (!text) return null
+
+      // 后端 created_at 基于 UTC 且常常不带时区标记，前端统一按 UTC 解释再转本地时区显示。
+      if (!/[zZ]|[+\-]\d{2}:\d{2}$/.test(text)) {
+        const utcText = text.includes('T') ? `${text}Z` : `${text.replace(' ', 'T')}Z`
+        const utcDate = new Date(utcText)
+        return Number.isNaN(utcDate.getTime()) ? null : utcDate
+      }
+
+      const date = new Date(text)
+      return Number.isNaN(date.getTime()) ? null : date
     },
     openDrawer(item) {
       this.activeItem = item

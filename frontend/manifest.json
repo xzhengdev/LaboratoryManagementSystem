@@ -1,14 +1,15 @@
 {
-  "name": "lab-reservation",
-  "appid": "__UNI__LAB_RESERVATION__",
-  "description": "支持跨校区协作的实验室预约系统",
-  "versionName": "1.0.0",
-  "versionCode": "100",
-  "transformPx": false,
-  "h5": {
-    "title": "实验室预约系统",
-    "router": {
-      "mode": "hash"
-    }
-  }
+    "name" : "lab-reservation",
+    "appid" : "__UNI__0B52E99",
+    "description" : "支持跨校区协作的实验室预约系统",
+    "versionName" : "1.0.0",
+    "versionCode" : "100",
+    "transformPx" : false,
+    "h5" : {
+        "title" : "实验室预约系统",
+        "router" : {
+            "mode" : "hash"
+        }
+    },
+    "fallbackLocale" : "zh-Hans"
 }
