@@ -11,7 +11,21 @@
       <view class="agent-page__chat">
         <scroll-view scroll-y class="agent-page__messages">
           <view v-for="(item, index) in messages" :key="index" class="agent-page__row" :class="item.role">
-            <view class="agent-page__avatar">{{ item.role === 'assistant' ? '机' : '你' }}</view>
+            <view class="agent-page__avatar" :class="item.role === 'assistant' ? 'assistant' : 'user'">
+              <image
+                v-if="item.role === 'assistant'"
+                class="agent-page__avatar-img"
+                src="/static/logo.png"
+                mode="aspectFill"
+              />
+              <image
+                v-else-if="userAvatar"
+                class="agent-page__avatar-img"
+                :src="userAvatar"
+                mode="aspectFill"
+              />
+              <view v-else class="agent-page__avatar-fallback">{{ userInitial }}</view>
+            </view>
             <view class="agent-page__bubble">
               <view class="agent-page__text">{{ item.content }}</view>
               <view v-if="item.role === 'assistant' && item.actions && item.actions.length" class="agent-page__actions">
@@ -29,9 +43,17 @@
         </scroll-view>
 
         <view class="agent-page__quick">
-          <view class="agent-page__quick-item" @click="usePrompt('显示我的预约状态')">显示我的预约状态</view>
-          <view class="agent-page__quick-item" @click="usePrompt('总结本月的实验室使用情况')">总结本月实验室使用情况</view>
-          <view class="agent-page__quick-item" @click="usePrompt('明天下午可预约的实验室')">明天下午可预约实验室</view>
+          <view class="agent-page__quick-title">常用提问</view>
+          <view class="agent-page__quick-list">
+            <view
+              v-for="(item, idx) in quickPrompts"
+              :key="'prompt-' + idx"
+              class="agent-page__quick-item"
+              @click="usePrompt(item)"
+            >
+              {{ item }}
+            </view>
+          </view>
         </view>
 
         <view class="agent-page__input-bar">
@@ -57,12 +79,23 @@ import StudentTopNav from '../../components/student-top-nav.vue'
 import { api } from '../../api/index'
 import { requireLogin } from '../../common/guard'
 import { openPage } from '../../common/router'
+import { getProfile } from '../../common/session'
 
 export default {
   components: { SiteFooter, StudentTopNav },
   data() {
     return {
       draft: '',
+      userAvatar: '',
+      userInitial: '我',
+      quickPrompts: [
+        '显示我的预约状态',
+        '总结本月实验室使用情况',
+        '明天下午可预约的实验室',
+        '查询实验室列表',
+        '帮我查看实验室详情',
+        '推荐一个可预约实验室'
+      ],
       messages: [
         {
           role: 'assistant',
@@ -73,8 +106,52 @@ export default {
   },
   onShow() {
     if (!requireLogin()) return
+    const profile = getProfile() || {}
+    const name = String(profile.real_name || profile.username || '我')
+    this.userAvatar = profile.avatar_url || ''
+    this.userInitial = name.slice(0, 1) || '我'
   },
   methods: {
+    stripMarkdownSyntax(content) {
+      const text = String(content || '')
+      return text
+        .replace(/```[\s\S]*?```/g, (block) => block.replace(/```/g, ''))
+        .replace(/^#{1,6}\s*/gm, '')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/^\s*([-*_])\1{2,}\s*$/gm, '')
+        .replace(/^\s*[-*+]\s+/gm, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    },
+    normalizeStatusText(content) {
+      const text = String(content || '')
+      return text
+        .replace(/\bpending\b/gi, '待审批')
+        .replace(/\bapproved\b/gi, '已通过')
+        .replace(/\bcancelled\b/gi, '已取消')
+        .replace(/\bcanceled\b/gi, '已取消')
+    },
+    normalizeAssistantText(content) {
+      return this.normalizeStatusText(this.stripMarkdownSyntax(content))
+    },
+    normalizeActionPath(path) {
+      const raw = String(path || '')
+      const map = {
+        '/pages/my-reservations/my-reservations': '/pages/my-reservations/index',
+        '/pages/agent/chat': '/pages/agent/index',
+        '/pages/agent/index': '/pages/agent/index'
+      }
+      return map[raw] || raw
+    },
+    normalizeActions(actions) {
+      if (!Array.isArray(actions)) return []
+      return actions.map((item) => ({
+        ...item,
+        path: this.normalizeActionPath(item.path)
+      }))
+    },
     usePrompt(text) {
       this.draft = text
       this.sendMessage()
@@ -88,8 +165,8 @@ export default {
         const res = await api.agentChat(message)
         this.messages.push({
           role: 'assistant',
-          content: res.reply || '已收到，请稍后再试。',
-          actions: res.actions || []
+          content: this.normalizeAssistantText(res.reply || '已收到，请稍后再试。'),
+          actions: this.normalizeActions(res.actions)
         })
       } catch (error) {
         this.messages.push({
@@ -100,7 +177,7 @@ export default {
       }
     },
     go(path) {
-      openPage(path)
+      openPage(this.normalizeActionPath(path))
     }
   }
 }
@@ -120,6 +197,9 @@ export default {
 .agent-page__shell {
   flex: 1;
   padding: 28rpx 32rpx 22rpx;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .agent-page__title {
@@ -137,6 +217,10 @@ export default {
 
 .agent-page__chat {
   margin-top: 18rpx;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   border-radius: 24rpx;
   border: 1rpx solid rgba(197, 198, 207, 0.28);
   background: rgba(255, 255, 255, 0.78);
@@ -144,7 +228,8 @@ export default {
 }
 
 .agent-page__messages {
-  height: 840rpx;
+  flex: 1;
+  min-height: 0;
   padding: 6rpx;
 }
 
@@ -170,11 +255,35 @@ export default {
   font-size: 22rpx;
   font-weight: 800;
   flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: 0 8rpx 18rpx rgba(0, 0, 0, 0.08);
 }
 
-.agent-page__row.user .agent-page__avatar {
-  background: #3aaee7;
-  color: #032349;
+.agent-page__avatar.assistant {
+  background: #ffffff;
+  border: 2rpx solid rgba(255, 255, 255, 0.75);
+}
+
+.agent-page__avatar.user {
+  background: linear-gradient(135deg, #4a90e2, #6aa8f0);
+  border: 2rpx solid rgba(255, 255, 255, 0.82);
+}
+
+.agent-page__avatar-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.agent-page__avatar-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 22rpx;
+  font-weight: 700;
 }
 
 .agent-page__bubble {
@@ -220,7 +329,20 @@ export default {
 }
 
 .agent-page__quick {
-  margin-top: 8rpx;
+  margin-top: 10rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.agent-page__quick-title {
+  font-size: 22rpx;
+  color: #5b6f8a;
+  font-weight: 700;
+  padding: 0 4rpx;
+}
+
+.agent-page__quick-list {
   display: flex;
   gap: 10rpx;
   flex-wrap: wrap;
@@ -239,7 +361,8 @@ export default {
 }
 
 .agent-page__input-bar {
-  margin-top: 12rpx;
+  margin-top: 10rpx;
+  margin-bottom: 6rpx;
   border-radius: 18rpx;
   background: #ffffff;
   border: 1rpx solid rgba(197, 198, 207, 0.34);
@@ -283,7 +406,7 @@ export default {
 
 @media screen and (max-width: 860px) {
   .agent-page__messages {
-    height: 620rpx;
+    min-height: 520rpx;
   }
 
   .agent-page__bubble {
