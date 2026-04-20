@@ -1,25 +1,49 @@
 # Python
-backend/.venv/
-backend/__pycache__/
-backend/app/__pycache__/
-backend/app/api/__pycache__/
-backend/app/models/__pycache__/
-backend/app/services/__pycache__/
-backend/app/utils/__pycache__/
-backend/scripts/__pycache__/
-backend/*.pyc
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# Local environment and secrets
+# Virtual env
+.venv/
+venv/
+backend/.venv/
+
+# Local env and secrets
+.env
+.env.*
+!.env.example
 backend/.env
 
-# Local databases and logs
+# Runtime files
+*.log
+*.out
+*.err
 backend/instance/
-backend/*.log
+backend/uploads/
 
-# Frontend local/build output
+# Node / npm
+node_modules/
+.npm_cache/
+**/.npm_cache/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Frontend build output
 frontend/unpackage/
 frontend/.hbuilderx/
+frontend/dist/
+miniprogram/dist/
+miniprogram/project.private.config.json
 
-# OS/editor
+# IDE / OS
+.idea/
+.vscode/
 .DS_Store
 Thumbs.db
