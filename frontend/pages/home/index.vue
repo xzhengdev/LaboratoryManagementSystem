@@ -131,7 +131,7 @@ const HERO_BANNERS = [
     image: '/static/campuses/zhongyangminzudaxue.jpg',
   },
   {
-    image: '/static\campuses\haidian.png',
+    image: '/static/campuses/haidian.jpg',
   },
   {
     image: '/static/campuses/fengtai.jpg',
