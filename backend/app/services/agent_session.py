@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Callable, Dict
 
-
+# 定义一个空的预约表单结构，后续用户逐步提供信息时填充这个字典。
 def _default_reservation_form() -> Dict[str, Any]:
     return {
         "date": "",
@@ -15,7 +15,7 @@ def _default_reservation_form() -> Dict[str, Any]:
         "preference": "",
     }
 
-
+# 从存储中获取用户会话，如果过期则重置。
 def clean_session(
     store: Dict[int, Dict[str, Any]],
     user_id: int,
@@ -40,7 +40,7 @@ def clean_session(
     store[user_id] = session
     return session
 
-
+# 更新会话的 updated_at 并保存到存储中。
 def save_session(
     store: Dict[int, Dict[str, Any]],
     user_id: int,
@@ -50,7 +50,7 @@ def save_session(
     session["updated_at"] = now_fn()
     store[user_id] = session
 
-
+# 清空用户当前的所有预约相关状态，通常用于：
 def reset_form(session: Dict[str, Any]) -> None:
     session["reservation_form"] = _default_reservation_form()
     session["last_labs"] = []
@@ -58,3 +58,22 @@ def reset_form(session: Dict[str, Any]) -> None:
     session["last_choice_type"] = ""
     session["pending_action"] = None
     session["followup_context"] = None
+
+# ┌─────────────────────────────────────────────────────┐
+# │                   会话存储 (store)                    │
+# │  {                                                  │
+# │    12345: {  # user_id                              │
+# │        "reservation_form": {...},                   │
+# │        "last_labs": [...],                          │
+# │        "pending_action": {...},                     │
+# │        "updated_at": datetime(...)                  │
+# │    },                                               │
+# │    67890: {...}                                     │
+# │  }                                                  │
+# └─────────────────────────────────────────────────────┘
+#                         ↑
+#                         │
+#         ┌───────────────┼───────────────┐
+#         │               │               │
+#    clean_session    save_session    reset_form
+#    (获取/初始化)    (保存更新)      (重置状态)

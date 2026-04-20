@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 import requests
 from app.config import Config
 from app.models import Laboratory, Reservation
+from app.services.agent_debug import debug_log as _debug_log
 from app.services.agent_helpers import (
     contains_any as _contains_any,
     is_abab_loop as _is_abab_loop,
@@ -31,7 +32,7 @@ from app.utils.exceptions import AppError
 from app.extensions import db  # 如果你的项目不是这个路径，改成你自己的 db 导入
 
 ACTIVE_RESERVATION_STATUSES = {"pending", "approved"} #预约状态控制，判断预约时间是否冲突
-SESSION_TTL_MINUTES = 60                              #用户会话保留 60 分钟
+SESSION_TTL_MINUTES = 10                              #用户会话保留 10 分钟
 MAX_AGENT_STEPS = 5
 MAX_TOOL_REPEAT_STEPS = 2
 MAX_HISTORY_SUMMARY_CHARS = 280
@@ -159,80 +160,6 @@ def _today() -> date:
 # ==================== 生成追踪ID ====================
 def _new_trace_id() -> str:
     return f"agt-{uuid4().hex[:12]}"
-# ==================== 是否开启调试日志 ====================
-def _debug_enabled() -> bool:
-    raw = str(getattr(Config, "AGENT_DEBUG_TRACE", "") or "").strip().lower()
-    return raw in {"1", "true", "yes", "on"}
-_DEBUG_EVENT_META: Dict[str, Tuple[str, str]] = {
-    "chat_received": ("chat", "收到用户输入"),
-    "chat_rejected": ("chat", "用户校验失败"),
-    "route": ("chat", "路由分支"),
-    "agent_loop_start": ("_agent_loop", "开始智能循环"),
-    "fallback_rule": ("_agent_loop", "降级到规则引擎"),
-    "form_initialized": ("_agent_loop", "初始化表单"),
-    "llm_decision": ("_llm_agent_decide", "LLM 决策"),
-    "auto_fill_params": ("_auto_fill_params", "自动补参"),
-    "params_filled": ("_agent_loop", "补参完成"),
-    "run_tool_enter": ("_run_tool", "执行工具"),
-    "run_tool_missing_fields": ("_run_tool", "缺少必填参数"),
-    "run_tool_unknown": ("_run_tool", "未知工具"),
-    "tool_executed": ("_run_tool", "工具执行结果"),
-    "form_synced_by_tool": ("_agent_loop", "根据工具结果回填表单"),
-    "pending_action_set": ("_agent_loop", "挂起待续动作"),
-    "pending_action_continue": ("chat", "续接待续动作"),
-    "pending_action_cleared": ("chat", "清除待续动作"),
-    "done_return": ("_agent_loop", "任务完成返回"),
-    "agent_loop_exception_fallback": ("chat", "Agent异常，进入兜底"),
-    "fallback_exception_general_llm": ("chat", "兜底异常，转通用LLM"),
-}
-def _debug_clip(value: Any, limit: int = 60) -> str:
-    text = str(value)
-    if len(text) <= limit:
-        return text
-    return text[: limit - 3] + "..."
-def _debug_brief_payload(event: str, payload: Dict[str, Any]) -> str:
-    if not payload:
-        return ""
-    preferred_keys: Dict[str, List[str]] = {
-        "chat_received": ["message"],
-        "route": ["target", "lab_related", "lab_followup"],
-        "llm_decision": ["step", "tool", "done", "params"],
-        "auto_fill_params": ["tool", "out_params"],
-        "params_filled": ["step", "tool", "params"],
-        "run_tool_enter": ["tool", "params"],
-        "run_tool_missing_fields": ["tool", "missing"],
-        "tool_executed": ["step", "tool", "ok", "error_code", "data_preview"],
-        "form_synced_by_tool": ["step", "tool", "form"],
-        "pending_action_set": ["tool", "missing"],
-        "pending_action_continue": ["tool", "message"],
-        "pending_action_cleared": ["tool"],
-        "done_return": ["step", "reply_preview"],
-    }
-    keys = preferred_keys.get(event) or list(payload.keys())[:3]
-    parts: List[str] = []
-    for k in keys:
-        if k not in payload:
-            continue
-        v = payload.get(k)
-        if isinstance(v, dict):
-            # show only commonly useful fields from params/form dictionaries
-            compact = {}
-            for sub in ["date", "start_time", "end_time", "lab_id", "participant_count", "preference", "purpose"]:
-                if sub in v and v.get(sub) not in [None, ""]:
-                    compact[sub] = v.get(sub)
-            v = compact or v
-        parts.append(f"{k}={_debug_clip(v)}")
-    return " | ".join(parts)
-def _debug_log(trace_id: str, event: str, **payload: Any) -> None:
-    if not _debug_enabled():
-        return
-    now = _localized_now().strftime("%Y-%m-%d %H:%M:%S")
-    func_name, desc = _DEBUG_EVENT_META.get(event, ("-", event))
-    body = _debug_brief_payload(event, payload)
-    if body:
-        print(f"[AGENT][{now}][{trace_id}] {func_name} | {desc} | {body}")
-    else:
-        print(f"[AGENT][{now}][{trace_id}] {func_name} | {desc}")
 
 #=================================================================debug=================================
 # 根据工具定义过滤并清洗参数，只保留合法字段并做类型转换
@@ -274,9 +201,9 @@ def _rules_context() -> str:
         "实验室预约规则: 预约必须在实验室开放时间内，开始时间早于结束时间; "
         "预约开始至少晚于当前时间30分钟，预约日期不能超过未来7天; "
         "参与人数不可超过实验室容量; 同一用户不能重叠预约。"
-        "如果当前工具结果已经足以直接回答用户问题，不要再调用其他工具，直接 done=true。"
-        "对“查询空闲实验室/查看实验室列表”这类请求，query_labs 成功后通常即可结束。"
-        "不要为了重复验证而再次调用 query_schedule，除非用户明确要求查看排期。"
+        # "如果当前工具结果已经足以直接回答用户问题，不要再调用其他工具，直接 done=true。"
+        # "对“查询空闲实验室/查看实验室列表”这类请求，query_labs 成功后通常即可结束。"
+        # "不要为了重复验证而再次调用 query_schedule，除非用户明确要求查看排期。"
     )
 
 # 从规则文本中提取“需提前多少天预约”的限制
@@ -1092,7 +1019,16 @@ def _query_schedule(date_text: str, lab_id: Optional[int]) -> Dict[str, Any]:
     labs = Laboratory.query.filter_by(status="active").order_by(Laboratory.id.asc()).limit(12).all()
     return {"ok": True, "schedules": [{"lab": lab, "schedule": get_lab_schedule(lab, d)} for lab in labs]}
 
-
+'''
+这个推荐算法通过打分机制选择最优时段：
+首先根据用户偏好（上午/下午/晚上）筛选出符合条件的候选时段，
+然后计算每个候选时段的长度（分钟）作为基础分，
+若时段符合用户偏好则额外加30分，
+最后选择得分最高的时段作为推荐结果。
+如果多个时段得分相同，则选择先遍历到的那个。
+推荐时长会被限制在2小时以内，即使空闲段更长也只推荐前2小时。
+整体逻辑是：有偏好时优先选符合偏好的最长时段，无偏好时直接选全天最长的空闲时段。
+'''
 def _recommend_time(date_text: str, lab_id: Optional[int], preference: str) -> Tuple[str, Optional[Dict[str, Any]]]:
     result = _query_schedule(date_text, lab_id)
     if not result.get("ok"):
