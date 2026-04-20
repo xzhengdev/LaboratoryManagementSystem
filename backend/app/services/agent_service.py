@@ -72,8 +72,8 @@ AGENT_TOOL_SCHEMAS: Dict[str, Dict[str, Any]] = {
 
     "recommend_lab": {
         "required": ["date"],
-        "optional": ["participant_count", "type", "campus"],
-        "description": "根据日期、人数、实验室类型、校区等条件，为用户推荐最合适的实验室。",
+        "optional": ["participant_count", "type", "campus", "preference"],
+        "description": "根据日期、人数、实验室类型、校区和时间偏好等条件，为用户推荐最合适的实验室。",
         "returns": "返回推荐实验室结果，通常包含实验室ID、名称、容量、校区及推荐理由。"
     },
 
@@ -1084,6 +1084,102 @@ def _recommend_time(date_text: str, lab_id: Optional[int], preference: str) -> T
     return f"我为你推荐: {date_text} {st}-{et}, 实验室 {best['lab_name']}。", {"date": date_text, "lab_id": best["lab_id"], "start_time": st, "end_time": et}
 
 
+def _recommend_lab(
+    date_text: str,
+    campus: str,
+    lab_type: str,
+    participant_count: Optional[int],
+    preference: str,
+) -> Tuple[str, Optional[Dict[str, Any]], List[Dict[str, Any]]]:
+    labs = _query_labs(date_text, campus, lab_type, participant_count)
+    if not labs:
+        return "没有找到符合条件的可用实验室。", None, []
+
+    pref_windows: List[Tuple[int, int]] = []
+    pref = str(preference or "")
+    if "上午" in pref:
+        pref_windows = [(8 * 60, 12 * 60)]
+    elif "下午" in pref:
+        pref_windows = [(12 * 60, 18 * 60)]
+    elif "晚上" in pref or "晚间" in pref:
+        pref_windows = [(18 * 60, 22 * 60)]
+
+    parsed_date: Optional[date] = None
+    try:
+        parsed_date = datetime.strptime(date_text, "%Y-%m-%d").date() if date_text else None
+    except Exception:
+        parsed_date = None
+
+    ranked: List[Dict[str, Any]] = []
+    for lab in labs:
+        score = 0.0
+        reasons: List[str] = []
+
+        # 1) 容量贴合：满足人数前提下，越接近越优
+        cap = _safe_int(getattr(lab, "capacity", None)) or 0
+        if participant_count is not None and participant_count > 0:
+            surplus = max(0, cap - participant_count)
+            fit = max(0, 120 - surplus * 2)
+            score += fit
+            reasons.append(f"容量匹配度{int(fit)}")
+        else:
+            score += min(80, cap)
+
+        # 2) 日期可用性：按最大连续空闲时长与总空闲时长打分
+        max_free = 0
+        total_free = 0
+        pref_overlap = 0
+        if parsed_date is not None:
+            schedule = get_lab_schedule(lab, parsed_date)
+            free_slots = _free_slots_from_schedule(schedule)
+            for s, e in free_slots:
+                dur = e - s
+                if dur <= 0:
+                    continue
+                total_free += dur
+                max_free = max(max_free, dur)
+                for ws, we in pref_windows:
+                    overlap = max(0, min(e, we) - max(s, ws))
+                    pref_overlap += overlap
+            score += max_free * 0.2 + total_free * 0.05
+            if max_free > 0:
+                reasons.append(f"最大连续空闲{max_free}分钟")
+
+        # 3) 偏好时间命中
+        if pref_windows:
+            score += pref_overlap * 0.25
+            if pref_overlap > 0:
+                reasons.append(f"偏好时段重叠{pref_overlap}分钟")
+
+        # 4) 校区/类型软加分（大部分已在筛选中）
+        campus_name = getattr(lab.campus, "campus_name", "") if getattr(lab, "campus", None) else ""
+        if campus and campus_name and campus in campus_name:
+            score += 30
+        if lab_type:
+            desc = (getattr(lab, "description", "") or "") + " " + (getattr(lab, "lab_name", "") or "")
+            if lab_type.lower() in desc.lower():
+                score += 30
+
+        ranked.append(
+            {
+                "lab_id": lab.id,
+                "lab_name": lab.lab_name,
+                "capacity": cap,
+                "campus": campus_name,
+                "score": round(score, 2),
+                "reason": "，".join(reasons) if reasons else "综合评分最优",
+            }
+        )
+
+    ranked.sort(key=lambda x: (-float(x.get("score") or 0), _safe_int(x.get("lab_id")) or 0))
+    best = ranked[0] if ranked else None
+    if not best:
+        return "没有找到合适实验室。", None, []
+
+    reply = f"推荐实验室：{best['lab_name']}（容量{best['capacity']}，校区{best['campus']}）。推荐理由：{best['reason']}。"
+    return reply, best, ranked[:5]
+
+
 def _extract_form_from_text(user, text: str, form: Dict[str, Any], session: Dict[str, Any]) -> Dict[str, Any]:
     merged = dict(form or {})
     relative_date = _resolve_relative_date(text)
@@ -1527,6 +1623,21 @@ def _build_create_flow_clarification(missing: List[str], form: Dict[str, Any]) -
     return "为了帮你把预约真正办下来，我还需要确认这些信息：" + "，".join(parts) + "。"
 
 
+def _has_explicit_lab_reference_this_turn(text: str, session: Dict[str, Any]) -> bool:
+    msg = (text or "").strip()
+    if not msg:
+        return False
+    if _detect_lab_id_or_choice(msg, session) is not None:
+        return True
+    return bool(
+        re.search(
+            r"(实验室ID|lab_id|第\s*[0-9一二三四五]+\s*个|这个实验室|该实验室|就这个|就它|那个实验室|推荐的那个)",
+            msg,
+            re.IGNORECASE,
+        )
+    )
+
+
 def _clear_followup_context(session: Dict[str, Any]) -> None:
     session["followup_context"] = None
 
@@ -1732,6 +1843,12 @@ def _auto_fill_params(tool: str, user, params: Dict[str, Any], form: Dict[str, A
     for key in ["date", "participant_count", "start_time", "end_time", "purpose", "campus", "type", "lab_id", "preference"]:
         if not raw.get(key) and merged.get(key):
             raw[key] = merged[key]
+
+    # get_lab_detail 仅在“本轮明确指定实验室”时继承/使用 lab_id；
+    # 避免泛指请求（如“查看实验室详情”）误用历史上下文的 lab_id。
+    if tool == "get_lab_detail" and not _has_explicit_lab_reference_this_turn(text, session):
+        raw.pop("lab_id", None)
+
     if tool == "cancel_reservation" and not raw.get("reservation_id"):
         rid = _detect_reservation_id_or_choice(text, session)
         if rid:
@@ -1854,19 +1971,25 @@ def _handle_recommend_time(tool: str, params: Dict[str, Any], user, session: Dic
 
 
 def _handle_recommend_lab(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
-    # 处理实验室推荐工具，从符合条件的实验室中返回推荐结果
-    labs = _query_labs(
+    # 处理实验室推荐工具，使用评分算法返回最优推荐和候选列表
+    reply, pick, ranked = _recommend_lab(
         params.get("date"),
         params.get("campus"),
         params.get("type"),
         _safe_int(params.get("participant_count")),
+        str(params.get("preference") or ""),
     )
-    if not labs:
-        return _tool_result(tool, False, "没有合适实验室", error_code="not_found")
-    lab = labs[0]
-    session["last_labs"] = [{"id": item.id, "name": item.lab_name} for item in labs[:8]]
+    if not pick:
+        return _tool_result(tool, False, reply or "没有合适实验室", error_code="not_found")
+
+    session["last_labs"] = [{"id": int(item["lab_id"]), "name": str(item["lab_name"])} for item in ranked]
     session["last_choice_type"] = "lab_list"
-    return _tool_result(tool, True, f"推荐实验室：{lab.lab_name}（容量{lab.capacity}）", extra={"lab_id": lab.id})
+    return _tool_result(
+        tool,
+        True,
+        reply,
+        extra={"lab_id": pick.get("lab_id"), "pick": pick, "ranked_labs": ranked},
+    )
 
 
 def _handle_get_lab_detail(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
@@ -2137,6 +2260,9 @@ def _fallback_rule_chat(user, text: str, session: Dict[str, Any]) -> Any:
         lab_type = _detect_type(text)
         if lab_type:
             params["type"] = lab_type
+        pref = _detect_preference(text)
+        if pref:
+            params["preference"] = pref
         return _tool_call("recommend_lab", params, "我先帮你推荐实验室。")
     if intent == "recommend_time":
         d = _detect_date(text)

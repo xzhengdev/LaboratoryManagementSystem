@@ -30,6 +30,9 @@ def missing_fields_hint(tool: str, missing: List[str]) -> str:
     if tool == "cancel_reservation":
         return "请告诉我要取消的预约ID，例如：取消预约ID 23。"
 
+    if tool == "get_lab_detail":
+        return "你想看哪个实验室的详情？可以说实验室ID"
+
     labels = [common_label_map.get(x, x) for x in missing]
     return "参数不完整，请补充这些信息：" + "、".join(labels) + "。"
 
@@ -123,4 +126,3 @@ def build_followup_question(
         )
 
     return "", None
-
