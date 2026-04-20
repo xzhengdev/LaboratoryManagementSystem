@@ -20,7 +20,10 @@
             :class="{ active: active === item.key }"
             @click="go(item.path)"
           >
-            <view class="admin-menu-item__icon">{{ item.icon }}</view>
+            <view class="admin-menu-item__icon">
+              <image v-if="isImageIcon(item.icon)" class="admin-menu-item__icon-image" :src="item.icon" mode="aspectFit" />
+              <text v-else>{{ item.icon }}</text>
+            </view>
             <view class="admin-menu-item__title">{{ item.title }}</view>
           </view>
         </view>
@@ -95,13 +98,13 @@ export default {
     // 计算属性：根据用户角色动态生成侧边栏菜单项
     sidebarItems() {
       const iconMap = {
-        campuses: '🏫',
-        labs: '🔬',
-        equipment: '🛠',
-        approvals: '✅',
-        users: '👥',
-        statistics: '📊',
-        settings: '⚙'
+        campuses: '/static/icons/campuses.png',
+        labs: '/static/icons/labs.png',
+        equipment: '/static/icons/equipment.png',
+        approvals: '/static/icons/approvals.png',
+        users: '/static/icons/users.png',
+        statistics: '/static/icons/statistics.png',
+        settings: '/static/icons/settings.png'
       }
       return getAdminMenusByRole(this.currentUser.role).map((item) => ({
         key: item.key,
@@ -117,6 +120,10 @@ export default {
     this.ensureRoutePermission()      // 校验当前路由权限
   },
   methods: {
+    isImageIcon(icon) {
+      const text = String(icon || '').trim()
+      return /^(\/|https?:\/\/)/.test(text) || /\.(png|jpe?g|svg|webp|gif)$/i.test(text)
+    },
     // 方法：确保用户有权限访问当前页面，若无权限则跳转至默认管理页
     ensureRoutePermission() {
       // 获取当前页面栈及当前页面路径
@@ -220,6 +227,11 @@ export default {
   line-height: 1;
   opacity: 0.9;
   flex-shrink: 0;
+}
+.admin-menu-item__icon-image {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 .admin-menu-item__title {
   font-size: 30rpx;
