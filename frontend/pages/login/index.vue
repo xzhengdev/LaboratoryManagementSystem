@@ -429,6 +429,74 @@ export default {
   letter-spacing: 2rpx;
 }
 
+@media screen and (max-width: 768px) {
+  .login-page__content {
+    padding: 28rpx 18rpx calc(18rpx + env(safe-area-inset-bottom));
+  }
+
+  .login-page__main {
+    align-items: flex-start;
+    padding-top: 24rpx;
+  }
+
+  .login-card {
+    width: 100%;
+    max-width: none;
+    border-radius: 24rpx;
+    padding: 30rpx 22rpx 24rpx;
+    box-shadow: 0 16rpx 36rpx rgba(0, 0, 0, 0.18);
+  }
+
+  .login-hero {
+    margin-bottom: 24rpx;
+  }
+
+  .login-title {
+    font-size: 48rpx;
+  }
+
+  .login-subtitle {
+    font-size: 22rpx;
+    line-height: 1.5;
+  }
+
+  .role-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10rpx;
+    padding: 10rpx;
+  }
+
+  .role-card {
+    min-height: 92rpx;
+  }
+
+  .role-card__text {
+    font-size: 22rpx;
+  }
+
+  .login-input {
+    min-height: 82rpx;
+    font-size: 28rpx;
+  }
+
+  .input-wrap__icon,
+  .password-toggle,
+  .remember-box__label,
+  .forgot-link {
+    font-size: 24rpx;
+  }
+
+  .login-button {
+    min-height: 82rpx;
+    line-height: 82rpx;
+    font-size: 30rpx;
+  }
+
+  .login-page__bottom {
+    margin-top: 12rpx;
+  }
+}
+
 
 @media screen and (min-width: 1024px) {
   .login-page__content {
