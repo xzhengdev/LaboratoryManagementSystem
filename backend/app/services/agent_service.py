@@ -201,9 +201,9 @@ def _rules_context() -> str:
         "实验室预约规则: 预约必须在实验室开放时间内，开始时间早于结束时间; "
         "预约开始至少晚于当前时间30分钟，预约日期不能超过未来7天; "
         "参与人数不可超过实验室容量; 同一用户不能重叠预约。"
-        # "如果当前工具结果已经足以直接回答用户问题，不要再调用其他工具，直接 done=true。"
-        # "对“查询空闲实验室/查看实验室列表”这类请求，query_labs 成功后通常即可结束。"
-        # "不要为了重复验证而再次调用 query_schedule，除非用户明确要求查看排期。"
+        "如果当前工具结果已经足以直接回答用户问题，不要再调用其他工具，直接 done=true。"
+        "对“查询空闲实验室/查看实验室列表”这类请求，query_labs 成功后通常即可结束。"
+        "不要为了重复验证而再次调用 query_schedule，除非用户明确要求查看排期。"
     )
 
 # 从规则文本中提取“需提前多少天预约”的限制
@@ -2117,11 +2117,17 @@ def _handle_update_reservation(tool: str, params: Dict[str, Any], user, session:
 
 
 def _handle_my_reservations(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
-    rows = Reservation.query.filter_by(user_id=user.id).order_by(Reservation.id.desc()).limit(8).all()
+    rows = (
+        Reservation.query.filter_by(user_id=user.id)
+        .filter(~Reservation.status.in_(["cancelled", "canceled"]))
+        .order_by(Reservation.id.desc())
+        .limit(8)
+        .all()
+    )
     if not rows:
         session["last_reservations"] = []
         session["last_choice_type"] = ""
-        return _tool_result(tool, True, "暂无预约记录")
+        return _tool_result(tool, True, "暂无有效预约记录")
 
     session["last_reservations"] = [{"id": r.id} for r in rows]
     session["last_choice_type"] = "reservation_list"
