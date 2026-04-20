@@ -261,4 +261,70 @@ export default {
     grid-template-columns: 1fr;
   }
 }
+
+@media screen and (max-width: 768px) {
+  .admin-kpi-grid {
+    grid-template-columns: 1fr;
+    gap: 12rpx;
+    margin-bottom: 14rpx;
+  }
+
+  .admin-kpi-card {
+    padding: 16rpx 18rpx;
+  }
+
+  .admin-kpi-card__label {
+    font-size: 21rpx;
+  }
+
+  .admin-kpi-card__value {
+    font-size: 42rpx;
+  }
+
+  .admin-panels-grid {
+    gap: 12rpx;
+    margin-bottom: 14rpx;
+  }
+
+  .ranking-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10rpx;
+    padding: 14rpx 0;
+  }
+
+  .ranking-item__left {
+    width: 100%;
+    align-items: flex-start;
+  }
+
+  .ranking-item__title {
+    font-size: 24rpx;
+    line-height: 1.45;
+    word-break: break-all;
+  }
+
+  .ranking-item__sub {
+    font-size: 21rpx;
+    line-height: 1.5;
+  }
+
+  .ranking-item .pill {
+    align-self: flex-start;
+    max-width: 100%;
+    white-space: normal;
+    line-height: 1.4;
+  }
+
+  .admin-tip-list {
+    gap: 10rpx;
+    margin-top: 12rpx;
+  }
+
+  .admin-tip-item {
+    padding: 14rpx 14rpx;
+    font-size: 22rpx;
+    line-height: 1.55;
+  }
+}
 </style>

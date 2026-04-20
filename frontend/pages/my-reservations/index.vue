@@ -859,4 +859,173 @@ export default {
   }
 }
 
+@media screen and (max-width: 760px) {
+  .my-res-page__shell {
+    padding: 18rpx 14rpx calc(34rpx + env(safe-area-inset-bottom));
+  }
+
+  .my-res-page__title {
+    font-size: 50rpx;
+    letter-spacing: 0;
+  }
+
+  .my-res-page__sub {
+    margin-top: 8rpx;
+    font-size: 23rpx;
+    line-height: 1.55;
+  }
+
+  .my-res-page__new-btn {
+    min-width: 0;
+    height: 64rpx;
+    border-radius: 14rpx;
+    font-size: 22rpx;
+  }
+
+  .my-res-page__layout {
+    margin-top: 14rpx;
+    gap: 14rpx;
+  }
+
+  .my-res-side {
+    gap: 12rpx;
+  }
+
+  .my-res-side__next-card {
+    padding: 18rpx;
+    border-radius: 18rpx;
+  }
+
+  .my-res-side__countdown {
+    font-size: 44rpx;
+  }
+
+  .my-res-side__next-lab {
+    font-size: 24rpx;
+  }
+
+  .my-res-side__next-loc {
+    font-size: 20rpx;
+  }
+
+  .my-res-side__next-btn {
+    margin-top: 14rpx;
+    height: 56rpx;
+    border-radius: 12rpx;
+    font-size: 22rpx;
+  }
+
+  .my-res-side__status-card {
+    padding: 14rpx;
+    border-radius: 18rpx;
+  }
+
+  .my-res-side__status-title {
+    font-size: 28rpx;
+  }
+
+  .my-res-side__status-row {
+    min-height: 52rpx;
+    margin-top: 8rpx;
+    border-radius: 12rpx;
+  }
+
+  .my-res-side__status-label,
+  .my-res-side__status-count {
+    font-size: 22rpx;
+  }
+
+  .my-res-toolbar {
+    margin-bottom: 12rpx;
+    padding: 14rpx;
+    border-radius: 18rpx;
+  }
+
+  .my-res-toolbar__chip {
+    min-height: 50rpx;
+    font-size: 20rpx;
+    padding: 0 12rpx;
+  }
+
+  .my-res-toolbar__meta {
+    min-height: 50rpx;
+    font-size: 21rpx;
+  }
+
+  .table-row {
+    padding: 16rpx 14rpx;
+    border-radius: 14rpx;
+    margin-bottom: 10rpx;
+    border: 1rpx solid #e7edf5;
+    background: #fff;
+  }
+
+  .table-row:last-of-type {
+    border-bottom: 1rpx solid #e7edf5;
+  }
+
+  .my-res-resource {
+    gap: 12rpx;
+  }
+
+  .my-res-resource__icon {
+    width: 52rpx;
+    height: 52rpx;
+    border-radius: 14rpx;
+    font-size: 22rpx;
+  }
+
+  .my-res-resource__name {
+    font-size: 28rpx;
+  }
+
+  .my-res-resource__meta,
+  .my-res-resource__purpose,
+  .my-res-time__weekday {
+    font-size: 20rpx;
+  }
+
+  .my-res-time__date {
+    font-size: 26rpx;
+  }
+
+  .my-res-status__pill {
+    min-height: 40rpx;
+    font-size: 19rpx;
+    padding: 0 12rpx;
+  }
+
+  .pill {
+    min-height: 46rpx;
+    border-radius: 12rpx;
+    font-size: 20rpx;
+  }
+
+  .my-res-main__pager {
+    margin-top: 14rpx;
+    justify-content: flex-start;
+  }
+
+  .my-res-main__page-btn {
+    min-width: 52rpx;
+    height: 48rpx;
+    font-size: 20rpx;
+    border-radius: 12rpx;
+  }
+}
+
+@media screen and (max-width: 420px) {
+  .my-res-page__title {
+    font-size: 44rpx;
+  }
+
+  .my-res-page__sub {
+    font-size: 22rpx;
+  }
+
+  .my-res-resource__name {
+    font-size: 26rpx;
+  }
+}
+
 </style>

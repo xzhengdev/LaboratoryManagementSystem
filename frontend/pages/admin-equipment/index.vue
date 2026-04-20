@@ -585,5 +585,85 @@ page {
     grid-template-columns: 1fr;
   }
 }
+
+@media screen and (max-width: 768px) {
+  .admin-kpi-grid {
+    gap: 16rpx;
+    margin-bottom: 20rpx;
+  }
+
+  .admin-kpi-card {
+    padding: 20rpx 22rpx;
+  }
+
+  .admin-kpi-card__value {
+    font-size: 44rpx;
+  }
+
+  .admin-toolbar-lite {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14rpx;
+    padding: 18rpx !important;
+    margin-bottom: 20rpx;
+  }
+
+  .toolbar-picker,
+  .admin-toolbar-lite__picker,
+  .admin-toolbar-lite__search,
+  .admin-toolbar-lite__btn {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    height: 64rpx;
+  }
+
+  .table-header {
+    display: none !important;
+  }
+
+  .table-row.equipment-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10rpx;
+    padding: 20rpx !important;
+    border-bottom: 1rpx solid #e6edf7;
+  }
+
+  .table-row.equipment-grid > text,
+  .table-row.equipment-grid > view {
+    width: 100%;
+    font-size: 24rpx;
+    line-height: 1.5;
+  }
+
+  .actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 10rpx;
+  }
+
+  .admin-equipment-modal {
+    width: calc(100vw - 32rpx);
+    max-width: calc(100vw - 32rpx);
+    padding: 22rpx 20rpx 20rpx;
+    border-radius: 22rpx;
+  }
+
+  .admin-equipment-modal__title {
+    font-size: 30rpx;
+  }
+
+  .admin-equipment-modal__actions {
+    flex-direction: column;
+    gap: 10rpx;
+  }
+
+  .admin-equipment-btn {
+    width: 100%;
+    min-width: 0;
+    height: 64rpx;
+  }
+}
 </style>
 

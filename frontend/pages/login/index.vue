@@ -56,13 +56,13 @@
           </view>
 
           <view class="login-tools">
-            <view class="remember-box" @click="rememberMe = !rememberMe">
+            <view class="remember-box" @click="toggleRememberMe">
               <view class="remember-box__check" :class="{ 'remember-box__check--active': rememberMe }">
                 <text v-if="rememberMe" class="remember-box__tick">√</text>
               </view>
-              <text class="remember-box__label">记住账号</text>
+              <text class="remember-box__label">记住密码</text>
             </view>
-            <text class="forgot-link">忘记密码</text>
+            <text class="forgot-link" @click="handleForgotPassword">忘记密码</text>
           </view>
 
           <view class="login-button" :class="{ 'login-button--loading': loading }" @click="submit">
@@ -91,6 +91,8 @@ import teacherIcon from '../../static/icons/teacher.png'
 import labAdminIcon from '../../static/icons/lab-admin.png'
 import systemAdminIcon from '../../static/icons/system-admin.png'
 
+const REMEMBER_LOGIN_KEY = 'lab_remember_login'
+
 export default {
   data() {
     const roleOptions = [
@@ -113,6 +115,9 @@ export default {
       loading: false
     }
   },
+  onShow() {
+    this.restoreRememberedLogin()
+  },
   methods: {
     selectRole(index) {
       this.roleIndex = index
@@ -120,6 +125,51 @@ export default {
     },
     togglePassword() {
       this.showPassword = !this.showPassword
+    },
+    toggleRememberMe() {
+      this.rememberMe = !this.rememberMe
+      if (!this.rememberMe) {
+        uni.removeStorageSync(REMEMBER_LOGIN_KEY)
+      }
+    },
+    restoreRememberedLogin() {
+      const remembered = uni.getStorageSync(REMEMBER_LOGIN_KEY) || null
+      if (!remembered || typeof remembered !== 'object') return
+
+      const role = String(remembered.role || '')
+      const roleIndex = this.roleOptions.findIndex((item) => item.value === role)
+      if (roleIndex >= 0) {
+        this.roleIndex = roleIndex
+        this.form.role = this.roleOptions[roleIndex].value
+      }
+
+      this.form.username = String(remembered.username || '')
+      this.form.password = String(remembered.password || '')
+      this.rememberMe = !!(this.form.username && this.form.password)
+    },
+    persistRememberedLogin() {
+      if (!this.rememberMe) {
+        uni.removeStorageSync(REMEMBER_LOGIN_KEY)
+        return
+      }
+
+      uni.setStorageSync(REMEMBER_LOGIN_KEY, {
+        role: this.form.role,
+        username: this.form.username,
+        password: this.form.password
+      })
+    },
+    handleForgotPassword() {
+      const username = (this.form.username || '').trim()
+      const roleText = this.roleOptions[this.roleIndex]?.label || '当前角色'
+      uni.showModal({
+        title: '找回密码',
+        content: username
+          ? `账号「${username}」（${roleText}）请联系系统管理员重置密码。若为首次登录，可尝试初始密码 123456。`
+          : '请先输入账号后联系系统管理员重置密码。若为首次登录，可尝试初始密码 123456。',
+        showCancel: false,
+        confirmText: '知道了'
+      })
     },
     async submit() {
       if (this.loading) return
@@ -132,6 +182,7 @@ export default {
       try {
         const res = await api.login(this.form)
         setSession(res.token, res.user)
+        this.persistRememberedLogin()
         uni.reLaunch({ url: getLoginLandingPage(res.user?.role) })
       } finally {
         this.loading = false

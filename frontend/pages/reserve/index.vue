@@ -1072,4 +1072,220 @@ export default {
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 760px) {
+  .reserve-page__shell {
+    padding: 16rpx 12rpx calc(20rpx + env(safe-area-inset-bottom));
+  }
+
+  .reserve-page__title {
+    font-size: 46rpx;
+    line-height: 1.1;
+    letter-spacing: 0;
+  }
+
+  .reserve-page__sub {
+    margin-top: 8rpx;
+    font-size: 22rpx;
+    line-height: 1.5;
+  }
+
+  .reserve-page__steps {
+    width: 100%;
+    margin-top: 8rpx;
+    padding: 10rpx 12rpx;
+    border-radius: 14rpx;
+    gap: 8rpx;
+  }
+
+  .reserve-page__step {
+    font-size: 20rpx;
+    gap: 6rpx;
+  }
+
+  .reserve-page__step text {
+    width: 32rpx;
+    height: 32rpx;
+    font-size: 18rpx;
+  }
+
+  .reserve-page__line {
+    width: 44rpx;
+  }
+
+  .reserve-page__layout {
+    margin-top: 14rpx;
+    gap: 12rpx;
+  }
+
+  .reserve-form,
+  .reserve-side__summary,
+  .reserve-side__notice {
+    border-radius: 18rpx;
+  }
+
+  .reserve-form {
+    padding: 14rpx;
+  }
+
+  .reserve-form__section + .reserve-form__section {
+    margin-top: 16rpx;
+  }
+
+  .reserve-form__section-title {
+    font-size: 24rpx;
+  }
+
+  .reserve-form__grid {
+    margin-top: 10rpx;
+    gap: 10rpx;
+  }
+
+  .reserve-form__label {
+    margin-bottom: 6rpx;
+    font-size: 20rpx;
+  }
+
+  .reserve-form__input {
+    height: 58rpx;
+    border-radius: 12rpx;
+    font-size: 22rpx;
+    padding: 0 12rpx;
+  }
+
+  .reserve-form__textarea {
+    min-height: 132rpx;
+    border-radius: 12rpx;
+    padding: 12rpx;
+    font-size: 22rpx;
+  }
+
+  .reserve-form__occupancy {
+    margin-top: 12rpx;
+    border-radius: 14rpx;
+    padding: 12rpx;
+  }
+
+  .reserve-form__occupancy-title {
+    font-size: 20rpx;
+  }
+
+  .reserve-form__occupancy-legend {
+    margin-top: 8rpx;
+    gap: 10rpx;
+  }
+
+  .reserve-form__legend-item {
+    font-size: 17rpx;
+  }
+
+  .reserve-form__legend-swatch {
+    width: 16rpx;
+    height: 16rpx;
+  }
+
+  .reserve-form__timeline {
+    height: 44rpx;
+    border-radius: 12rpx;
+  }
+
+  .reserve-form__timeline-tick {
+    height: 44rpx;
+  }
+
+  .reserve-form__timeline-label {
+    font-size: 16rpx;
+  }
+
+  .reserve-form__marks {
+    margin-top: 8rpx;
+    min-height: 22rpx;
+  }
+
+  .reserve-form__mark {
+    font-size: 15rpx;
+  }
+
+  .reserve-form__actions {
+    margin-top: 16rpx;
+    justify-content: stretch;
+  }
+
+  .reserve-form__btn {
+    width: 100%;
+    min-width: 0;
+    height: 60rpx;
+    border-radius: 12rpx;
+    font-size: 23rpx;
+  }
+
+  .reserve-side {
+    gap: 10rpx;
+  }
+
+  .reserve-side__summary,
+  .reserve-side__notice {
+    padding: 14rpx;
+  }
+
+  .reserve-side__summary-title,
+  .reserve-side__notice-title {
+    font-size: 24rpx;
+  }
+
+  .reserve-side__summary-item {
+    margin-top: 12rpx;
+    grid-template-columns: 40rpx minmax(0, 1fr);
+    gap: 10rpx;
+  }
+
+  .reserve-side__summary-icon {
+    width: 40rpx;
+    height: 40rpx;
+    border-radius: 12rpx;
+    font-size: 20rpx;
+  }
+
+  .reserve-side__summary-label {
+    font-size: 17rpx;
+  }
+
+  .reserve-side__summary-value {
+    margin-top: 4rpx;
+    font-size: 20rpx;
+  }
+
+  .reserve-side__notice-item {
+    margin-top: 10rpx;
+    grid-template-columns: 10rpx minmax(0, 1fr);
+    gap: 10rpx;
+  }
+
+  .reserve-side__notice-dot {
+    width: 10rpx;
+    height: 10rpx;
+    margin-top: 8rpx;
+  }
+
+  .reserve-side__notice-text {
+    font-size: 20rpx;
+    line-height: 1.6;
+  }
+}
+
+@media (max-width: 420px) {
+  .reserve-page__title {
+    font-size: 40rpx;
+  }
+
+  .reserve-page__sub {
+    font-size: 20rpx;
+  }
+
+  .reserve-form__section-title,
+  .reserve-side__summary-title,
+  .reserve-side__notice-title {
+    font-size: 22rpx;
+  }
+}
 </style>

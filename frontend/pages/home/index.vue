@@ -656,24 +656,128 @@ filter: brightness(1.08) contrast(1.05);
 }
 
 @media screen and (max-width: 760px) {
+  .student-home__body {
+    padding: 14rpx 0 calc(88rpx + env(safe-area-inset-bottom));
+  }
+
   .student-home__shell {
-    padding: 0 20rpx;
+    padding: 0 14rpx;
+  }
+
+  .student-home__hero {
+    min-height: 46vh;
+    padding: 38rpx 28rpx 34rpx;
+    border-radius: 22rpx;
+  }
+
+  .student-home__hero-content {
+    min-height: calc(46vh - 72rpx);
+  }
+
+  .student-home__hero-copy {
+    max-width: 100%;
+  }
+
+  .student-home__hero-title {
+    font-size: 50rpx;
+  }
+
+  .student-home__hero-sub {
+    margin-top: 14rpx;
+    font-size: 24rpx;
+    line-height: 1.55;
+  }
+
+  .student-home__hero-btn {
+    width: 220rpx;
+    height: 72rpx;
+    border-radius: 16rpx;
+    font-size: 24rpx;
+  }
+
+  .student-home__entry-card {
+    min-height: 172rpx;
+    padding: 20rpx 18rpx;
+  }
+
+  .student-home__entry-title {
+    margin-top: 14rpx;
+    font-size: 34rpx;
+  }
+
+  .student-home__entry-desc {
+    font-size: 22rpx;
   }
 
   .student-home__entry-grid {
     grid-template-columns: 1fr;
   }
 
+  .student-home__section-head {
+    margin-top: 30rpx;
+    margin-bottom: 14rpx;
+  }
+
+  .student-home__section-title {
+    font-size: 40rpx;
+  }
+
   .student-home__list-item {
     grid-template-columns: 1fr;
+    gap: 14rpx;
+    padding: 14rpx;
+    border-radius: 20rpx;
   }
 
   .student-home__list-cover {
-    height: 210rpx;
+    height: 178rpx;
+    border-radius: 14rpx;
+  }
+
+  .student-home__list-name {
+    font-size: 34rpx;
+  }
+
+  .student-home__list-meta {
+    font-size: 21rpx;
   }
 
   .student-home__list-side {
     justify-content: flex-start;
+    align-items: flex-start;
+    gap: 10rpx;
+  }
+
+  .student-home__list-action {
+    min-width: 124rpx;
+    height: 58rpx;
+    font-size: 22rpx;
+  }
+
+  .student-home__list-detail {
+    font-size: 21rpx;
+  }
+}
+
+@media screen and (max-width: 420px) {
+  .student-home__hero-title {
+    font-size: 44rpx;
+  }
+
+  .student-home__hero-btn {
+    width: 206rpx;
+  }
+
+  .student-home__entry-title {
+    font-size: 30rpx;
+  }
+
+  .student-home__section-title {
+    font-size: 36rpx;
+  }
+
+  .student-home__list-name {
+    font-size: 30rpx;
   }
 }
 </style>

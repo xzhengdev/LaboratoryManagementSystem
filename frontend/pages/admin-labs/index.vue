@@ -948,4 +948,107 @@ page {
     grid-template-columns: 1.2fr 1fr 0.7fr 0.9fr 0.7fr 1fr;
   }
 }
+
+@media screen and (max-width: 768px) {
+  .admin-kpi-grid {
+    gap: 16rpx;
+    margin-bottom: 20rpx;
+  }
+
+  .admin-kpi-card {
+    padding: 20rpx 22rpx;
+  }
+
+  .admin-kpi-card__value {
+    font-size: 44rpx;
+  }
+
+  .admin-toolbar-lite {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14rpx;
+    padding: 18rpx !important;
+    margin-bottom: 20rpx;
+  }
+
+  .toolbar-picker,
+  .admin-toolbar-lite__picker,
+  .admin-toolbar-lite__search,
+  .admin-toolbar-lite__btn {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    height: 64rpx;
+  }
+
+  .table-header {
+    display: none !important;
+  }
+
+  .table-row.lab-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10rpx;
+    padding: 20rpx !important;
+    border-bottom: 1rpx solid #e6edf7;
+  }
+
+  .table-row.lab-grid > text,
+  .table-row.lab-grid > view {
+    width: 100%;
+    font-size: 24rpx;
+    line-height: 1.5;
+  }
+
+  .actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 10rpx;
+  }
+
+  .admin-drawer {
+    width: calc(100vw - 20rpx);
+    max-width: calc(100vw - 20rpx);
+    border-radius: 20rpx;
+  }
+
+  .admin-lab-modal {
+    width: calc(100vw - 32rpx);
+    max-width: calc(100vw - 32rpx);
+    padding: 22rpx 20rpx 20rpx;
+    border-radius: 22rpx;
+  }
+
+  .admin-lab-modal__title {
+    font-size: 30rpx;
+  }
+
+  .admin-form-grid {
+    grid-template-columns: 1fr;
+    gap: 14rpx;
+  }
+
+  .admin-lab-cover-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12rpx;
+  }
+
+  .admin-lab-cover-preview,
+  .admin-lab-cover-empty {
+    width: 100%;
+    height: 220rpx;
+  }
+
+  .admin-lab-modal__actions {
+    flex-direction: column;
+    gap: 10rpx;
+  }
+
+  .admin-lab-btn {
+    width: 100%;
+    min-width: 0;
+    height: 64rpx;
+  }
+}
 </style>

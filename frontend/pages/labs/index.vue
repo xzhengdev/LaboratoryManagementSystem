@@ -595,4 +595,124 @@ export default {
   }
 }
 
+@media screen and (max-width: 760px) {
+  .labs-page__body {
+    padding: 18rpx 0 calc(56rpx + env(safe-area-inset-bottom));
+  }
+
+  .labs-page__shell {
+    padding: 0 14rpx;
+  }
+
+  .labs-page__title {
+    font-size: 52rpx;
+    line-height: 1.08;
+    letter-spacing: 0;
+  }
+
+  .labs-page__sub {
+    margin-top: 10rpx;
+    font-size: 24rpx;
+    line-height: 1.55;
+  }
+
+  .labs-page__filters {
+    margin-top: 16rpx;
+    padding: 14rpx;
+    border-radius: 18rpx;
+    gap: 12rpx;
+  }
+
+  .labs-page__chips {
+    gap: 8rpx;
+  }
+
+  .labs-page__chip {
+    min-width: 74rpx;
+    height: 50rpx;
+    padding: 0 14rpx;
+    font-size: 20rpx;
+  }
+
+  .labs-page__map-btn {
+    height: 56rpx;
+    padding: 0 16rpx;
+    font-size: 22rpx;
+    justify-content: flex-start;
+  }
+
+  .labs-page__empty {
+    margin-top: 16rpx;
+    border-radius: 16rpx;
+    padding: 20rpx;
+    font-size: 22rpx;
+  }
+
+  .labs-page__grid {
+    margin-top: 14rpx;
+    gap: 14rpx;
+  }
+
+  .labs-page__card {
+    border-radius: 20rpx;
+  }
+
+  .labs-page__cover {
+    height: 220rpx;
+  }
+
+  .labs-page__card.featured .labs-page__cover {
+    min-height: 220rpx;
+  }
+
+  .labs-page__card-body {
+    padding: 16rpx;
+  }
+
+  .labs-page__card-title {
+    font-size: 32rpx;
+  }
+
+  .labs-page__card-loc {
+    font-size: 21rpx;
+  }
+
+  .labs-page__tools {
+    margin-top: 10rpx;
+    gap: 8rpx;
+  }
+
+  .labs-page__tool {
+    min-height: 34rpx;
+    font-size: 19rpx;
+    border-radius: 10rpx;
+    padding: 0 10rpx;
+  }
+
+  .labs-page__actions {
+    margin-top: 14rpx;
+    gap: 10rpx;
+  }
+
+  .labs-page__btn {
+    height: 62rpx;
+    border-radius: 14rpx;
+    font-size: 22rpx;
+  }
+}
+
+@media screen and (max-width: 420px) {
+  .labs-page__title {
+    font-size: 46rpx;
+  }
+
+  .labs-page__sub {
+    font-size: 22rpx;
+  }
+
+  .labs-page__card-title {
+    font-size: 30rpx;
+  }
+}
+
 </style>

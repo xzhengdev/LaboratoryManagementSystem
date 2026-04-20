@@ -35,7 +35,30 @@ export default {
 </script>
 
 <style scoped lang="scss">
+.chart-bars {
+  overflow-x: auto;
+}
+
+.chart-item {
+  min-width: 88rpx;
+}
+
 .chart-bar {
   background: linear-gradient(180deg, #bee5ff 0%, #f0feff 100%);
+}
+
+.chart-label {
+  word-break: break-all;
+}
+
+@media screen and (max-width: 768px) {
+  .chart-item {
+    min-width: 78rpx;
+  }
+
+  .chart-label {
+    font-size: 20rpx;
+    line-height: 1.35;
+  }
 }
 </style>

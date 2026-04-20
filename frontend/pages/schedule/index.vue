@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page schedule-page">
     <view class="page-shell two-col">
       <view class="card hero-card">
         <view class="hero-kicker">可预约时段</view>
@@ -16,12 +16,12 @@
         </view>
         <view class="subtitle">开放时间：{{ schedule.open_time }} - {{ schedule.close_time }}</view>
         <view v-if="!(schedule.reservations || []).length" class="empty-state">当天暂无预约，可直接发起新的预约申请。</view>
-        <view v-for="item in schedule.reservations || []" :key="item.id" class="table-row" style="grid-template-columns: 1.2fr 1fr 1.6fr;">
+        <view v-for="item in schedule.reservations || []" :key="item.id" class="table-row schedule-page__row">
           <text>{{ item.start_time.slice(0, 5) }} - {{ item.end_time.slice(0, 5) }}</text>
           <status-tag :status="item.status" />
           <text>{{ item.purpose }}</text>
         </view>
-        <view class="actions" style="margin-top:20rpx;">
+        <view class="actions schedule-page__actions">
           <view class="btn" @click="goReserve">前往预约</view>
         </view>
       </view>
@@ -73,3 +73,72 @@ export default {
   }
 }
 </script>
+
+<style lang="scss">
+.schedule-page__row {
+  grid-template-columns: 1.2fr 1fr 1.6fr;
+}
+
+.schedule-page__actions {
+  margin-top: 20rpx;
+}
+
+@media screen and (max-width: 760px) {
+  .schedule-page .page-shell {
+    padding-left: 14rpx;
+    padding-right: 14rpx;
+    padding-bottom: calc(18rpx + env(safe-area-inset-bottom));
+  }
+
+  .schedule-page .hero-card .title {
+    font-size: 42rpx;
+    line-height: 1.16;
+  }
+
+  .schedule-page .hero-card .subtitle {
+    font-size: 22rpx;
+    line-height: 1.55;
+  }
+
+  .schedule-page .card {
+    border-radius: 18rpx;
+    padding: 16rpx;
+  }
+
+  .schedule-page .label,
+  .schedule-page .subtitle,
+  .schedule-page .table-header,
+  .schedule-page .table-row {
+    font-size: 20rpx;
+  }
+
+  .schedule-page .input {
+    min-height: 54rpx;
+    border-radius: 12rpx;
+    font-size: 22rpx;
+    padding: 0 12rpx;
+  }
+
+  .schedule-page__row {
+    grid-template-columns: 1fr;
+    gap: 8rpx;
+  }
+
+  .schedule-page .actions .btn {
+    width: 100%;
+    min-height: 56rpx;
+    border-radius: 12rpx;
+    font-size: 22rpx;
+  }
+}
+
+@media screen and (max-width: 420px) {
+  .schedule-page .hero-card .title {
+    font-size: 36rpx;
+  }
+
+  .schedule-page .hero-card .subtitle {
+    font-size: 20rpx;
+  }
+}
+</style>

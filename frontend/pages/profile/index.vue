@@ -495,9 +495,122 @@ export default {
 }
 
 @media screen and (max-width: 760px) {
+  .profile-page__shell {
+    padding: 16rpx 12rpx calc(16rpx + env(safe-area-inset-bottom));
+  }
+
+  .profile-page__hero {
+    border-radius: 20rpx;
+    padding: 14rpx;
+    gap: 12rpx;
+    align-items: flex-start;
+  }
+
+  .profile-page__avatar {
+    width: 88rpx;
+    height: 88rpx;
+    border-radius: 16rpx;
+    font-size: 34rpx;
+  }
+
+  .profile-page__name {
+    font-size: 42rpx;
+    line-height: 1.12;
+  }
+
+  .profile-page__role {
+    margin-top: 6rpx;
+    font-size: 24rpx;
+  }
+
+  .profile-page__badges {
+    margin-top: 8rpx;
+    gap: 6rpx;
+  }
+
+  .profile-page__badge {
+    min-height: 32rpx;
+    font-size: 18rpx;
+    padding: 0 10rpx;
+  }
+
+  .profile-page__layout {
+    margin-top: 12rpx;
+  }
+
+  .profile-page__card {
+    border-radius: 18rpx;
+    padding: 14rpx;
+    margin-bottom: 12rpx;
+  }
+
+  .profile-page__card-title {
+    font-size: 30rpx;
+  }
+
+  .profile-page__card-link {
+    font-size: 20rpx;
+    padding: 4rpx 10rpx;
+    border-radius: 8rpx;
+  }
+
+  .profile-page__form-grid {
+    margin-top: 10rpx;
+    gap: 10rpx;
+  }
+
+  .profile-page__avatar-row {
+    gap: 10rpx;
+    flex-wrap: wrap;
+  }
+
+  .profile-page__avatar--small {
+    width: 68rpx;
+    height: 68rpx;
+    border-radius: 14rpx;
+    font-size: 24rpx;
+  }
+
+  .profile-page__label {
+    font-size: 20rpx;
+    margin-bottom: 5rpx;
+  }
+
+  .profile-page__input {
+    min-height: 56rpx;
+    font-size: 22rpx;
+    border-radius: 10rpx;
+    padding: 0 12rpx;
+  }
+
+  .profile-page__form-actions {
+    margin-top: 12rpx;
+    gap: 8rpx;
+    flex-wrap: wrap;
+  }
+
+  .profile-page__btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 54rpx;
+    border-radius: 10rpx;
+    font-size: 21rpx;
+    padding: 0 12rpx;
+  }
+
   .profile-page__stats,
   .profile-page__form-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media screen and (max-width: 420px) {
+  .profile-page__name {
+    font-size: 38rpx;
+  }
+
+  .profile-page__card-title {
+    font-size: 28rpx;
   }
 }
 

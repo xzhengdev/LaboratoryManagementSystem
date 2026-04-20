@@ -190,4 +190,46 @@ export default {
     grid-template-columns: 1fr;
   }
 }
+
+@media screen and (max-width: 768px) {
+  .admin-profile-grid {
+    gap: 14rpx;
+  }
+
+  .admin-profile-head {
+    gap: 12rpx;
+  }
+
+  .admin-profile-avatar {
+    width: 72rpx;
+    height: 72rpx;
+    font-size: 28rpx;
+  }
+
+  .admin-profile-name {
+    font-size: 30rpx;
+  }
+
+  .admin-profile-role {
+    font-size: 21rpx;
+  }
+
+  .admin-profile-row {
+    min-height: 58rpx;
+    padding: 0 12rpx;
+  }
+
+  .admin-profile-label {
+    font-size: 21rpx;
+  }
+
+  .admin-profile-value {
+    font-size: 22rpx;
+  }
+
+  .admin-btn {
+    height: 62rpx;
+    font-size: 23rpx;
+  }
+}
 </style>

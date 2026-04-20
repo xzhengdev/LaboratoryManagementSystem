@@ -1205,9 +1205,19 @@ export default {
 }
 
 @media screen and (max-width: 760px) {
+  .lab-detail-page {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
   .lab-detail-page__hero {
+    margin: 0 16rpx;
     padding: 20rpx;
     min-height: 340rpx;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16rpx;
   }
 
   .lab-detail-page__hero-title {
@@ -1215,9 +1225,47 @@ export default {
   }
 
   .lab-detail-page__hero-action {
-    min-width: 160rpx;
+    min-width: 0;
+    width: 100%;
     height: 66rpx;
     font-size: 22rpx;
+  }
+
+  .lab-detail-page__tabs {
+    margin: 0 16rpx;
+    padding: 0 8rpx;
+    min-height: 74rpx;
+    gap: 20rpx;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .lab-detail-page__tab {
+    height: 72rpx;
+    font-size: 23rpx;
+    flex-shrink: 0;
+  }
+
+  .lab-detail-page__body {
+    padding: 14rpx 16rpx 24rpx;
+    grid-template-columns: 1fr;
+    gap: 14rpx;
+    overflow: visible;
+  }
+
+  .lab-detail-page__main,
+  .lab-detail-page__main.is-rules,
+  .lab-detail-page__side {
+    overflow: visible;
+  }
+
+  .lab-detail-page__block-title {
+    font-size: 34rpx;
+  }
+
+  .lab-detail-page__intro {
+    font-size: 23rpx;
+    line-height: 1.65;
   }
 
   .lab-detail-page__block-head,
@@ -1235,11 +1283,48 @@ export default {
     align-items: flex-start;
   }
 
+  .lab-detail-page__agenda-time {
+    font-size: 25rpx;
+  }
+
+  .lab-detail-page__agenda-purpose {
+    font-size: 23rpx;
+  }
+
   .lab-detail-page__availability-action {
     margin-left: 0;
     width: fit-content;
   }
 
+  .lab-detail-page__card-title {
+    font-size: 32rpx;
+  }
+}
+
+@media screen and (max-width: 420px) {
+  .lab-detail-page__hero-title {
+    font-size: 40rpx;
+  }
+
+  .lab-detail-page__pill {
+    font-size: 18rpx;
+    padding: 0 10rpx;
+  }
+
+  .lab-detail-page__metric-value {
+    font-size: 30rpx;
+  }
+
+  .lab-detail-page__flow-title,
+  .lab-detail-page__rule-card-title {
+    font-size: 24rpx;
+  }
+
+  .lab-detail-page__flow-desc,
+  .lab-detail-page__rule-text,
+  .lab-detail-page__check-text {
+    font-size: 20rpx;
+  }
 }
 
 </style>

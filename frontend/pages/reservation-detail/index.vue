@@ -554,4 +554,132 @@ export default {
   }
 }
 
+@media screen and (max-width: 760px) {
+  .reservation-detail-page__shell {
+    padding: 16rpx 12rpx calc(18rpx + env(safe-area-inset-bottom));
+  }
+
+  .reservation-detail-page__head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10rpx;
+  }
+
+  .reservation-detail-page__id {
+    font-size: 20rpx;
+  }
+
+  .reservation-detail-page__title {
+    margin-top: 6rpx;
+    font-size: 46rpx;
+    line-height: 1.1;
+    letter-spacing: 0;
+  }
+
+  .reservation-detail-page__sub {
+    margin-top: 8rpx;
+    font-size: 22rpx;
+    line-height: 1.5;
+  }
+
+  .reservation-detail-page__actions {
+    width: 100%;
+    gap: 8rpx;
+  }
+
+  .reservation-detail-page__btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 54rpx;
+    border-radius: 10rpx;
+    padding: 0 10rpx;
+    font-size: 20rpx;
+  }
+
+  .reservation-detail-page__layout {
+    margin-top: 12rpx;
+    gap: 12rpx;
+  }
+
+  .reservation-detail-page__timeline-card,
+  .reservation-detail-page__side-card,
+  .reservation-detail-page__purpose-card,
+  .reservation-detail-page__tip-card {
+    border-radius: 16rpx;
+    padding: 12rpx;
+  }
+
+  .reservation-detail-page__card-title,
+  .reservation-detail-page__side-title,
+  .reservation-detail-page__tip-title {
+    font-size: 26rpx;
+  }
+
+  .reservation-detail-page__status-pill {
+    min-height: 32rpx;
+    padding: 0 10rpx;
+    font-size: 18rpx;
+  }
+
+  .reservation-detail-page__timeline {
+    margin-top: 10rpx;
+    gap: 8rpx;
+  }
+
+  .reservation-detail-page__node {
+    grid-template-columns: 22rpx 1fr;
+    gap: 8rpx;
+  }
+
+  .reservation-detail-page__node-mark {
+    width: 18rpx;
+    height: 18rpx;
+    border-width: 2rpx;
+    margin-top: 2rpx;
+  }
+
+  .reservation-detail-page__node-body {
+    padding-left: 8rpx;
+    padding-bottom: 8rpx;
+  }
+
+  .reservation-detail-page__node-title {
+    font-size: 24rpx;
+  }
+
+  .reservation-detail-page__node-time,
+  .reservation-detail-page__node-desc,
+  .reservation-detail-page__node-reviewer,
+  .reservation-detail-page__line,
+  .reservation-detail-page__tip-text,
+  .reservation-detail-page__purpose-text,
+  .reservation-detail-page__purpose-id {
+    font-size: 20rpx;
+    line-height: 1.55;
+  }
+
+  .reservation-detail-page__line .k {
+    font-size: 18rpx;
+  }
+
+  .reservation-detail-page__line .v {
+    font-size: 26rpx;
+  }
+
+  .reservation-detail-page__tips {
+    margin-top: 12rpx;
+    gap: 10rpx;
+  }
+}
+
+@media screen and (max-width: 420px) {
+  .reservation-detail-page__title {
+    font-size: 40rpx;
+  }
+
+  .reservation-detail-page__sub {
+    font-size: 20rpx;
+  }
+}
+
 </style>

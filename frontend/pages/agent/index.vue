@@ -414,4 +414,121 @@ export default {
   }
 }
 
+@media screen and (max-width: 760px) {
+  .agent-page__shell {
+    padding: 16rpx 12rpx calc(16rpx + env(safe-area-inset-bottom));
+    min-height: 0;
+  }
+
+  .agent-page__title {
+    font-size: 48rpx;
+    line-height: 1.08;
+  }
+
+  .agent-page__sub {
+    margin-top: 6rpx;
+    font-size: 22rpx;
+    line-height: 1.5;
+  }
+
+  .agent-page__chat {
+    margin-top: 12rpx;
+    border-radius: 18rpx;
+    padding: 10rpx;
+    min-height: 0;
+  }
+
+  .agent-page__messages {
+    height: auto;
+    min-height: 0;
+  }
+
+  .agent-page__row {
+    gap: 8rpx;
+    margin-bottom: 10rpx;
+  }
+
+  .agent-page__avatar {
+    width: 44rpx;
+    height: 44rpx;
+  }
+
+  .agent-page__bubble {
+    max-width: 88%;
+    border-radius: 14rpx;
+    padding: 10rpx 12rpx;
+  }
+
+  .agent-page__text {
+    font-size: 22rpx;
+    line-height: 1.55;
+  }
+
+  .agent-page__actions {
+    margin-top: 8rpx;
+    gap: 6rpx;
+  }
+
+  .agent-page__action {
+    min-height: 38rpx;
+    padding: 0 10rpx;
+    font-size: 19rpx;
+  }
+
+  .agent-page__quick {
+    margin-top: 6rpx;
+    gap: 6rpx;
+  }
+
+  .agent-page__quick-title {
+    font-size: 20rpx;
+  }
+
+  .agent-page__quick-list {
+    gap: 8rpx;
+  }
+
+  .agent-page__quick-item {
+    min-height: 46rpx;
+    padding: 0 12rpx;
+    font-size: 20rpx;
+  }
+
+  .agent-page__input-bar {
+    margin-top: 8rpx;
+    margin-bottom: 2rpx;
+    border-radius: 14rpx;
+    padding: 8rpx;
+    gap: 8rpx;
+  }
+
+  .agent-page__input {
+    min-height: 54rpx;
+    border-radius: 10rpx;
+    font-size: 22rpx;
+    padding: 0 10rpx;
+  }
+
+  .agent-page__send {
+    min-width: 82rpx;
+    height: 54rpx;
+    border-radius: 10rpx;
+    font-size: 21rpx;
+  }
+}
+
+@media screen and (max-width: 420px) {
+  .agent-page__title {
+    font-size: 42rpx;
+  }
+
+  .agent-page__sub {
+    font-size: 20rpx;
+  }
+
+  .agent-page__bubble {
+    max-width: 90%;
+  }
+}
+
 </style>

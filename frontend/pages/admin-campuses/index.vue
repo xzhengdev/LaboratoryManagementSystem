@@ -754,5 +754,107 @@ page {
     grid-template-columns: 1.2fr 1.2fr 0.8fr 0.8fr 1fr;
   }
 }
+
+@media screen and (max-width: 768px) {
+  .admin-kpi-grid {
+    gap: 16rpx;
+    margin-bottom: 20rpx;
+  }
+
+  .admin-kpi-card {
+    padding: 20rpx 22rpx;
+  }
+
+  .admin-kpi-card__value {
+    font-size: 44rpx;
+  }
+
+  .admin-toolbar-lite {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14rpx;
+    padding: 18rpx !important;
+    margin-bottom: 20rpx;
+  }
+
+  .admin-toolbar-lite .input {
+    width: 100%;
+    height: 64rpx;
+    font-size: 24rpx;
+  }
+
+  .admin-toolbar-lite__btn {
+    width: 100%;
+    height: 64rpx;
+  }
+
+  .table-card {
+    padding: 8rpx 0;
+  }
+
+  .table-header {
+    display: none !important;
+  }
+
+  .table-row.campus-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10rpx;
+    padding: 20rpx !important;
+    border-bottom: 1rpx solid #e6edf7;
+  }
+
+  .table-row.campus-grid > text,
+  .table-row.campus-grid > view {
+    width: 100%;
+    font-size: 24rpx;
+    line-height: 1.5;
+  }
+
+  .table-row.campus-grid .admin-campus-name-cell {
+    padding-left: 0;
+  }
+
+  .actions {
+    margin-top: 4rpx;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 10rpx;
+  }
+
+  .admin-campus-modal {
+    width: calc(100vw - 32rpx);
+    max-width: calc(100vw - 32rpx);
+    padding: 22rpx 20rpx 20rpx;
+    border-radius: 22rpx;
+  }
+
+  .admin-campus-modal__title {
+    font-size: 30rpx;
+  }
+
+  .admin-campus-cover-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12rpx;
+  }
+
+  .admin-campus-cover-preview,
+  .admin-campus-cover-empty {
+    width: 100%;
+    height: 220rpx;
+  }
+
+  .admin-campus-btn {
+    min-width: 0;
+    width: 100%;
+    height: 64rpx;
+  }
+
+  .admin-campus-modal__actions {
+    flex-direction: column;
+    gap: 10rpx;
+  }
+}
 </style>
 
