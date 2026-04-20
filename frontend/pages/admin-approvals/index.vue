@@ -8,8 +8,15 @@
     </view>
 
     <view class="card admin-toolbar-lite">
+      <view class="approval-mode-switch">
+        <view class="approval-mode-pill" :class="{ active: viewMode === 'pending' }" @click="changeMode('pending')">待审批</view>
+        <view class="approval-mode-pill" :class="{ active: viewMode === 'all' }" @click="changeMode('all')">全部预约</view>
+      </view>
+      <picker v-if="viewMode === 'all'" class="approval-status-picker" :range="statusOptionLabels" @change="onStatusPickerChange">
+        <view class="approval-status-picker__text">状态: {{ statusLabel(statusFilter) }}</view>
+      </picker>
       <input v-model="keyword" class="input admin-toolbar-lite__search" style="flex: 1;" placeholder="搜索实验室、申请人或用途" />
-      <view class="admin-toolbar-lite__meta">{{ filteredList.length }} 条待处理</view>
+      <view class="admin-toolbar-lite__meta">{{ filteredList.length }} 条{{ viewMode === 'pending' ? '待处理' : '记录' }}</view>
     </view>
 
     <view class="card table-card">
@@ -18,6 +25,7 @@
         <text>申请人</text>
         <text>预约日期</text>
         <text>预约时间</text>
+        <text>状态</text>
         <text>用途</text>
         <text>操作</text>
       </view>
@@ -25,13 +33,14 @@
         <text class="table-strong">{{ item.lab_name }}</text>
         <text>{{ item.user_name }}</text>
         <text>{{ item.reservation_date || '--' }}</text>
-        <text>{{ item.start_time.slice(0, 5) }} - {{ item.end_time.slice(0, 5) }}</text>
+        <text>{{ formatTimeRange(item.start_time, item.end_time) }}</text>
+        <text class="cell-status" :class="`status-${item.status || ''}`">{{ statusLabel(item.status) }}</text>
         <text class="cell-purpose">{{ item.purpose }}</text>
         <view class="actions">
-          <view class="pill" @click="openDrawer(item)">查看详情</view>
+          <view class="pill" @click="openDrawer(item)">{{ item.status === 'pending' ? '审批处理' : '查看详情' }}</view>
         </view>
       </view>
-      <view v-if="!filteredList.length" class="empty-state">当前没有待审批预约。</view>
+      <view v-if="!filteredList.length" class="empty-state">{{ viewMode === 'pending' ? '当前没有待审批预约。' : '当前筛选条件下没有预约记录。' }}</view>
     </view>
 
     <view v-if="drawerVisible" class="admin-drawer-mask" @click="drawerVisible = false">
@@ -40,13 +49,17 @@
         <view class="subtitle">{{ activeItem.user_name }} · {{ activeItem.reservation_date || '--' }}</view>
         <view class="field">
           <text class="label">预约时间</text>
-          <view class="input">{{ activeItem.start_time }} - {{ activeItem.end_time }}</view>
+          <view class="input">{{ formatTimeRange(activeItem.start_time, activeItem.end_time) }}</view>
         </view>
         <view class="field">
           <text class="label">用途</text>
           <view class="input">{{ activeItem.purpose }}</view>
         </view>
         <view class="field">
+          <text class="label">当前状态</text>
+          <view class="input">{{ statusLabel(activeItem.status) }}</view>
+        </view>
+        <view v-if="canApprove(activeItem)" class="field">
           <text class="label">审批备注</text>
           <textarea v-model="remark" class="input textarea approval-remark-input" placeholder="请输入审批意见" />
         </view>
@@ -55,7 +68,7 @@
           <view class="approval-record">
             <view class="approval-record__item">
               <text class="approval-record__key">当前状态</text>
-              <text class="approval-record__value approval-record__value--pending">待审批</text>
+              <text class="approval-record__value" :class="statusValueClass(activeItem.status)">{{ statusLabel(activeItem.status) }}</text>
             </view>
             <view class="approval-record__item">
               <text class="approval-record__key">上次处理人</text>
@@ -71,7 +84,7 @@
             </view>
           </view>
         </view>
-        <view class="actions">
+        <view v-if="canApprove(activeItem)" class="actions">
           <view class="btn" @click="submit(activeItem.id, 'approved')">审批通过</view>
           <view class="btn btn-danger" @click="submit(activeItem.id, 'rejected')">驳回申请</view>
         </view>
@@ -93,6 +106,9 @@ export default {
     return {
       profile: {},
       list: [],
+      viewMode: 'pending',
+      statusFilter: 'all',
+      statusOptions: ['all', 'pending', 'approved', 'rejected', 'cancelled'],
       keyword: '',
       drawerVisible: false,
       activeItem: {},
@@ -110,14 +126,21 @@ export default {
     },
     filteredList() {
       const text = this.keyword.trim().toLowerCase()
-      if (!text) return this.list
-      return this.list.filter((item) => `${item.lab_name}${item.user_name}${item.purpose}`.toLowerCase().includes(text))
+      const source = this.viewMode === 'all' && this.statusFilter !== 'all'
+        ? this.list.filter((item) => item.status === this.statusFilter)
+        : this.list
+      if (!text) return source
+      return source.filter((item) => `${item.lab_name}${item.user_name}${item.purpose}`.toLowerCase().includes(text))
+    },
+    statusOptionLabels() {
+      return this.statusOptions.map((item) => this.statusLabel(item))
     },
     summaryCards() {
-      const reservationUsers = new Set(this.list.map((item) => item.user_name)).size
+      const source = this.filteredList
+      const reservationUsers = new Set(source.map((item) => item.user_name)).size
       return [
-        { label: '待审批预约', value: this.list.length },
-        { label: '涉及实验室', value: new Set(this.list.map((item) => item.lab_name)).size },
+        { label: this.viewMode === 'pending' ? '待审批预约' : '当前记录', value: source.length },
+        { label: '涉及实验室', value: new Set(source.map((item) => item.lab_name)).size },
         { label: '申请人数', value: reservationUsers }
       ]
     }
@@ -130,14 +153,55 @@ export default {
   },
   methods: {
     async loadData() {
-      this.list = await api.pendingApprovals()
+      if (this.viewMode === 'pending') {
+        this.list = await api.pendingApprovals()
+        return
+      }
+      const params = this.statusFilter !== 'all' ? { status: this.statusFilter } : {}
+      this.list = await api.reservations(params)
+    },
+    changeMode(mode) {
+      if (this.viewMode === mode) return
+      this.viewMode = mode
+      this.statusFilter = 'all'
+      this.keyword = ''
+      this.drawerVisible = false
+      this.loadData()
+    },
+    onStatusPickerChange(event) {
+      const index = Number(event?.detail?.value || 0)
+      this.statusFilter = this.statusOptions[index] || 'all'
+      this.loadData()
+    },
+    statusLabel(status) {
+      const map = {
+        all: '全部',
+        pending: '待审批',
+        approved: '已通过',
+        rejected: '已驳回',
+        cancelled: '已取消'
+      }
+      return map[String(status || '').toLowerCase()] || '未知'
+    },
+    statusValueClass(status) {
+      const value = String(status || '').toLowerCase()
+      return value ? `approval-record__value--${value}` : ''
+    },
+    formatTimeRange(startTime, endTime) {
+      const start = String(startTime || '').slice(0, 5) || '--:--'
+      const end = String(endTime || '').slice(0, 5) || '--:--'
+      return `${start} - ${end}`
     },
     openDrawer(item) {
       this.activeItem = item
       this.remark = ''
       this.drawerVisible = true
     },
+    canApprove(item) {
+      return String(item?.status || '').toLowerCase() === 'pending'
+    },
     async submit(id, approvalStatus) {
+      if (!this.canApprove(this.activeItem)) return
       await api.approvalAction(id, {
         approval_status: approvalStatus,
         remark: this.remark || (approvalStatus === 'approved' ? '审批通过' : '审批驳回')
@@ -215,6 +279,44 @@ page {
   transition: all 0.25s ease;
   padding: 24rpx !important;
 }
+.approval-mode-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 6rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid #dce7f4;
+  background: #fff;
+}
+.approval-mode-pill {
+  height: 52rpx;
+  padding: 0 18rpx;
+  border-radius: 14rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #5a6e88;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+.approval-mode-pill.active {
+  background: #e9f1fb;
+  color: #1f4872;
+}
+.approval-status-picker {
+  height: 68rpx;
+  padding: 0 18rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
+  border: 1rpx solid #e4ebf5;
+  display: inline-flex;
+  align-items: center;
+}
+.approval-status-picker__text {
+  color: #3f5878;
+  font-size: 23rpx;
+  font-weight: 700;
+}
 
 .admin-toolbar-lite:hover {
   transform: translateY(-3rpx);
@@ -266,7 +368,7 @@ page {
 }
 
 .approval-table-grid {
-  grid-template-columns: 1fr 0.9fr 0.9fr 1fr 1.4fr 0.8fr;
+  grid-template-columns: 1fr 0.8fr 0.85fr 1fr 0.7fr 1.1fr 0.8fr;
 }
 
 .table-header {
@@ -299,6 +401,19 @@ page {
 
 .cell-purpose {
   color: #4d6079;
+}
+.cell-status {
+  font-weight: 700;
+}
+.cell-status.status-pending {
+  color: #2c7da0;
+}
+.cell-status.status-approved {
+  color: #2f855a;
+}
+.cell-status.status-rejected,
+.cell-status.status-cancelled {
+  color: #c05621;
 }
 
 .pill {
@@ -368,6 +483,15 @@ page {
   color: #2c7da0;
   font-weight: 700;
 }
+.approval-record__value--approved {
+  color: #2f855a;
+  font-weight: 700;
+}
+.approval-record__value--rejected,
+.approval-record__value--cancelled {
+  color: #c05621;
+  font-weight: 700;
+}
 
 .btn {
   transition: all 0.2s ease;
@@ -384,4 +508,3 @@ page {
   }
 }
 </style>
-
