@@ -316,3 +316,36 @@ page {
   }
 }
 
+/* 管理端全局按钮主题：统一渐变，排除取消/幽灵/危险按钮 */
+.admin-workspace .btn:not(.btn-light):not(.btn-danger),
+.admin-workspace .admin-toolbar-lite__btn,
+.admin-workspace .admin-campus-btn:not(.admin-campus-btn--ghost),
+.admin-workspace .admin-lab-btn:not(.admin-lab-btn--ghost),
+.admin-workspace .admin-equipment-btn:not(.admin-equipment-btn--ghost),
+.admin-workspace .admin-user-btn:not(.admin-user-btn--ghost) {
+  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%) !important;
+  color: #2b4864 !important;
+  border: 1rpx solid #c8e3f6 !important;
+  box-shadow: 0 8rpx 20rpx rgba(77, 123, 160, 0.18) !important;
+}
+
+.admin-workspace .btn:not(.btn-light):not(.btn-danger):hover,
+.admin-workspace .admin-toolbar-lite__btn:hover,
+.admin-workspace .admin-campus-btn:not(.admin-campus-btn--ghost):hover,
+.admin-workspace .admin-lab-btn:not(.admin-lab-btn--ghost):hover,
+.admin-workspace .admin-equipment-btn:not(.admin-equipment-btn--ghost):hover,
+.admin-workspace .admin-user-btn:not(.admin-user-btn--ghost):hover {
+  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%) !important;
+  box-shadow: 0 12rpx 26rpx rgba(77, 123, 160, 0.24) !important;
+}
+
+.admin-workspace .btn-light,
+.admin-workspace .admin-campus-btn--ghost,
+.admin-workspace .admin-lab-btn--ghost,
+.admin-workspace .admin-equipment-btn--ghost,
+.admin-workspace .admin-user-btn--ghost {
+  background: #eef3fb !important;
+  color: #486280 !important;
+  border: 1rpx solid #d6e4f3 !important;
+}
+

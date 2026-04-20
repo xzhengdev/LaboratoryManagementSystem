@@ -33,3 +33,9 @@ export default {
   }
 }
 </script>
+
+<style scoped lang="scss">
+.chart-bar {
+  background: linear-gradient(180deg, #bee5ff 0%, #f0feff 100%);
+}
+</style>
