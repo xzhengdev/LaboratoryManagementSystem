@@ -47,10 +47,15 @@ def build_followup_question(
 
     if tool == "query_labs":
         return (
-            "要不要我继续按日期/时段给你筛选可预约实验室？",
+            "要不要我继续按日期给你筛选可预约实验室？"
+            "你可以这样回复：\n"
+            "• “好，帮我筛选明天的”\n"
+            "• “继续，查一下后天下午的”\n"
+            "• “要，日期2026-04-25”",
             {
                 "expected_tool": "query_labs",
                 "required_response": ["要", "好", "可以", "继续", "筛选"],
+                "expected_fields": ["date"],  # 期望用户提供的字段
                 "context_preserve": True,
             },
         )
