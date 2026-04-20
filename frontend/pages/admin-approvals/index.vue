@@ -12,26 +12,31 @@
         <view class="approval-mode-pill" :class="{ active: viewMode === 'pending' }" @click="changeMode('pending')">待审批</view>
         <view class="approval-mode-pill" :class="{ active: viewMode === 'all' }" @click="changeMode('all')">全部预约</view>
       </view>
+      <view class="approval-sort-toggle" @click="toggleSubmitSort">
+        提交时间{{ submitSort === 'asc' ? '升序' : '降序' }}
+      </view>
       <picker v-if="viewMode === 'all'" class="approval-status-picker" :range="statusOptionLabels" @change="onStatusPickerChange">
         <view class="approval-status-picker__text">状态: {{ statusLabel(statusFilter) }}</view>
       </picker>
       <input v-model="keyword" class="input admin-toolbar-lite__search" style="flex: 1;" placeholder="搜索实验室、申请人或用途" />
-      <view class="admin-toolbar-lite__meta">{{ filteredList.length }} 条{{ viewMode === 'pending' ? '待处理' : '记录' }}</view>
+      <view class="admin-toolbar-lite__meta">{{ displayList.length }} 条{{ viewMode === 'pending' ? '待处理' : '记录' }}</view>
     </view>
 
     <view class="card table-card">
       <view class="table-header approval-table-grid">
         <text>实验室</text>
         <text>申请人</text>
+        <text>提交时间</text>
         <text>预约日期</text>
         <text>预约时间</text>
         <text>状态</text>
         <text>用途</text>
         <text>操作</text>
       </view>
-      <view v-for="item in filteredList" :key="item.id" class="table-row approval-table-grid">
+      <view v-for="item in displayList" :key="item.id" class="table-row approval-table-grid">
         <text class="table-strong">{{ item.lab_name }}</text>
         <text>{{ item.user_name }}</text>
+        <text>{{ formatDateTimeMinute(item.created_at) }}</text>
         <text>{{ item.reservation_date || '--' }}</text>
         <text>{{ formatTimeRange(item.start_time, item.end_time) }}</text>
         <text class="cell-status" :class="`status-${item.status || ''}`">{{ statusLabel(item.status) }}</text>
@@ -40,7 +45,7 @@
           <view class="pill" @click="openDrawer(item)">{{ item.status === 'pending' ? '审批处理' : '查看详情' }}</view>
         </view>
       </view>
-      <view v-if="!filteredList.length" class="empty-state">{{ viewMode === 'pending' ? '当前没有待审批预约。' : '当前筛选条件下没有预约记录。' }}</view>
+      <view v-if="!displayList.length" class="empty-state">{{ viewMode === 'pending' ? '当前没有待审批预约。' : '当前筛选条件下没有预约记录。' }}</view>
     </view>
 
     <view v-if="drawerVisible" class="admin-drawer-mask" @click="drawerVisible = false">
@@ -50,6 +55,10 @@
         <view class="field">
           <text class="label">预约时间</text>
           <view class="input">{{ formatTimeRange(activeItem.start_time, activeItem.end_time) }}</view>
+        </view>
+        <view class="field">
+          <text class="label">提交时间</text>
+          <view class="input">{{ formatDateTimeMinute(activeItem.created_at) }}</view>
         </view>
         <view class="field">
           <text class="label">用途</text>
@@ -108,6 +117,7 @@ export default {
       list: [],
       viewMode: 'pending',
       statusFilter: 'all',
+      submitSort: 'desc',
       statusOptions: ['all', 'pending', 'approved', 'rejected', 'cancelled'],
       keyword: '',
       drawerVisible: false,
@@ -132,11 +142,17 @@ export default {
       if (!text) return source
       return source.filter((item) => `${item.lab_name}${item.user_name}${item.purpose}`.toLowerCase().includes(text))
     },
+    displayList() {
+      return [...this.filteredList].sort((a, b) => {
+        const diff = this.getSubmitMinute(a) - this.getSubmitMinute(b)
+        return this.submitSort === 'asc' ? diff : -diff
+      })
+    },
     statusOptionLabels() {
       return this.statusOptions.map((item) => this.statusLabel(item))
     },
     summaryCards() {
-      const source = this.filteredList
+      const source = this.displayList
       const reservationUsers = new Set(source.map((item) => item.user_name)).size
       return [
         { label: this.viewMode === 'pending' ? '待审批预约' : '当前记录', value: source.length },
@@ -173,6 +189,9 @@ export default {
       this.statusFilter = this.statusOptions[index] || 'all'
       this.loadData()
     },
+    toggleSubmitSort() {
+      this.submitSort = this.submitSort === 'asc' ? 'desc' : 'asc'
+    },
     statusLabel(status) {
       const map = {
         all: '全部',
@@ -191,6 +210,19 @@ export default {
       const start = String(startTime || '').slice(0, 5) || '--:--'
       const end = String(endTime || '').slice(0, 5) || '--:--'
       return `${start} - ${end}`
+    },
+    formatDateTimeMinute(value) {
+      const text = String(value || '').trim()
+      if (!text) return '--'
+      if (text.includes('T')) return text.replace('T', ' ').slice(0, 16)
+      return text.slice(0, 16)
+    },
+    getSubmitMinute(item) {
+      const raw = String(item?.created_at || '').trim()
+      if (!raw) return Number.MIN_SAFE_INTEGER
+      const value = Date.parse(raw)
+      if (!Number.isNaN(value)) return Math.floor(value / 60000)
+      return Number.MIN_SAFE_INTEGER
     },
     openDrawer(item) {
       this.activeItem = item
@@ -317,6 +349,18 @@ page {
   font-size: 23rpx;
   font-weight: 700;
 }
+.approval-sort-toggle {
+  height: 68rpx;
+  padding: 0 18rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
+  border: 1rpx solid #e4ebf5;
+  color: #3f5878;
+  font-size: 23rpx;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+}
 
 .admin-toolbar-lite:hover {
   transform: translateY(-3rpx);
@@ -368,7 +412,7 @@ page {
 }
 
 .approval-table-grid {
-  grid-template-columns: 1fr 0.8fr 0.85fr 1fr 0.7fr 1.1fr 0.8fr;
+  grid-template-columns: 1fr 0.8fr 1.05fr 0.85fr 1fr 0.7fr 1.1fr 0.8fr;
 }
 
 .table-header {
