@@ -7,6 +7,25 @@ from zoneinfo import ZoneInfo
 import requests
 from app.config import Config
 from app.models import Laboratory, Reservation
+from app.services.agent_helpers import (
+    contains_any as _contains_any,
+    is_abab_loop as _is_abab_loop,
+    normalize_params_shape as _normalize_params_shape,
+    safe_int as _safe_int,
+    safe_json_loads as _safe_json_loads,
+    to_minutes as _to_minutes,
+    tool_call as _tool_call,
+    tool_result as _tool_result,
+)
+from app.services.agent_rules import (
+    build_followup_question as _build_followup_question,
+    missing_fields_hint as _missing_fields_hint,
+)
+from app.services.agent_session import (
+    clean_session as _session_clean,
+    reset_form as _session_reset_form,
+    save_session as _session_save,
+)
 from app.services.reservation_service import cancel_reservation, create_reservation, get_lab_schedule
 from app.utils.exceptions import AppError
 from app.extensions import db  # 如果你的项目不是这个路径，改成你自己的 db 导入
@@ -17,6 +36,7 @@ MAX_AGENT_STEPS = 5
 MAX_TOOL_REPEAT_STEPS = 2
 MAX_HISTORY_SUMMARY_CHARS = 280
 DEFAULT_AGENT_TIMEZONE = "Asia/Shanghai"
+FOLLOWUP_CONTEXT_TTL_SECONDS = 600
 WEEKDAY_CN = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
 
 #xinzhu修改
@@ -215,54 +235,6 @@ def _debug_log(trace_id: str, event: str, **payload: Any) -> None:
         print(f"[AGENT][{now}][{trace_id}] {func_name} | {desc}")
 
 #=================================================================debug=================================
- # 判断工具调用是否出现 ABAB 循环模式（防止 Agent 在两个工具之间反复调用形成死循环）
-def _is_abab_loop(history: List[Dict[str, Any]]) -> bool:
-    if len(history) < 4:
-        return False
-    tools = [str(x.get("tool") or "") for x in history[-4:]]
-    return tools[0] == tools[2] and tools[1] == tools[3] and tools[0] != tools[1]
-
- # 构造工具调用指令，表示当前需要执行某个工具（由 Agent 返回给上层调度）
-def _tool_call(tool: str, params: Dict[str, Any], reply: str) -> Dict[str, Any]:
-    return {"type": "tool_call", "tool": tool, "params": params, "reply": reply}
-
- # 构造统一的工具执行结果格式，包含执行状态、返回数据及错误信息
-def _tool_result(
-    tool: str,
-    ok: bool,
-    data: str,
-    *,
-    error_code: str = "",
-    error_message: str = "",
-    raw: Optional[Any] = None,
-    extra: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
-    out: Dict[str, Any] = {
-        "ok": ok,
-        "tool": tool,
-        "data": data,
-        "error_code": error_code,
-        "error_message": error_message,
-    }
-    if raw is not None:
-        out["raw"] = raw
-    if extra:
-        out.update(extra)
-    return out
-
- # 将参数统一规范为字典类型，避免 LLM 返回非 dict 导致错误
-def _normalize_params_shape(params: Any) -> Dict[str, Any]:
-    return dict(params) if isinstance(params, dict) else {}
-
-# 安全地将参数转换为整数，转换失败返回 None（避免异常中断流程）
-def _safe_int(value: Any) -> Optional[int]:
-    if value is None or value == "":
-        return None
-    try:
-        return int(value)
-    except Exception:
-        return None
-
 # 根据工具定义过滤并清洗参数，只保留合法字段并做类型转换
 def _sanitize_tool_params(tool: str, params: Dict[str, Any]) -> Dict[str, Any]:
     schema = AGENT_TOOL_SCHEMAS.get(tool) or {}
@@ -293,39 +265,6 @@ def _missing_required_tool_fields(tool: str, params: Dict[str, Any]) -> List[str
             missing.append(key)
     return missing
 
-# 根据缺失参数生成用户友好的提示信息，引导用户补充数据
-def _missing_fields_hint(tool: str, missing: List[str]) -> str:
-    common_label_map = {
-        "lab_id": "实验室ID",
-        "date": "预约日期(YYYY-MM-DD)",
-        "start_time": "开始时间(HH:MM)",
-        "end_time": "结束时间(HH:MM)",
-        "participant_count": "参与人数",
-        "purpose": "用途说明",
-        "reservation_id": "预约ID",
-        "path": "页面路径",
-        "form": "表单数据",
-    }
-
-    if tool in {"create_reservation", "update_reservation"}:
-        labels = [common_label_map.get(x, x) for x in missing]
-        return "还缺少这些信息: " + "、".join(labels) + "。"
-
-    if tool == "recommend_lab":
-        return "为了更准确推荐实验室，请告诉我日期，并尽量补充校区、人数和实验室类型偏好。"
-
-    if tool == "recommend_time":
-        return "请先告诉我日期；如果有指定实验室或上午/下午偏好也可以一起说。"
-
-    if tool == "query_schedule":
-        return "请先告诉我日期，例如 2026-04-20。"
-
-    if tool == "cancel_reservation":
-        return "请告诉我要取消的预约ID，例如：取消预约ID 23。"
-
-    labels = [common_label_map.get(x, x) for x in missing]
-    return "参数不完整，请补充这些信息：" + "、".join(labels) + "。"
-
  # 获取预约规则上下文（优先读取配置，否则使用默认规则）
 def _rules_context() -> str:
     text = str(getattr(Config, "AGENT_RULES_CONTEXT", "") or "")
@@ -350,31 +289,6 @@ def _extract_min_advance_days(ctx: str) -> int:
  # 判断规则中是否禁止重复或重叠预约
 def _forbid_duplicate(ctx: str) -> bool:
     return "重叠预约" in ctx or "重复预约" in ctx
-
-# 安全解析 JSON（支持去除 ``` 包裹，并容错提取 JSON 结构）
-def _safe_json_loads(text: str) -> Optional[Dict[str, Any]]:
-    if not text:
-        return None
-    content = text.strip()
-    if content.startswith("```"):
-        content = re.sub(r"^```(?:json)?", "", content, flags=re.IGNORECASE).strip()
-        content = re.sub(r"```$", "", content).strip()
-    try:
-        data = json.loads(content)
-        if isinstance(data, dict):
-            return data
-    except Exception:
-        pass
-    m = re.search(r"(\{.*\})", content, re.DOTALL)
-    if m:
-        try:
-            data = json.loads(m.group(1))
-            if isinstance(data, dict):
-                return data
-        except Exception:
-            return None
-    return None
-
 
 def _call_llm_messages(messages: List[Dict[str, str]], temperature: float = 0.1) -> str:
     """
@@ -451,83 +365,15 @@ def _call_general_llm(user, message: str) -> str:
 
 
 def _clean_session(user_id: int) -> Dict[str, Any]:
-    """
-    清理或初始化用户会话
-    """
-    # 获取当前时间（用于过期判断和时间戳更新）
-    now = _now()
-    # ==================== 1. 获取现有会话 ====================
-    # 从全局会话字典中获取该用户的会话数据
-    # 如果不存在则初始化为空字典
-    session = AGENT_SESSIONS.get(user_id) or {}
-    # ==================== 2. 会话过期检查 ====================
-    # 获取会话的最后更新时间
-    last = session.get("updated_at")
-    # 判断会话是否过期：
-    # - 没有更新时间记录（新会话或异常）
-    # - 或当前时间减去最后更新时间超过 TTL（Time To Live）
-    if not last or (now - last).total_seconds() > SESSION_TTL_MINUTES * 60:
-        # 会话已过期，重置为空字典（丢弃所有历史数据）
-        session = {}
-    # ==================== 3. 初始化会话默认结构 ====================
-    # setdefault 确保字段存在，如果不存在则设置默认值
-    # 这样既保留了已有数据，又能保证结构完整
-    # 3.1 预约表单：存储用户正在填写的预约信息
-    # 支持多轮对话逐步收集预约信息
-    session.setdefault(
-        "reservation_form",
-        {
-            "date": "",                    # 预约日期 (YYYY-MM-DD)
-            "start_time": "",              # 开始时间 (HH:MM)
-            "end_time": "",                # 结束时间 (HH:MM)
-            "participant_count": None,     # 参与人数
-            "purpose": "",                 # 用途说明
-            "lab_id": None,                # 实验室ID
-            "campus": "",                  # 校区（用于实验室筛选）
-            "type": "",                    # 实验室类型（用于筛选）
-            "preference": "",              # 时间偏好（上午/下午）
-        },
-    )
-    # 3.2 最近查询的实验室列表
-    # 用于支持用户通过序号选择实验室（例如："选第1个"）
-    session.setdefault("last_labs", [])
-    # 3.3 最近查询的预约列表
-    # 用于支持用户通过序号取消预约（例如："取消第2个"）
-    session.setdefault("last_reservations", [])
-    session.setdefault("last_recommended_time", {})
-    session.setdefault("pending_action", None)
-    # 3.4 最后更新时间戳
-    # 用于会话过期判断，每次操作都会更新
-    session.setdefault("updated_at", now)
-    session.setdefault("last_choice_type", "")
-    # ==================== 4. 保存并返回 ====================
-    # 将会话写回全局字典
-    AGENT_SESSIONS[user_id] = session
-    # 返回会话对象供调用方使用
-    return session
+    return _session_clean(AGENT_SESSIONS, user_id, _now, SESSION_TTL_MINUTES)
 
 
 def _save_session(user_id: int, session: Dict[str, Any]) -> None:
-    session["updated_at"] = _now()
-    AGENT_SESSIONS[user_id] = session
+    _session_save(AGENT_SESSIONS, user_id, session, _now)
 
 # 把当前会话里的预约表单恢复成“初始空状态”
 def _reset_form(session: Dict[str, Any]) -> None:
-    session["reservation_form"] = {
-        "date": "",
-        "start_time": "",
-        "end_time": "",
-        "participant_count": None,
-        "purpose": "",
-        "lab_id": None,
-        "campus": "",
-        "type": "",
-        "preference": "",
-    }
-    session["last_labs"] = []
-    session["last_recommended_time"] = {}
-    session["last_choice_type"] = ""
-    session["pending_action"] = None
+    _session_reset_form(session)
 
 # 识别“今天/明天/后天”等相对日期，并转换为对应的天数偏移
 def _relative_day_offset(text: str) -> Optional[int]:
@@ -774,10 +620,6 @@ def _detect_reservation_id_or_choice(text: str, session: Dict[str, Any]) -> Opti
     return None
 
 
-def _to_minutes(hhmm: str) -> int:
-    h, m = [int(i) for i in hhmm.split(":")]
-    return h * 60 + m
-
 # 让大模型从用户输入中提取预约表单字段（补全信息）
 def _llm_extract_form(text: str, form: Dict[str, Any]) -> Dict[str, Any]:
     if not Config.LLM_API_KEY:
@@ -810,10 +652,6 @@ def _llm_extract_form(text: str, form: Dict[str, Any]) -> Dict[str, Any]:
     except Exception:
         pass
     return form
-
-
-def _contains_any(msg: str, keywords: List[str]) -> bool:
-    return any(k in msg for k in keywords)
 
 
 def _extract_intent(text: str) -> str:
@@ -1597,34 +1435,6 @@ def _tool_reply_prefer_facts(
     return "已处理完成。"
 
 
-def _build_followup_question(tool: str, tool_result: Dict[str, Any], form: Dict[str, Any]) -> str:
-    """
-    在工具执行后给出可执行的下一步追问，避免“只报结果不推进”。
-    """
-    if not tool_result.get("ok"):
-        return ""
-
-    if tool == "query_labs":
-        return "要不要我继续按日期/时段给你筛选可预约实验室？例如：`明天下午，3人`。"
-
-    if tool == "recommend_lab":
-        return "要不要我基于这个实验室继续推荐具体可用时间段？"
-
-    if tool == "recommend_time":
-        return "要继续的话，我可以直接帮你检查该时段是否可约，或你直接说“创建预约”。"
-
-    if tool == "get_lab_detail":
-        return "要不要我再查这个实验室明天的排期，或直接帮你预约一个时间段？"
-
-    if tool == "check_availability":
-        purpose = str((form or {}).get("purpose") or "").strip()
-        if purpose:
-            return "这个时段可用。你回复“创建预约”我就直接提交。"
-        return "这个时段可用。还差预约用途（purpose），补充后我就能直接创建预约。"
-
-    return ""
-
-
 def _wants_create_flow(user_input: str) -> bool:
     """
     判断用户是否明确想“完成预约”，用于避免中间结果过早返回。
@@ -1779,6 +1589,173 @@ def _build_create_flow_clarification(missing: List[str], form: Dict[str, Any]) -
         return ""
 
     return "为了帮你把预约真正办下来，我还需要确认这些信息：" + "，".join(parts) + "。"
+
+
+def _clear_followup_context(session: Dict[str, Any]) -> None:
+    session["followup_context"] = None
+
+
+def _set_followup_context(
+    session: Dict[str, Any],
+    source_tool: str,
+    followup_cfg: Dict[str, Any],
+    form: Dict[str, Any],
+) -> None:
+    cfg = dict(followup_cfg or {})
+    preserve_fields = list(cfg.get("preserve_fields") or [])
+    snapshot: Dict[str, Any] = {}
+    for key in preserve_fields:
+        value = (form or {}).get(key)
+        if value not in [None, ""]:
+            snapshot[key] = value
+
+    now_ts = int(_localized_now().timestamp())
+    cfg["source_tool"] = source_tool
+    cfg["snapshot"] = snapshot
+    cfg["created_at"] = now_ts
+    cfg["expires_at"] = now_ts + FOLLOWUP_CONTEXT_TTL_SECONDS
+    session["followup_context"] = cfg
+
+
+def _message_hits_keywords(text: str, keywords: List[str]) -> bool:
+    msg = (text or "").strip().lower()
+    if not msg:
+        return False
+    for key in keywords or []:
+        if str(key).strip().lower() in msg:
+            return True
+    return False
+
+
+def _resolve_followup_expected_tool(ctx: Dict[str, Any], text: str) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+    expected_tool = str(ctx.get("expected_tool") or "").strip()
+    if expected_tool:
+        return expected_tool, None
+
+    options = ctx.get("options")
+    if not isinstance(options, list):
+        return None, None
+
+    for opt in options:
+        if not isinstance(opt, dict):
+            continue
+        triggers = opt.get("trigger")
+        trigger_list: List[str] = []
+        if isinstance(triggers, list):
+            trigger_list = [str(x) for x in triggers]
+        elif isinstance(triggers, str):
+            trigger_list = [triggers]
+        if trigger_list and _message_hits_keywords(text, trigger_list):
+            tool = str(opt.get("tool") or "").strip()
+            if tool:
+                return tool, opt
+    return None, None
+
+
+def _continue_followup_context(user, text: str, session: Dict[str, Any], trace_id: str) -> Optional[Dict[str, Any]]:
+    ctx = session.get("followup_context")
+    if not isinstance(ctx, dict):
+        return None
+
+    now_ts = int(_localized_now().timestamp())
+    expires_at = _safe_int(ctx.get("expires_at")) or 0
+    if expires_at and now_ts > expires_at:
+        _clear_followup_context(session)
+        _debug_log(trace_id, "route", target="followup_expired")
+        return None
+
+    # 强意图切题时，清除续接上下文并进入常规路由
+    intent = _extract_intent(text)
+    if intent in {"cancel_reservation", "my_reservations", "update_reservation", "explain_rules", "navigate"}:
+        _clear_followup_context(session)
+        _debug_log(trace_id, "route", target="followup_cleared_by_strong_intent", intent=intent)
+        return None
+
+    form = dict(session.get("reservation_form") or {})
+    form = _extract_form_from_text(user, text, form, session)
+    session["reservation_form"] = form
+
+    waiting_for = list(ctx.get("waiting_for") or [])
+    missing_waiting = [k for k in waiting_for if (form or {}).get(k) in [None, ""]]
+    if missing_waiting:
+        return {
+            "reply": "还差这些信息：" + "、".join(missing_waiting) + "。",
+            "actions": [],
+            "trace_id": trace_id,
+        }
+
+    required = ctx.get("required_response")
+    if isinstance(required, list) and required:
+        if not _message_hits_keywords(text, [str(x) for x in required]):
+            # 常见确认词兜底，避免“好的/行”漏触发
+            if not _message_hits_keywords(text, ["好", "可以", "行", "继续", "就这个", "确定"]):
+                return None
+
+    expected_tool, matched_option = _resolve_followup_expected_tool(ctx, text)
+    if not expected_tool:
+        return {
+            "reply": "我可以继续帮你推进。你可以说“查排期”或“创建预约”。",
+            "actions": [],
+            "trace_id": trace_id,
+        }
+
+    params_seed: Dict[str, Any] = {}
+    snapshot = ctx.get("snapshot") if isinstance(ctx.get("snapshot"), dict) else {}
+    params_seed.update(snapshot)
+
+    if isinstance(matched_option, dict):
+        raw_params = matched_option.get("params")
+        if isinstance(raw_params, dict):
+            for key, value in raw_params.items():
+                if value == "from_context":
+                    if key in snapshot:
+                        params_seed[key] = snapshot[key]
+                else:
+                    params_seed[key] = value
+
+    params = _auto_fill_params(expected_tool, user, params_seed, form, text, session)
+    result = _run_tool(expected_tool, params, user, session)
+
+    if result.get("ok"):
+        _clear_followup_context(session)
+        reply = str(result.get("data") or "处理成功。")
+        form = _sync_form_from_tool_result(form, expected_tool, result)
+        session["reservation_form"] = form
+
+        followup_text, followup_cfg = _build_followup_question(expected_tool, result, form)
+        if isinstance(followup_cfg, dict):
+            _set_followup_context(session, expected_tool, followup_cfg, form)
+        if followup_text:
+            reply = f"{reply}\n\n{followup_text}"
+
+        return {
+            "reply": reply,
+            "actions": [{"label": "查看我的预约", "path": "/pages/my-reservations/my-reservations"}]
+            if expected_tool in {"create_reservation", "update_reservation", "cancel_reservation"} and result.get("ok")
+            else [],
+            "trace_id": trace_id,
+        }
+
+    if result.get("error_code") == "missing_fields":
+        missing = result.get("missing_fields") or []
+        session["pending_action"] = {
+            "tool": expected_tool,
+            "missing": missing,
+            "params": params,
+        }
+        _clear_followup_context(session)
+        return {
+            "reply": str(result.get("data") or _missing_fields_hint(expected_tool, missing)),
+            "actions": [],
+            "trace_id": trace_id,
+        }
+
+    _clear_followup_context(session)
+    return {
+        "reply": str(result.get("data") or "处理失败。"),
+        "actions": [],
+        "trace_id": trace_id,
+    }
 
 
 def _sync_form_from_tool_result(form: Dict[str, Any], tool: str, tool_result: Dict[str, Any]) -> Dict[str, Any]:
@@ -2261,6 +2238,8 @@ def _continue_pending_action(user, text: str, session: Dict[str, Any], trace_id:
     if not isinstance(pending, dict):
         return None
 
+    _clear_followup_context(session)
+
     tool = str(pending.get("tool") or "")
     if not tool:
         return None
@@ -2711,6 +2690,7 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
 
         # 4.2 我的预约 / 取消预约
         if tool in {"my_reservations", "cancel_reservation"}:
+            _clear_followup_context(session)
             reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params)
             _debug_log(trace_id, "done_return", step=step, reply_preview=reply[:120])
             return {
@@ -2721,6 +2701,7 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
 
         # 4.3 创建 / 修改预约
         if tool in {"create_reservation", "update_reservation"}:
+            _clear_followup_context(session)
             reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params)
             _debug_log(trace_id, "done_return", step=step, reply_preview=reply[:120])
             return {
@@ -2743,9 +2724,13 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
                 _debug_log(trace_id, "route", target="continue_planning", reason="create_flow_not_finished", step=step, tool=tool)
             else:
                 reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params)
-                followup = _build_followup_question(tool, tool_result, form)
-                if followup:
-                    reply = f"{reply}\n\n{followup}"
+                followup_text, followup_cfg = _build_followup_question(tool, tool_result, form)
+                if isinstance(followup_cfg, dict):
+                    _set_followup_context(session, tool, followup_cfg, form)
+                else:
+                    _clear_followup_context(session)
+                if followup_text:
+                    reply = f"{reply}\n\n{followup_text}"
                 _debug_log(trace_id, "done_return", step=step, reply_preview=reply[:120])
                 return {
                     "reply": reply,
@@ -2766,9 +2751,13 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
                 _debug_log(trace_id, "route", target="continue_planning", reason="done_but_create_flow_not_finished", step=step, tool=tool)
             else:
                 final_reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params)
-                followup = _build_followup_question(tool, tool_result, form)
-                if followup:
-                    final_reply = f"{final_reply}\n\n{followup}"
+                followup_text, followup_cfg = _build_followup_question(tool, tool_result, form)
+                if isinstance(followup_cfg, dict):
+                    _set_followup_context(session, tool, followup_cfg, form)
+                else:
+                    _clear_followup_context(session)
+                if followup_text:
+                    final_reply = f"{final_reply}\n\n{followup_text}"
                 _debug_log(trace_id, "done_return", step=step, reply_preview=final_reply[:120])
                 return {
                     "reply": final_reply,
@@ -2874,6 +2863,13 @@ def chat(user, message):
         if pending_result is not None:
             _save_session(user_id, session)
             return _normalize_chat_result(pending_result, trace_id)
+
+        followup_result = _continue_followup_context(user, text, session, trace_id)
+        if followup_result is not None:
+            _debug_log(trace_id, "route", target="followup_context")
+            session["last_domain"] = "lab"
+            _save_session(user_id, session)
+            return _normalize_chat_result(followup_result, trace_id)
 
         # ----- 4.2 实验室相关问题 vs 通用问题 -----
         # 判断用户问题是否与实验室预约相关
