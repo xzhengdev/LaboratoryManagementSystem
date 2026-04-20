@@ -93,20 +93,36 @@ export default {
     campusChart() {
       return this.campusStats.map((item) => ({ label: item.campus_name, value: item.reservation_count }))
     },
+    sortedUsageStats() {
+      return [...this.usageStats].sort((a, b) => {
+        const reservationDiff = (Number(b.reservation_count) || 0) - (Number(a.reservation_count) || 0)
+        if (reservationDiff !== 0) return reservationDiff
+        const approvedDiff = (Number(b.approved_count) || 0) - (Number(a.approved_count) || 0)
+        if (approvedDiff !== 0) return approvedDiff
+        return (Number(a.lab_id) || 0) - (Number(b.lab_id) || 0)
+      })
+    },
     labChart() {
-      return this.usageStats.slice(0, 6).map((item) => ({ label: item.lab_name, value: item.approved_count }))
+      return this.sortedUsageStats.slice(0, 6).map((item) => ({ label: item.lab_name, value: item.approved_count }))
     },
     localReservationChart() {
-      return this.usageStats.slice(0, 6).map((item) => ({ label: item.lab_name, value: item.reservation_count || 0 }))
+      return this.sortedUsageStats.slice(0, 6).map((item) => ({ label: item.lab_name, value: item.reservation_count || 0 }))
     },
     localApprovedChart() {
-      return this.usageStats.slice(0, 6).map((item) => ({ label: item.lab_name, value: item.approved_count || 0 }))
+      return this.sortedUsageStats.slice(0, 6).map((item) => ({ label: item.lab_name, value: item.approved_count || 0 }))
     },
     rankingTitle() {
       return this.isSystemView ? '热门实验室排行（全校）' : '热门实验室排行（本校区）'
     },
     rankingList() {
-      return this.usageStats.slice(0, 5)
+      return this.sortedUsageStats.slice(0, 5)
+    },
+    campusNameMap() {
+      const map = {}
+      this.campusStats.forEach((item) => {
+        map[String(item.campus_id)] = item.campus_name
+      })
+      return map
     },
     tipList() {
       if (this.isSystemView) {
@@ -136,7 +152,9 @@ export default {
   methods: {
     pillText(item) {
       const campusName = this.campusStats.length ? this.campusStats[0].campus_name : '当前校区'
-      return this.isSystemView ? item.campus_name || '未分配校区' : campusName
+      if (!this.isSystemView) return campusName
+      const key = String(item.campus_id || '')
+      return this.campusNameMap[key] || item.campus_name || '未分配校区'
     }
   }
 }

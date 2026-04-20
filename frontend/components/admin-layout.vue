@@ -260,14 +260,14 @@ export default {
   gap: 18rpx;
 }
 .admin-content-head__title {
-  font-size: 56rpx;
+  font-size: 68rpx;
   font-weight: 800;
   color: #152d4c;
 }
 .admin-content-head__sub {
-  margin-top: 2rpx;
-  font-size: 26rpx;
-  color: #1ab6cc;
+  margin-top: 10rpx;
+  font-size: 30rpx;
+  color: #a0a0a0;
   font-weight: 700;
 }
 .admin-head-user {
