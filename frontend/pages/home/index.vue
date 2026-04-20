@@ -128,20 +128,16 @@ const LAB_COVERS = [
 ]
 const HERO_BANNERS = [
   {
-    image: '/static/wallhaven-gpg5wl.png',
-    gradient: 'linear-gradient(125deg, #132e4e 0%, #29608f 58%, #8ac4ea 100%)'
+    image: '/static/campuses/zhongyangminzudaxue.jpg',
   },
   {
-    image: '/static/campuses/haidian.png',
-    gradient: 'linear-gradient(125deg, #1f3d63 0%, #2b5f8f 56%, #9dcff3 100%)'
+    image: '/static\campuses\haidian.png',
   },
   {
-    image: '/static/campuses/fengtai.png',
-    gradient: 'linear-gradient(125deg, #1a3757 0%, #3a628a 55%, #b1daf8 100%)'
+    image: '/static/campuses/fengtai.jpg',
   },
   {
-    image: '/static/campuses/hainan.png',
-    gradient: 'linear-gradient(125deg, #204066 0%, #3f6990 52%, #aed9fb 100%)'
+    image: '/static/campuses/hainan.jpg',
   }
 ]
 
@@ -289,6 +285,7 @@ export default {
   display: block;
   width: 100%;
   height: 100%;
+filter: brightness(1.08) contrast(1.05);
 }
 
 .student-home__hero-overlay {
@@ -296,8 +293,15 @@ export default {
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background: linear-gradient(110deg, rgba(3, 24, 48, 0.65) 0%, rgba(11, 47, 82, 0.38) 60%, rgba(19, 66, 102, 0.2) 100%);
+  background: linear-gradient(
+    110deg,
+    rgba(3, 24, 48, 0.22) 0%,
+    rgba(11, 47, 82, 0.12) 60%,
+    rgba(19, 66, 102, 0.08) 100%
+  );
 }
+
+
 
 .student-home__hero-content {
   position: relative;
