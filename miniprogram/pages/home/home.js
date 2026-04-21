@@ -5,9 +5,9 @@ Page({
   data: {
     labs: [],
     banners: [
-      { title: '智慧实验室预约', sub: '随时随地，轻松预约', bg: 'linear-gradient(135deg,#4A90E2,#2c6fbe)' },
-      { title: '跨校区协作', sub: '多校区资源统一管理', bg: 'linear-gradient(135deg,#27AE60,#1e8449)' },
-      { title: 'AI智能助手', sub: '自然语言查询预约信息', bg: 'linear-gradient(135deg,#9B59B6,#7d3c98)' }
+      { title: '智慧实验室预约', sub: '随时随地，快速锁定实验资源', image: '/assets/logo.png' },
+      { title: '跨校区协同', sub: '多校区资源统一查看与调度', image: '/assets/logo.png' },
+      { title: 'AI 智能助手', sub: '自然语言查询预约和排期信息', image: '/assets/logo.png' }
     ]
   },
   onShow() {
@@ -15,7 +15,26 @@ Page({
       wx.redirectTo({ url: '/pages/login/login' })
       return
     }
+    this.loadBanners()
     this.loadLabs()
+  },
+  async loadBanners() {
+    try {
+      const campuses = await api.campuses()
+      const list = Array.isArray(campuses) ? campuses : []
+      const imageBanners = list
+        .filter((item) => item && item.cover_url)
+        .slice(0, 5)
+        .map((item) => ({
+          title: item.campus_name || '校区实验室资源',
+          sub: item.description || item.address || '查看该校区可预约实验室与开放时段',
+          image: item.cover_url
+        }))
+
+      if (imageBanners.length) {
+        this.setData({ banners: imageBanners })
+      }
+    } catch (_) {}
   },
   async loadLabs() {
     try {

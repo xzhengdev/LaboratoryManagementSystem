@@ -1,60 +1,49 @@
 <view class="reservations-page">
+  <scroll-view scroll-x class="filter-scroll">
+    <view class="filter-tabs">
+      <view
+        wx:for="{{filters}}"
+        wx:key="value"
+        class="filter-tab {{activeFilter===item.value?'active':''}}"
+        bindtap="setFilter"
+        data-value="{{item.value}}"
+      >
+        {{item.label}}
+      </view>
+    </view>
+  </scroll-view>
 
-<!-- 筛选 -->
-<scroll-view scroll-x class="filter-scroll">
-  <view class="filter-tabs">
-    <view
-      wx:for="{{filters}}"
-      wx:key="value"
-      class="filter-tab {{activeFilter===item.value?'active':''}}"
-      bindtap="setFilter"
-      data-value="{{item.value}}"
-    >
-      {{item.label}}
+  <view wx:if="{{list.length===0}}" class="empty-tip">暂无预约记录</view>
+
+  <view
+    wx:for="{{list}}"
+    wx:key="id"
+    class="res-card"
+    bindtap="goDetail"
+    data-id="{{item.id}}"
+  >
+    <view class="res-header">
+      <text class="res-lab">{{item.lab_name || '实验室'}}</text>
+      <view class="status-tag status-{{item.status}}">
+        {{statusText[item.status]}}
+      </view>
+    </view>
+
+    <view class="res-body">
+      <view class="res-row">
+        <text class="res-label">日期</text>
+        <text class="res-text">{{item.reservation_date}}</text>
+      </view>
+
+      <view class="res-row">
+        <text class="res-label">时间</text>
+        <text class="res-text">{{item.start_time}} - {{item.end_time}}</text>
+      </view>
+
+      <view class="res-row">
+        <text class="res-label">人数</text>
+        <text class="res-text">{{item.participant_count}} 人</text>
+      </view>
     </view>
   </view>
-</scroll-view>
-
-<!-- 空 -->
-<view wx:if="{{list.length===0}}" class="empty-tip">暂无预约记录</view>
-
-<!-- 列表 -->
-<view
-  wx:for="{{list}}"
-  wx:key="id"
-  class="res-card"
-  bindtap="goDetail"
-  data-id="{{item.id}}"
->
-
-  <!-- 顶部 -->
-  <view class="res-header">
-    <text class="res-lab">{{item.lab_name || '实验室'}}</text>
-
-    <view class="status-tag status-{{item.status}}">
-      {{statusText[item.status]}}
-    </view>
-  </view>
-
-  <!-- 信息区 -->
-  <view class="res-body">
-
-    <view class="res-row">
-      <text class="res-icon">📅</text>
-      <text class="res-text">{{item.reservation_date}}</text>
-    </view>
-
-    <view class="res-row">
-      <text class="res-icon">⏰</text>
-      <text class="res-text">{{item.start_time}} – {{item.end_time}}</text>
-    </view>
-
-    <view class="res-row">
-      <text class="res-icon">👥</text>
-      <text class="res-text">{{item.participant_count}} 人</text>
-    </view>
-
-  </view>
-</view>
-
 </view>

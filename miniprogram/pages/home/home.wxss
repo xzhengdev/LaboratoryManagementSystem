@@ -8,7 +8,7 @@
 
 /* ===== Banner（升级） ===== */
 .banner {
-  height: 320rpx;
+  height: 340rpx;
   width: 100%;
   border-radius: 24rpx;
   overflow: hidden;
@@ -16,12 +16,32 @@
 }
 
 .banner-slide {
-  height: 320rpx;
+  position: relative;
+  height: 340rpx;
+  border-radius: 24rpx;
+  overflow: hidden;
+}
+
+.banner-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.banner-mask {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(6, 19, 39, 0.08) 0%, rgba(6, 19, 39, 0.46) 100%);
+}
+
+.banner-content {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0 40rpx 30rpx;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding: 0 40rpx;
-  border-radius: 24rpx;
 }
 
 /* 标题 */
@@ -68,6 +88,12 @@
   font-size: 40rpx;
 
   box-shadow: 0 6rpx 16rpx rgba(0,0,0,0.08);
+}
+
+.entry-icon-image {
+  width: 42rpx;
+  height: 42rpx;
+  display: block;
 }
 
 /* label */
