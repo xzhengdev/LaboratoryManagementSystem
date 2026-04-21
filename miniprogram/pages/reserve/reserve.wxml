@@ -1,11 +1,34 @@
 <view class="reserve-page">
   <view class="card lab-summary">
     <text class="lab-summary-name">{{lab.lab_name}}</text>
-    <text class="lab-summary-loc">📍 {{lab.location || ''}}</text>
+    <text class="lab-summary-loc">位置：{{lab.location || '-'}}</text>
+  </view>
+
+  <view class="card timeline-card">
+    <view class="timeline-header">
+      <text class="card-title">时间可视化</text>
+      <text class="timeline-note">深色为已占用，蓝色为当前选择</text>
+    </view>
+    <view class="timeline-track">
+      <view
+        wx:for="{{busyTimelineBlocks}}"
+        wx:key="index"
+        class="timeline-block timeline-block-busy"
+        style="left: {{item.left}}%; width: {{item.width}}%;"
+      ></view>
+      <view
+        wx:if="{{selectedTimeline.visible}}"
+        class="timeline-block timeline-block-selected"
+        style="left: {{selectedTimeline.left}}%; width: {{selectedTimeline.width}}%;"
+      ></view>
+    </view>
+    <view class="timeline-range">
+      <text>{{openTime}}</text>
+      <text>{{closeTime}}</text>
+    </view>
   </view>
 
   <view class="card form-card">
-    <!-- Date -->
     <view class="form-row">
       <text class="form-label">预约日期</text>
       <picker mode="date" value="{{form.date}}" start="{{minDate}}" end="{{maxDate}}" bindchange="onDate">
@@ -13,33 +36,33 @@
       </picker>
     </view>
 
-    <!-- Start time -->
-    <view class="form-row">
+    <view class="form-row form-row-tap" bindtap="openTimePanel" data-field="start">
       <text class="form-label">开始时间</text>
-      <picker mode="time" value="{{form.start_time}}" bindchange="onStartTime">
-        <view class="form-val">{{form.start_time}} ›</view>
-      </picker>
+      <view class="form-val-wrap">
+        <text class="form-val">{{form.start_time || '请选择'}} ›</text>
+      </view>
     </view>
 
-    <!-- End time -->
-    <view class="form-row">
+    <view class="form-row form-row-tap" bindtap="openTimePanel" data-field="end">
       <text class="form-label">结束时间</text>
-      <picker mode="time" value="{{form.end_time}}" bindchange="onEndTime">
-        <view class="form-val">{{form.end_time}} ›</view>
-      </picker>
+      <view class="form-val-wrap">
+        <text class="form-val">{{form.end_time || '请选择'}} ›</text>
+      </view>
     </view>
 
-    <!-- Participants -->
+    <view class="option-tip" wx:if="{{!availableStartTimes.length}}">
+      当前日期没有可预约时间，请切换日期。
+    </view>
+
     <view class="form-row">
       <text class="form-label">参与人数</text>
       <view class="count-ctrl">
-        <view class="count-btn" bindtap="decCount">−</view>
+        <view class="count-btn" bindtap="decCount">-</view>
         <text class="count-val">{{form.participant_count}}</text>
         <view class="count-btn" bindtap="incCount">+</view>
       </view>
     </view>
 
-    <!-- Purpose -->
     <view class="form-col">
       <text class="form-label">使用目的</text>
       <textarea
@@ -53,16 +76,34 @@
     </view>
   </view>
 
-  <!-- Timeline preview -->
-  <view class="card" wx:if="{{schedule.length > 0}}">
+  <!-- <view class="card" wx:if="{{schedule.length > 0}}">
     <text class="card-title">当日排期</text>
     <view wx:for="{{schedule}}" wx:key="id" class="sched-row">
-      <text class="sched-time">{{item.start_time}}–{{item.end_time}}</text>
-      <text class="sched-status status-tag status-{{item.status}}">{{statusText[item.status]}}</text>
+      <text class="sched-time">{{item.start_label}} - {{item.end_label}}</text>
+      <text class="sched-status status-tag status-{{item.status}}">{{item.status_label}}</text>
     </view>
-  </view>
+  </view> -->
 
   <view class="submit-bar">
     <button class="btn-primary submit-btn" bindtap="doSubmit" loading="{{loading}}">提交预约</button>
+  </view>
+
+  <view wx:if="{{timePanelVisible}}" class="time-panel-mask" bindtap="closeTimePanel"></view>
+  <view wx:if="{{timePanelVisible}}" class="time-panel">
+    <view class="time-panel-head">
+      <text class="time-panel-title">{{timePanelTitle}}</text>
+      <text class="time-panel-close" bindtap="closeTimePanel">关闭</text>
+    </view>
+    <scroll-view class="time-panel-options" scroll-y>
+      <view
+        wx:for="{{timePanelOptions}}"
+        wx:key="index"
+        class="time-option {{(timePanelField==='start' && item===form.start_time) || (timePanelField==='end' && item===form.end_time) ? 'time-option-active' : ''}}"
+        data-value="{{item}}"
+        bindtap="chooseTimeOption"
+      >
+        {{item}}
+      </view>
+    </scroll-view>
   </view>
 </view>
