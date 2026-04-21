@@ -25,13 +25,11 @@ Page({
   },
 
   onLoad() {
-    // 已登录直接跳转
     if (isLoggedIn()) {
       wx.switchTab({ url: '/pages/home/home' })
       return
     }
 
-    // 读取记住密码
     const remembered = wx.getStorageSync(REMEMBER_KEY)
     if (remembered?.username && remembered?.password) {
       this.setData({
@@ -44,7 +42,6 @@ Page({
     }
   },
 
-  /* ===== 输入处理（关键：保证浮动 label 正常） ===== */
   onUsername(e) {
     this.setData({
       'form.username': e.detail.value.trim()
@@ -57,30 +54,25 @@ Page({
     })
   },
 
-  /* ===== 记住密码 ===== */
   toggleRemember() {
     const next = !this.data.rememberPassword
     this.setData({ rememberPassword: next })
-
     if (!next) {
       wx.removeStorageSync(REMEMBER_KEY)
     }
   },
 
-  /* ===== 忘记密码 ===== */
   onForgotPassword() {
     wx.showModal({
       title: '忘记密码',
-      content: '请联系实验室管理员或教务系统管理员重置密码。',
+      content: '请联系实验室管理员或系统管理员重置密码。',
       confirmText: '我知道了',
       showCancel: false
     })
   },
 
-  /* ===== 登录（带 loading 动效） ===== */
   async doLogin() {
-    if (this.data.loading) return   // 防重复点击
-
+    if (this.data.loading) return
     const { username, password } = this.data.form
 
     if (!username || !password) {
@@ -95,10 +87,8 @@ Page({
 
     try {
       const res = await api.login({ username, password })
-
       setSession(res.token, res.user)
 
-      // 记住密码
       if (this.data.rememberPassword) {
         wx.setStorageSync(REMEMBER_KEY, { username, password })
       } else {
@@ -110,14 +100,14 @@ Page({
         icon: 'success'
       })
 
-      // 延迟一点更有“产品感”
       setTimeout(() => {
         wx.switchTab({ url: '/pages/home/home' })
       }, 500)
-
     } catch (err) {
+      console.error('[MP][LOGIN][ERROR]', err)
+      const message = (err && err.message) || (err && err.msg) || '登录失败，请检查账号或密码'
       wx.showToast({
-        title: '登录失败，请检查账号或网络',
+        title: message,
         icon: 'none'
       })
     }
