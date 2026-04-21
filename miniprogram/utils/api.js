@@ -39,6 +39,7 @@ const api = {
   myReservations: () => request({ url: '/reservations/my' }),
   reservationDetail: (id) => request({ url: `/reservations/${id}` }),
   cancelReservation: (id) => request({ url: `/reservations/${id}/cancel`, method: 'POST' }),
+  deleteReservation: (id) => request({ url: `/reservations/${id}`, method: 'DELETE' }),
   agentChat: (message, options = {}) => request({
     url: '/agent/chat',
     method: 'POST',

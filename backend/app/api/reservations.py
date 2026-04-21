@@ -133,6 +133,25 @@ def cancel_reservation_api(reservation_id):
 
 
 # ==================== 通用预约列表（管理端）====================
+@reservation_bp.delete("/reservations/<int:reservation_id>")
+@jwt_required()
+def delete_reservation_api(reservation_id):
+    current_user = get_current_user()
+    item = Reservation.query.get_or_404(reservation_id)
+    if item.user_id != current_user.id:
+        raise AppError("只能删除自己的预约", 403, 40331)
+    if item.status not in {"rejected", "cancelled"}:
+        raise AppError("仅已拒绝或已取消的预约可删除", 400, 40071)
+
+    from app.extensions import db
+    from app.models import Approval
+
+    Approval.query.filter_by(reservation_id=item.id).delete(synchronize_session=False)
+    db.session.delete(item)
+    db.session.commit()
+    return success(None, "删除预约成功")
+
+
 @reservation_bp.get("/reservations")
 @jwt_required()
 def list_reservations_api():
