@@ -16,6 +16,7 @@
   adminApprovals: '/pages/admin-approvals/index',
   adminUsers: '/pages/admin-users/index',
   adminProfile: '/pages/admin-profile/index',
+  adminLogs: '/pages/admin-logs/index',
   statistics: '/pages/statistics/index'
 }
 
@@ -77,6 +78,13 @@ export const adminMenus = [
     desc: '维护账号与角色',
     path: routes.adminUsers,
     group: '权限管理'
+  },
+  {
+    key: 'logs',
+    title: '日志审计',
+    desc: '查看关键业务操作日志',
+    path: routes.adminLogs,
+    group: '分析看板'
   },
   {
     key: 'statistics',
@@ -189,5 +197,9 @@ export function canApproveReservations(role) {
 }
 
 export function canViewStatistics(role) {
+  return isSystemAdmin(role) || isLabAdmin(role)
+}
+
+export function canViewOperationLogs(role) {
   return isSystemAdmin(role) || isLabAdmin(role)
 }

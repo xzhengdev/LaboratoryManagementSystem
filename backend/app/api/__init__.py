@@ -4,6 +4,7 @@ from .auth import auth_bp
 from .campuses import campus_bp
 from .equipment import equipment_bp
 from .labs import lab_bp
+from .operation_logs import operation_log_bp
 from .reservations import reservation_bp
 from .statistics import statistics_bp
 from .users import user_bp
@@ -18,6 +19,7 @@ def register_blueprints(app):
         equipment_bp,
         reservation_bp,
         approval_bp,
+        operation_log_bp,
         statistics_bp,
         user_bp,
         agent_bp,

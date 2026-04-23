@@ -184,6 +184,8 @@ export const api = {
     request({ url: `/users/${id}`, method: "PUT", data }),
   resetUserPassword: (id, data = {}) =>
     request({ url: `/users/${id}/reset-password`, method: "POST", data }),
+  operationLogs: (params = {}) =>
+    request({ url: "/operation-logs", data: params }),
   statisticsOverview: () => request({ url: "/statistics/overview" }),
   statisticsCampus: () => request({ url: "/statistics/campus" }),
   statisticsUsage: () => request({ url: "/statistics/lab_usage" }),
