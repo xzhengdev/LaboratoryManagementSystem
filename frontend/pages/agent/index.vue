@@ -9,8 +9,19 @@
       </view>
 
       <view class="agent-page__chat">
-        <scroll-view scroll-y class="agent-page__messages">
-          <view v-for="(item, index) in messages" :key="index" class="agent-page__row" :class="item.role">
+        <scroll-view
+          scroll-y
+          scroll-with-animation
+          class="agent-page__messages"
+          :scroll-into-view="scrollIntoView"
+        >
+          <view
+            v-for="(item, index) in messages"
+            :id="messageDomId(index)"
+            :key="item.id || index"
+            class="agent-page__row"
+            :class="item.role"
+          >
             <view class="agent-page__avatar" :class="item.role === 'assistant' ? 'assistant' : 'user'">
               <image
                 v-if="item.role === 'assistant'"
@@ -77,6 +88,7 @@
 import SiteFooter from '../../components/site-footer.vue'
 import StudentTopNav from '../../components/student-top-nav.vue'
 import { api } from '../../api/index'
+import { formatAgentReply, normalizeAgentActions, normalizeAgentPath } from '../../common/agent-format'
 import { requireLogin } from '../../common/guard'
 import { openPage } from '../../common/router'
 import { getProfile } from '../../common/session'
@@ -86,6 +98,8 @@ export default {
   data() {
     return {
       draft: '',
+      messageSeq: 1,
+      scrollIntoView: '',
       userAvatar: '',
       userInitial: '我',
       quickPrompts: [
@@ -98,6 +112,7 @@ export default {
       ],
       messages: [
         {
+          id: 'msg-0',
           role: 'assistant',
           content: '你好，我可以帮你查可预约实验室、我的预约状态、审批进度和统计概览。'
         }
@@ -110,47 +125,35 @@ export default {
     const name = String(profile.real_name || profile.username || '我')
     this.userAvatar = profile.avatar_url || ''
     this.userInitial = name.slice(0, 1) || '我'
+    this.scrollToBottom()
   },
   methods: {
-    stripMarkdownSyntax(content) {
-      const text = String(content || '')
-      return text
-        .replace(/```[\s\S]*?```/g, (block) => block.replace(/```/g, ''))
-        .replace(/^#{1,6}\s*/gm, '')
-        .replace(/\*\*(.*?)\*\*/g, '$1')
-        .replace(/\*(.*?)\*/g, '$1')
-        .replace(/`([^`]+)`/g, '$1')
-        .replace(/^\s*([-*_])\1{2,}\s*$/gm, '')
-        .replace(/^\s*[-*+]\s+/gm, '')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim()
+    createMessage(role, content, extra = {}) {
+      const id = `msg-${this.messageSeq++}`
+      return {
+        id,
+        role,
+        content,
+        ...extra
+      }
     },
-    normalizeStatusText(content) {
-      const text = String(content || '')
-      return text
-        .replace(/\bpending\b/gi, '待审批')
-        .replace(/\bapproved\b/gi, '已通过')
-        .replace(/\bcancelled\b/gi, '已取消')
-        .replace(/\bcanceled\b/gi, '已取消')
+    messageDomId(index) {
+      return `agent-page-msg-${index}`
+    },
+    scrollToBottom() {
+      this.$nextTick(() => {
+        const target = this.messageDomId(this.messages.length - 1)
+        this.scrollIntoView = ''
+        this.$nextTick(() => {
+          this.scrollIntoView = target
+        })
+      })
     },
     normalizeAssistantText(content) {
-      return this.normalizeStatusText(this.stripMarkdownSyntax(content))
-    },
-    normalizeActionPath(path) {
-      const raw = String(path || '')
-      const map = {
-        '/pages/my-reservations/my-reservations': '/pages/my-reservations/index',
-        '/pages/agent/chat': '/pages/agent/index',
-        '/pages/agent/index': '/pages/agent/index'
-      }
-      return map[raw] || raw
+      return formatAgentReply(content)
     },
     normalizeActions(actions) {
-      if (!Array.isArray(actions)) return []
-      return actions.map((item) => ({
-        ...item,
-        path: this.normalizeActionPath(item.path)
-      }))
+      return normalizeAgentActions(actions)
     },
     usePrompt(text) {
       this.draft = text
@@ -159,25 +162,31 @@ export default {
     async sendMessage() {
       if (!this.draft) return
       const message = this.draft
-      this.messages.push({ role: 'user', content: message })
+      this.messages.push(this.createMessage('user', message))
       this.draft = ''
+      this.scrollToBottom()
       try {
         const res = await api.agentChat(message)
         this.messages.push({
-          role: 'assistant',
+          ...this.createMessage(
+            'assistant',
+            this.normalizeAssistantText(res.reply || '已收到，请稍后再试。')
+          ),
           content: this.normalizeAssistantText(res.reply || '已收到，请稍后再试。'),
           actions: this.normalizeActions(res.actions)
         })
+        this.scrollToBottom()
       } catch (error) {
-        this.messages.push({
-          role: 'assistant',
-          content: '助手暂时不可用，请稍后再试。',
-          actions: []
-        })
+        this.messages.push(
+          this.createMessage('assistant', '助手暂时不可用，请稍后再试。', {
+            actions: []
+          })
+        )
+        this.scrollToBottom()
       }
     },
     go(path) {
-      openPage(this.normalizeActionPath(path))
+      openPage(normalizeAgentPath(path))
     }
   }
 }
@@ -185,9 +194,11 @@ export default {
 
 <style lang="scss">
 .agent-page {
+  height: 100vh;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background:
     radial-gradient(circle at 12% 14%, rgba(109, 179, 230, 0.25), transparent 26%),
     radial-gradient(circle at 88% 18%, rgba(173, 208, 240, 0.26), transparent 24%),
@@ -200,6 +211,7 @@ export default {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 
 .agent-page__title {
@@ -219,8 +231,10 @@ export default {
   margin-top: 18rpx;
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  gap: 10rpx;
+  overflow: hidden;
   border-radius: 24rpx;
   border: 1rpx solid rgba(197, 198, 207, 0.28);
   background: rgba(255, 255, 255, 0.78);
@@ -228,9 +242,10 @@ export default {
 }
 
 .agent-page__messages {
-  flex: 1;
+  height: 100%;
   min-height: 0;
   padding: 6rpx;
+  overflow: hidden;
 }
 
 .agent-page__row {
@@ -329,10 +344,11 @@ export default {
 }
 
 .agent-page__quick {
-  margin-top: 10rpx;
   display: flex;
   flex-direction: column;
   gap: 8rpx;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 .agent-page__quick-title {
@@ -361,8 +377,8 @@ export default {
 }
 
 .agent-page__input-bar {
-  margin-top: 10rpx;
   margin-bottom: 6rpx;
+  flex-shrink: 0;
   border-radius: 18rpx;
   background: #ffffff;
   border: 1rpx solid rgba(197, 198, 207, 0.34);
@@ -436,10 +452,11 @@ export default {
     border-radius: 18rpx;
     padding: 10rpx;
     min-height: 0;
+    gap: 6rpx;
   }
 
   .agent-page__messages {
-    height: auto;
+    height: 100%;
     min-height: 0;
   }
 
@@ -476,7 +493,6 @@ export default {
   }
 
   .agent-page__quick {
-    margin-top: 6rpx;
     gap: 6rpx;
   }
 

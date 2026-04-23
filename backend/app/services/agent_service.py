@@ -1261,6 +1261,7 @@ def _normalize_chat_result(result: Any, trace_id: str = "") -> Dict[str, Any]:
     normalized = dict(result) if isinstance(result, dict) else {"reply": str(result or "")}
     # 确保 reply 字段存在（防止后续代码出现 KeyError）
     normalized.setdefault("reply", "")
+    normalized["reply"] = _prettify_agent_reply(normalized.get("reply") or "")
     # ==================== 2. 处理 actions（快捷操作按钮）====================
     # 获取现有的 actions，如果不是列表则初始化为空列表
     actions = normalized.get("actions")
@@ -1307,6 +1308,37 @@ def _normalize_chat_result(result: Any, trace_id: str = "") -> Dict[str, Any]:
     
     # ==================== 4. 返回标准化结果 ====================
     return normalized
+
+
+def _replace_english_terms(text: str) -> str:
+    content = str(text or "")
+    replacements = {
+        "pending": "待审批",
+        "approved": "已通过",
+        "rejected": "已驳回",
+        "reject": "驳回",
+        "cancelled": "已取消",
+        "canceled": "已取消",
+        "reservation": "预约",
+        "approval": "审批",
+        "create": "创建",
+        "update": "更新",
+        "cancel": "取消",
+        "active": "启用",
+        "disabled": "停用",
+    }
+    for source, target in sorted(replacements.items(), key=lambda item: len(item[0]), reverse=True):
+        content = re.sub(rf"\b{re.escape(source)}\b", target, content, flags=re.IGNORECASE)
+    return content
+
+
+def _prettify_agent_reply(text: str) -> str:
+    content = str(text or "").strip()
+    if not content:
+        return ""
+    content = _replace_english_terms(content)
+    content = re.sub(r"\n{3,}", "\n\n", content)
+    return content.strip()
 
 
 def _llm_agent_decide(context: str, history: List[Dict[str, Any]], form: Dict[str, Any]) -> Dict[str, Any]:
@@ -1422,10 +1454,15 @@ def _labs_to_text(labs: List[Laboratory]) -> str:
     # 将实验室对象列表转换为可直接展示给用户的文本结果
     if not labs:
         return "没有找到符合条件的实验室。"
-    lines = []
+    lines = [f"共找到 {len(labs)} 个符合条件的实验室："]
     for i, lab in enumerate(labs, start=1):
         campus_name = getattr(lab.campus, "campus_name", "") if getattr(lab, "campus", None) else ""
-        lines.append(f"{i}. ID={lab.id} | {lab.lab_name} | 容量={lab.capacity} | 校区={campus_name}")
+        lines.append(
+            f"{i}. {lab.lab_name}\n"
+            f"   校区：{campus_name or '未分配'}\n"
+            f"   容量：{lab.capacity}\n"
+            f"   实验室ID：{lab.id}"
+        )
     return "\n".join(lines)
 
 
@@ -1437,12 +1474,16 @@ def _schedule_result_to_text(result: Dict[str, Any]) -> str:
     for item in result.get("schedules", []):
         lab, schedule = item["lab"], item["schedule"]
         rows = schedule.get("reservations") or []
-        row_text = [f"{r['start_time'][:5]}-{r['end_time'][:5]}({r.get('status', '')})" for r in rows[:10]]
+        row_text = [
+            f"- {r['start_time'][:5]}-{r['end_time'][:5]}（{_replace_english_terms(str(r.get('status', '') or '未知状态'))}）"
+            for r in rows[:10]
+        ]
         parts.append(
-            f"LabID={lab.id} | {lab.lab_name} | 开放={schedule.get('open_time')}-{schedule.get('close_time')} | "
-            f"预约={'; '.join(row_text) if row_text else '无'}"
+            f"实验室：{lab.lab_name}（ID {lab.id}）\n"
+            f"开放时间：{schedule.get('open_time')}-{schedule.get('close_time')}\n"
+            f"预约情况：\n{chr(10).join(row_text) if row_text else '- 暂无预约'}"
         )
-    return "\n".join(parts) if parts else "没有排期数据。"
+    return "\n\n".join(parts) if parts else "没有排期数据。"
 
 
 def _normalize_nav_path(path: str) -> str:
@@ -2138,9 +2179,12 @@ def _handle_my_reservations(tool: str, params: Dict[str, Any], user, session: Di
     session["last_reservations"] = [{"id": r.id} for r in rows]
     session["last_choice_type"] = "reservation_list"
 
-    text = "\n".join([
-        f"{idx}. 预约ID={r.id} | {r.lab.lab_name if r.lab else '-'} | {r.reservation_date} | "
-        f"{str(r.start_time)[:5]}-{str(r.end_time)[:5]} | {getattr(r, 'status', '-')}"
+    text = "\n\n".join([
+        f"{idx}. {r.lab.lab_name if r.lab else '未关联实验室'}\n"
+        f"   日期：{r.reservation_date}\n"
+        f"   时间：{str(r.start_time)[:5]}-{str(r.end_time)[:5]}\n"
+        f"   状态：{_replace_english_terms(str(getattr(r, 'status', '-') or '-'))}\n"
+        f"   预约ID：{r.id}"
         for idx, r in enumerate(rows, start=1)
     ])
     return _tool_result(tool, True, text)

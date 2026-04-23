@@ -8,10 +8,16 @@
         <text>实验室预约 Agent</text>
         <text class="agent-close" @click="visible = false">收起</text>
       </view>
-      <scroll-view scroll-y class="agent-body">
+      <scroll-view
+        scroll-y
+        scroll-with-animation
+        class="agent-body"
+        :scroll-into-view="scrollIntoView"
+      >
         <view
           v-for="(item, index) in messages"
-          :key="index"
+          :id="messageDomId(index)"
+          :key="item.id || index"
           class="agent-message-wrap"
           :class="item.role"
         >
@@ -49,6 +55,7 @@
 
 <script>
 import { api } from '../api/index'
+import { formatAgentReply, normalizeAgentActions, normalizeAgentPath } from '../common/agent-format'
 import { getProfile } from '../common/session'
 
 export default {
@@ -64,8 +71,11 @@ export default {
       // visible 控制浮窗显隐；messages 保存会话上下文；lastActions 保存后端推荐跳转。
       visible: this.defaultVisible,
       draft: '',
+      messageSeq: 1,
+      scrollIntoView: '',
       messages: [
         {
+          id: 'msg-0',
           role: 'assistant',
           content: '你好，我可以帮你查看实验室排期、我的预约、统计概览，也可以把你引导到对应页面。'
         }
@@ -77,6 +87,7 @@ export default {
   },
   created() {
     this.loadUserIdentity()
+    this.scrollToBottom()
   },
   methods: {
     loadUserIdentity() {
@@ -85,32 +96,33 @@ export default {
       this.userAvatar = profile.avatar_url || ''
       this.userInitial = name.slice(0, 1) || '我'
     },
-    stripMarkdownSyntax(content) {
-      const text = String(content || '')
-      return text
-        .replace(/```[\s\S]*?```/g, (block) => block.replace(/```/g, ''))
-        .replace(/^#{1,6}\s*/gm, '')
-        .replace(/\*\*(.*?)\*\*/g, '$1')
-        .replace(/\*(.*?)\*/g, '$1')
-        .replace(/`([^`]+)`/g, '$1')
-        .replace(/^\s*([-*_])\1{2,}\s*$/gm, '')
-        .replace(/^\s*[-*+]\s+/gm, '')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim()
-    },
-    normalizeStatusText(content) {
-      const text = String(content || '')
-      return text
-        .replace(/\bpending\b/gi, '待审批')
-        .replace(/\bapproved\b/gi, '已通过')
-        .replace(/\bcancelled\b/gi, '已取消')
-        .replace(/\bcanceled\b/gi, '已取消')
-    },
     normalizeAssistantText(content) {
-      return this.normalizeStatusText(this.stripMarkdownSyntax(content))
+      return formatAgentReply(content)
+    },
+    createMessage(role, content, extra = {}) {
+      const id = `msg-${this.messageSeq++}`
+      return {
+        id,
+        role,
+        content,
+        ...extra
+      }
+    },
+    messageDomId(index) {
+      return `agent-float-msg-${index}`
+    },
+    scrollToBottom() {
+      this.$nextTick(() => {
+        const target = this.messageDomId(this.messages.length - 1)
+        this.scrollIntoView = ''
+        this.$nextTick(() => {
+          this.scrollIntoView = target
+        })
+      })
     },
     toggleWindow() {
       this.visible = !this.visible
+      if (this.visible) this.scrollToBottom()
     },
     async sendMessage() {
       // 发送消息时先把用户输入写入本地消息列表，再请求后端 Agent 接口。
@@ -118,20 +130,27 @@ export default {
         return
       }
       const message = this.draft
-      this.messages.push({ role: 'user', content: message })
+      this.messages.push(this.createMessage('user', message))
       this.draft = ''
+      this.scrollToBottom()
       try {
         const res = await api.agentChat(message)
         // 后端返回 reply 文本和 actions 跳转建议，两者都展示在窗口中。
-        this.messages.push({ role: 'assistant', content: this.normalizeAssistantText(res.reply) })
-        this.lastActions = res.actions || []
+        this.messages.push(
+          this.createMessage('assistant', this.normalizeAssistantText(res.reply))
+        )
+        this.lastActions = normalizeAgentActions(res.actions)
+        this.scrollToBottom()
       } catch (error) {
-        this.messages.push({ role: 'assistant', content: '助手暂时不可用，请稍后再试。' })
+        this.messages.push(
+          this.createMessage('assistant', '助手暂时不可用，请稍后再试。')
+        )
+        this.scrollToBottom()
       }
     },
     go(path) {
       // 推荐操作点击后直接跳转到系统内对应页面。
-      uni.navigateTo({ url: path })
+      uni.navigateTo({ url: normalizeAgentPath(path) })
     }
   }
 }
@@ -162,8 +181,8 @@ export default {
   box-shadow: 0 20rpx 60rpx rgba(0, 0, 0, 0.14);
   margin-bottom: 18rpx;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
 }
 
 .agent-head {
@@ -180,9 +199,11 @@ export default {
 }
 
 .agent-body {
-  flex: 1;
+  height: 100%;
+  min-height: 0;
   padding: 20rpx;
   background: #f6f8f6;
+  overflow: hidden;
 }
 
 .agent-message-wrap {
@@ -260,6 +281,7 @@ export default {
   gap: 12rpx;
   padding: 12rpx 20rpx;
   background: #fff;
+  flex-shrink: 0;
 }
 
 .agent-action {
@@ -276,6 +298,7 @@ export default {
   padding: 20rpx;
   background: #fff;
   border-top: 1rpx solid #eef1ee;
+  flex-shrink: 0;
 }
 
 .agent-text {
