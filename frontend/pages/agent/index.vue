@@ -54,7 +54,7 @@
         </scroll-view>
 
         <view class="agent-page__quick">
-          <view class="agent-page__quick-title">常用提问</view>
+          <!-- <view class="agent-page__quick-title">常用提问</view> -->
           <view class="agent-page__quick-list">
             <view
               v-for="(item, idx) in quickPrompts"
@@ -103,12 +103,11 @@ export default {
       userAvatar: '',
       userInitial: '我',
       quickPrompts: [
-        '显示我的预约状态',
-        '总结本月实验室使用情况',
-        '明天下午可预约的实验室',
+        '我的预约',
         '查询实验室列表',
-        '帮我查看实验室详情',
-        '推荐一个可预约实验室'
+        '添加预约',
+        '查询实验室排期',
+        '取消预约',
       ],
       messages: [
         {

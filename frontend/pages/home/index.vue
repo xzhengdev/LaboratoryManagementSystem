@@ -605,7 +605,7 @@ filter: brightness(1.08) contrast(1.05);
   font-size: 24rpx;
   font-weight: 700;
   color: #ffffff;
-  background: #0c2a5a;
+  background: linear-gradient(135deg, #679fee 0%, #3c76cf 58%, #2d5fb1 100%);
   transition:
     transform 160ms ease,
     background-color 160ms ease,
@@ -614,8 +614,8 @@ filter: brightness(1.08) contrast(1.05);
 
 .student-home__list-action:hover {
   transform: translateY(-2rpx);
-  background: #143d7d;
-  box-shadow: 0 12rpx 24rpx rgba(9, 34, 73, 0.2);
+  background: linear-gradient(135deg, #73aaf5 0%, #4a84dc 58%, #3568ba 100%);
+  box-shadow: 0 12rpx 24rpx rgba(45, 95, 177, 0.24);
 }
 
 .student-home__list-action.disabled {

@@ -492,9 +492,11 @@ export default {
 
 .reservation-detail-page__purpose-card {
   border-radius: 22rpx;
-  background: linear-gradient(160deg, #081f46, #061634);
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.18), transparent 30%),
+    linear-gradient(160deg, #86b1ea 0%, #4e79bb 52%, #284a7d 100%);
   padding: 16rpx;
-  color: #d6e6fb;
+  color: #eaf4ff;
 }
 
 .reservation-detail-page__purpose-text {
@@ -505,7 +507,7 @@ export default {
 
 .reservation-detail-page__purpose-id {
   margin-top: 12rpx;
-  color: #34c6ff;
+  color: #d8ecff;
   font-size: 21rpx;
   font-weight: 700;
 }

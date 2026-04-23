@@ -312,8 +312,8 @@ export default {
 }
 
 .labs-page__chip.active {
-  background: #041c42;
-  color: #ecf4ff;
+  background: linear-gradient(135deg, #5d93e8 0%, #346ec7 100%);
+  color: #f8fbff;
 }
 
 .labs-page__map-btn {
@@ -530,14 +530,14 @@ export default {
 }
 
 .labs-page__btn.primary {
-  background: #041c42;
-  color: #ecf4ff;
+  background: linear-gradient(135deg, #679fee 0%, #3c76cf 58%, #2d5fb1 100%);
+  color: #f7fbff;
 }
 
 .labs-page__btn.primary:hover {
   transform: translateY(-2rpx);
-  background: #0a2b63;
-  box-shadow: 0 14rpx 28rpx rgba(4, 28, 66, 0.2);
+  background: linear-gradient(135deg, #73aaf5 0%, #4a84dc 58%, #3568ba 100%);
+  box-shadow: 0 14rpx 28rpx rgba(45, 95, 177, 0.24);
 }
 
 .labs-page__btn.primary.disabled {

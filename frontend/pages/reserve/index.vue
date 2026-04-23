@@ -972,9 +972,9 @@ export default {
 }
 
 .reserve-form__btn.primary {
-  background: linear-gradient(135deg, #082b63, #123f83);
+  background: linear-gradient(135deg, #6ea7f2 0%, #3d78d4 55%, #295cab 100%);
   color: #ffffff;
-  box-shadow: 0 16rpx 34rpx rgba(8, 43, 99, 0.18);
+  box-shadow: 0 16rpx 34rpx rgba(41, 92, 171, 0.22);
 }
 
 .reserve-side {
@@ -984,8 +984,10 @@ export default {
 
 .reserve-side__summary {
   padding: 28rpx;
-  background: linear-gradient(180deg, #082555 0%, #0b2c63 100%);
-  color: #ffffff;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.2), transparent 30%),
+    linear-gradient(160deg, #8fb7e8 0%, #4f78b8 50%, #274a7d 100%);
+  color: #eef6ff;
 }
 
 .reserve-side__summary-title {
@@ -1005,7 +1007,7 @@ export default {
   width: 52rpx;
   height: 52rpx;
   border-radius: 16rpx;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.16);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1014,7 +1016,7 @@ export default {
 }
 
 .reserve-side__summary-label {
-  color: rgba(194, 214, 243, 0.86);
+  color: rgba(226, 238, 255, 0.86);
   font-size: 19rpx;
   font-weight: 700;
 }

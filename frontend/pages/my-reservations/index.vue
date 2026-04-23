@@ -372,17 +372,17 @@ export default {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #0a254c;
-  color: #eef6ff;
+  background: linear-gradient(135deg, #6ea7f2 0%, #3d78d4 55%, #295cab 100%);
+  color: #f7fbff;
   font-size: 24rpx;
   font-weight: 800;
-  box-shadow: 0 10rpx 26rpx rgba(10, 37, 76, 0.2);
+  box-shadow: 0 12rpx 28rpx rgba(41, 92, 171, 0.24);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .my-res-page__new-btn:hover {
   transform: translateY(-2rpx);
-  box-shadow: 0 18rpx 38rpx rgba(10, 37, 76, 0.24);
+  box-shadow: 0 20rpx 40rpx rgba(41, 92, 171, 0.28);
 }
 
 .my-res-page__layout {
@@ -397,7 +397,7 @@ export default {
 .table-card,
 .my-res-side__next-card {
   border-radius: 24rpx;
-  box-shadow: 0 12rpx 32rpx rgba(16, 42, 73, 0.08);
+  box-shadow: 0 12rpx 32rpx rgba(18, 200, 167, 0.08);
   transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
@@ -422,9 +422,9 @@ export default {
 .my-res-side__next-card {
   padding: 24rpx;
   background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.12), transparent 30%),
-    linear-gradient(165deg, #0b2550 0%, #081938 100%);
-  color: #d8e7ff;
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.22), transparent 32%),
+    linear-gradient(160deg, #8fb7e8 0%, #4f78b8 52%, #274a7d 100%);
+  color: #eaf4ff;
 }
 
 .my-res-side__eyebrow {
@@ -584,13 +584,13 @@ export default {
 }
 
 .my-res-toolbar__chip.active {
-  background: #0a254c;
-  border-color: #0a254c;
-  color: #ffffff;
+  background: linear-gradient(135deg, #5d93e8 0%, #346ec7 100%);
+  border-color: #346ec7;
+  color: #f8fbff;
 }
 
 .my-res-toolbar__chip.active text {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.2);
   color: #ffffff;
 }
 
