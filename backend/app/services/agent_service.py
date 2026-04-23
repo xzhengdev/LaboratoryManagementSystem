@@ -217,6 +217,12 @@ def _extract_min_advance_days(ctx: str) -> int:
 def _forbid_duplicate(ctx: str) -> bool:
     return "重叠预约" in ctx or "重复预约" in ctx
 
+
+def _llm_agent_enabled() -> bool:
+    provider = str(getattr(Config, "AGENT_PROVIDER", "") or "").strip().lower()
+    return provider in {"openai", "deepseek", "llm"} and bool(Config.LLM_API_KEY)
+
+
 def _call_llm_messages(messages: List[Dict[str, str]], temperature: float = 0.1) -> str:
     """
     调用 LLM API 的核心函数 - 与大语言模型通信的统一接口
@@ -277,7 +283,7 @@ def _call_llm_messages(messages: List[Dict[str, str]], temperature: float = 0.1)
 
 # 当 Agent 不走工具流程时，用这个函数直接和大模型聊天
 def _call_general_llm(user, message: str) -> str:
-    if Config.AGENT_PROVIDER not in {"openai", "deepseek", "llm"} or not Config.LLM_API_KEY:
+    if not _llm_agent_enabled():
         return "我可以优先帮你处理实验室相关问题，比如查空闲时段、创建预约、取消预约。"
     try:
         return _call_llm_messages(
@@ -549,7 +555,7 @@ def _detect_reservation_id_or_choice(text: str, session: Dict[str, Any]) -> Opti
 
 # 让大模型从用户输入中提取预约表单字段（补全信息）
 def _llm_extract_form(text: str, form: Dict[str, Any]) -> Dict[str, Any]:
-    if not Config.LLM_API_KEY:
+    if not _llm_agent_enabled():
         return form
     prompt = (
         "从用户输入中抽取预约字段并仅返回 JSON。"
@@ -1326,7 +1332,7 @@ def _llm_agent_decide(context: str, history: List[Dict[str, Any]], form: Dict[st
     # ==================== 1. 降级检查 ====================
     # 如果没有配置 LLM API，无法使用此功能
     # 返回空字典，上层会使用规则引擎降级
-    if not Config.LLM_API_KEY:
+    if not _llm_agent_enabled():
         return {}
     
     # ==================== 2. 工具定义 ====================
@@ -2301,6 +2307,79 @@ def _fallback_rule_chat(user, text: str, session: Dict[str, Any]) -> Any:
     return _call_general_llm(user, text)
 
 
+def _rule_agent_chat(user, text: str, session: Dict[str, Any], trace_id: str) -> Any:
+    result = _fallback_rule_chat(user, text, session)
+    if not isinstance(result, dict) or result.get("type") != "tool_call":
+        return result
+
+    tool = str(result.get("tool") or "")
+    params = _normalize_params_shape(result.get("params"))
+    planner_reply = str(result.get("reply") or "")
+
+    form = dict(session.get("reservation_form") or {})
+    params = _auto_fill_params(tool, user, params, form, text, session)
+
+    missing = _missing_required_tool_fields(tool, params)
+    if missing:
+        session["pending_action"] = {
+            "tool": tool,
+            "missing": missing,
+            "params": dict(params or {}),
+        }
+        _debug_log(trace_id, "pending_action_set", tool=tool, missing=missing)
+        return {
+            "reply": _missing_fields_hint(tool, missing),
+            "actions": [],
+            "trace_id": trace_id,
+        }
+
+    tool_result = _run_tool(tool, params, user, session)
+    form = _sync_form_from_tool_result(form, tool, tool_result)
+    session["reservation_form"] = form
+
+    if tool_result.get("error_code") == "missing_fields":
+        missing = tool_result.get("missing_fields") or []
+        session["pending_action"] = {
+            "tool": tool,
+            "missing": missing,
+            "params": dict(params or {}),
+        }
+        _debug_log(trace_id, "pending_action_set", tool=tool, missing=missing)
+        return {
+            "reply": str(tool_result.get("data") or _missing_fields_hint(tool, missing)),
+            "actions": [],
+            "trace_id": trace_id,
+        }
+
+    if tool == "navigate" and tool_result.get("ok"):
+        return {
+            "reply": planner_reply or "我带你进入对应页面。",
+            "actions": [{"label": "前往页面", "path": str(tool_result.get("data") or "/pages/agent/agent")}],
+            "trace_id": trace_id,
+        }
+
+    actions = []
+    if tool in {"my_reservations", "cancel_reservation"}:
+        actions = [{"label": "查看我的预约", "path": "/pages/my-reservations/my-reservations"}]
+    elif tool in {"create_reservation", "update_reservation"} and tool_result.get("ok"):
+        actions = [{"label": "查看我的预约", "path": "/pages/my-reservations/my-reservations"}]
+
+    reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params)
+    followup_text, followup_cfg = _build_followup_question(tool, tool_result, form)
+    if isinstance(followup_cfg, dict):
+        _set_followup_context(session, tool, followup_cfg, form)
+    else:
+        _clear_followup_context(session)
+    if followup_text:
+        reply = f"{reply}\n\n{followup_text}"
+
+    return {
+        "reply": reply,
+        "actions": actions,
+        "trace_id": trace_id,
+    }
+
+
 def _continue_pending_action(user, text: str, session: Dict[str, Any], trace_id: str) -> Optional[Dict[str, Any]]:
     pending = session.get("pending_action")
     if not isinstance(pending, dict):
@@ -2466,10 +2545,10 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
     session["_debug_trace_id"] = trace_id
     _debug_log(trace_id, "agent_loop_start", user_input=user_input)
 
-    if not Config.LLM_API_KEY:
-        _debug_log(trace_id, "fallback_rule", reason="missing_llm_api_key")
+    if not _llm_agent_enabled():
+        _debug_log(trace_id, "fallback_rule", reason="llm_agent_disabled")
         return _normalize_chat_result(
-            _fallback_rule_chat(user, user_input, session),
+            _rule_agent_chat(user, user_input, session, trace_id),
             trace_id
         )
 
@@ -2862,7 +2941,7 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
     # ==================== 6. 超过最大步数，降级 ====================
     _debug_log(trace_id, "fallback_rule", reason="max_steps_exceeded")
     return _normalize_chat_result(
-        _fallback_rule_chat(user, user_input, session),
+        _rule_agent_chat(user, user_input, session, trace_id),
         trace_id
     )
 
@@ -2957,7 +3036,7 @@ def chat(user, message):
                 _debug_log(trace_id, "agent_loop_exception_fallback", reason="agent_loop_exception")
                 # 降级方案1：规则引擎（基于正则匹配的简单处理）
                 try:
-                    result = _fallback_rule_chat(user, text, session)
+                    result = _rule_agent_chat(user, text, session, trace_id)
                 except Exception:
                     _debug_log(trace_id, "fallback_exception_general_llm", reason="fallback_exception")
                     # 降级方案2：通用 LLM 兜底
