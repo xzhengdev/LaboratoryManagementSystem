@@ -51,7 +51,13 @@
                 placeholder="密码"
                 placeholder-class="login-placeholder"
               />
-              <text class="password-toggle" @click="togglePassword">{{ showPassword ? '隐藏' : '显示' }}</text>
+              <view class="password-toggle" @click="togglePassword">
+                <image
+                  class="password-toggle__img"
+                  :src="showPassword ? passwordVisibleIcon : passwordHiddenIcon"
+                  mode="aspectFit"
+                />
+              </view>
             </view>
           </view>
 
@@ -90,6 +96,8 @@ import studentIcon from '../../static/icons/student.png'
 import teacherIcon from '../../static/icons/teacher.png'
 import labAdminIcon from '../../static/icons/lab-admin.png'
 import systemAdminIcon from '../../static/icons/system-admin.png'
+import passwordEyeIcon from '../../static/密码_眼睛.png'
+import passwordEyeClosedIcon from '../../static/密码_眼睛关.png'
 
 const REMEMBER_LOGIN_KEY = 'lab_remember_login'
 
@@ -112,6 +120,8 @@ export default {
       roleIndex: 0,
       rememberMe: true,
       showPassword: false,
+      passwordVisibleIcon: passwordEyeIcon,
+      passwordHiddenIcon: passwordEyeClosedIcon,
       loading: false
     }
   },
@@ -388,9 +398,17 @@ export default {
   top: 50%;
   right: 24rpx;
   transform: translateY(-50%);
-  color: #3d6690;
-  font-size: 22rpx;
-  font-weight: 700;
+  width: 52rpx;
+  height: 52rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.password-toggle__img {
+  width: 34rpx;
+  height: 34rpx;
+  display: block;
 }
 
 .login-tools {
