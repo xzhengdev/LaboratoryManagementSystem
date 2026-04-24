@@ -3,7 +3,7 @@
     <view class="student-top-nav__inner">
       <view class="student-top-nav__main">
         <view class="student-top-nav__brand" @click="go(routes.home)">
-          <view class="login-hero__badge">
+          <view class="student-top-nav__brand-badge">
             <image 
               class="student-top-nav__brand-mark" 
               src="/static/logo.png" 
@@ -113,25 +113,41 @@ export default {
 .student-top-nav__brand {
   display: flex;
   align-items: center;
-  gap: 18rpx;
+  gap: 16rpx;
+  min-width: 0;
+  flex-shrink: 0;
 }
 
-
-.student-top-nav__brand-mark {
-  width: 78rpx;
-  height: 78rpx;
-  border-radius: 24rpx;
+.student-top-nav__brand-badge {
+  width: 80rpx;
+  height: 80rpx;
+  padding: 7rpx;
+  border-radius: 20rpx;
+  background: #ffffff;
+  border: 1rpx solid rgba(26, 43, 75, 0.1);
+  box-shadow: 0 8rpx 22rpx rgba(8, 27, 58, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.student-top-nav__brand-mark {
+  width: 100%;
+  height: 100%;
+  border-radius: 14rpx;
+  display: block;
 }
 
 
 .student-top-nav__brand-text {
-  font-size: 30rpx;
+  font-size: 32rpx;
+  line-height: 1.15;
   font-weight: 800;
-  letter-spacing: -0.5rpx;
-  color: #1a2b4b;
+  letter-spacing: 0;
+  color: #13263a;
+  white-space: nowrap;
 }
 
 .student-top-nav__links {
@@ -208,6 +224,26 @@ export default {
 
   .student-top-nav__main {
     gap: 20rpx;
+  }
+
+  .student-top-nav__inner {
+    min-height: 88rpx;
+    padding: 0 24rpx;
+  }
+
+  .student-top-nav__brand {
+    gap: 12rpx;
+  }
+
+  .student-top-nav__brand-badge {
+    width: 66rpx;
+    height: 66rpx;
+    padding: 6rpx;
+    border-radius: 16rpx;
+  }
+
+  .student-top-nav__brand-text {
+    font-size: 28rpx;
   }
 }
 </style>
