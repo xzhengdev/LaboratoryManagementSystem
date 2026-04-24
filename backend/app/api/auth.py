@@ -100,6 +100,37 @@ def update_profile_api():
     return success(user.to_dict(), '资料更新成功')
 
 
+# ==================== 修改密码 ====================
+@auth_bp.post('/auth/change-password')
+@jwt_required()  # 需要JWT认证
+def change_password_api():
+    """
+    修改当前登录用户密码
+    请求体：{"old_password": "旧密码", "new_password": "新密码"}
+    """
+    payload = request.get_json(silent=True) or {}
+    require_fields(payload, ['old_password', 'new_password'])
+
+    old_password = str(payload.get('old_password') or '')
+    new_password = str(payload.get('new_password') or '')
+    confirm_password = str(payload.get('confirm_password') or new_password)
+
+    if len(new_password) < 6:
+        raise AppError('新密码至少 6 位', 400, 40066)
+    if new_password != confirm_password:
+        raise AppError('两次输入的新密码不一致', 400, 40067)
+
+    user = get_current_user()
+    if not user.check_password(old_password):
+        raise AppError('原密码不正确', 400, 40068)
+    if user.check_password(new_password):
+        raise AppError('新密码不能与原密码相同', 400, 40069)
+
+    user.set_password(new_password)
+    db.session.commit()
+    return success({'user_id': user.id}, '密码修改成功')
+
+
 # ==================== 上传头像（文件上传）====================
 @auth_bp.post('/auth/upload-avatar')
 @jwt_required()  # 需要JWT认证

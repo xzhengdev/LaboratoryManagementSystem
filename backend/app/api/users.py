@@ -9,8 +9,8 @@ from datetime import datetime  # 日期时间处理，用于记录重置时间
 from flask import Blueprint, request  # Flask核心：蓝图、请求对象
 
 from app.extensions import db                       # 数据库实例
-from app.models import Campus, User                 # 数据模型：校区、用户
-from app.utils.decorators import role_required      # 角色权限装饰器
+from app.models import Approval, Campus, OperationLog, Reservation, User  # 数据模型
+from app.utils.decorators import get_current_user, role_required      # 角色权限装饰器
 from app.utils.exceptions import AppError           # 自定义异常类
 from app.utils.response import success              # 统一成功响应格式
 from app.utils.validators import require_fields     # 验证必填字段
@@ -319,6 +319,39 @@ def update_user(user_id):
         item.to_dict({"role_name": _build_role_text(item.role)}),
         "更新用户成功",
     )
+
+
+# ==================== 删除用户 ====================
+@user_bp.delete("/users/<int:user_id>")
+@role_required("system_admin")
+def delete_user(user_id):
+    """
+    删除用户（仅系统管理员可用）
+
+    规则：
+        - 不允许删除当前登录账号，避免管理员误删自己
+        - 如果用户已经产生预约、审批或操作日志，则拒绝物理删除
+          这类账号建议改为停用，以保留业务追踪链路
+    """
+    current_user = get_current_user()
+    item = User.query.get_or_404(user_id)
+
+    if item.id == current_user.id:
+        raise AppError("不能删除当前登录账号", 400, 40026)
+
+    reservation_count = Reservation.query.filter_by(user_id=item.id).count()
+    approval_count = Approval.query.filter_by(approver_id=item.id).count()
+    log_count = OperationLog.query.filter_by(user_id=item.id).count()
+    if reservation_count or approval_count or log_count:
+        raise AppError(
+            "该用户已有预约、审批或操作日志记录，不能删除；可将账号停用以保留追踪记录",
+            400,
+            40027,
+        )
+
+    db.session.delete(item)
+    db.session.commit()
+    return success({"user_id": user_id}, "删除用户成功")
 
 
 # ==================== 重置密码 ====================

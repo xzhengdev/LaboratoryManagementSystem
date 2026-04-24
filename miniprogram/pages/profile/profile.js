@@ -10,6 +10,13 @@ Page({
     editing: false,
     loading: false,
     globalLoading: false,
+    changingPassword: false,
+    passwordDialogVisible: false,
+    passwordForm: {
+      old_password: '',
+      new_password: '',
+      confirm_password: ''
+    },
     roleText: ROLE_TEXT
   },
   onShow() {
@@ -45,6 +52,10 @@ Page({
   onRealName(e) { this.setData({ 'editForm.real_name': e.detail.value }) },
   onEmail(e)    { this.setData({ 'editForm.email': e.detail.value }) },
   onPhone(e)    { this.setData({ 'editForm.phone': e.detail.value }) },
+  onOldPassword(e) { this.setData({ 'passwordForm.old_password': e.detail.value }) },
+  onNewPassword(e) { this.setData({ 'passwordForm.new_password': e.detail.value }) },
+  onConfirmPassword(e) { this.setData({ 'passwordForm.confirm_password': e.detail.value }) },
+  noop() {},
   async saveEdit() {
     // 简单的输入验证
     const { editForm } = this.data
@@ -127,6 +138,53 @@ Page({
         }
       }
     })
+  },
+  resetPasswordForm() {
+    this.setData({
+      passwordForm: {
+        old_password: '',
+        new_password: '',
+        confirm_password: ''
+      }
+    })
+  },
+  openPasswordDialog() {
+    this.setData({ passwordDialogVisible: true })
+  },
+  closePasswordDialog() {
+    if (this.data.changingPassword) return
+    this.setData({ passwordDialogVisible: false })
+    this.resetPasswordForm()
+  },
+  async changePassword() {
+    if (this.data.changingPassword) return
+    const { old_password, new_password, confirm_password } = this.data.passwordForm
+
+    if (!old_password) {
+      wx.showToast({ title: '请输入原密码', icon: 'none' })
+      return
+    }
+    if (!new_password || new_password.length < 6) {
+      wx.showToast({ title: '新密码至少 6 位', icon: 'none' })
+      return
+    }
+    if (new_password !== confirm_password) {
+      wx.showToast({ title: '两次密码不一致', icon: 'none' })
+      return
+    }
+
+    this.setData({ changingPassword: true })
+    try {
+      await api.changePassword({ old_password, new_password, confirm_password })
+      this.resetPasswordForm()
+      this.setData({ passwordDialogVisible: false })
+      wx.showToast({ title: '密码修改成功', icon: 'success' })
+    } catch (err) {
+      console.error('修改密码失败:', err)
+      wx.showToast({ title: err?.message || '修改失败，请重试', icon: 'none' })
+    } finally {
+      this.setData({ changingPassword: false })
+    }
   },
   doLogout() {
     wx.showModal({

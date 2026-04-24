@@ -9,6 +9,8 @@ export const api = {
   profile: () => request({ url: "/auth/profile" }),
   updateProfile: (data) =>
     request({ url: "/auth/profile", method: "PUT", data }),
+  changePassword: (data) =>
+    request({ url: "/auth/change-password", method: "POST", data }),
   uploadAvatar: (filePath) =>
     new Promise((resolve, reject) => {
       uni.uploadFile({
@@ -182,6 +184,7 @@ export const api = {
   createUser: (data) => request({ url: "/users", method: "POST", data }),
   updateUser: (id, data) =>
     request({ url: `/users/${id}`, method: "PUT", data }),
+  deleteUser: (id) => request({ url: `/users/${id}`, method: "DELETE" }),
   resetUserPassword: (id, data = {}) =>
     request({ url: `/users/${id}/reset-password`, method: "POST", data }),
   operationLogs: (params = {}) =>

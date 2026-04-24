@@ -5,6 +5,7 @@ const api = {
   login: (data) => request({ url: '/auth/login', method: 'POST', data }),
   profile: () => request({ url: '/auth/profile' }),
   updateProfile: (data) => request({ url: '/auth/profile', method: 'PUT', data }),
+  changePassword: (data) => request({ url: '/auth/change-password', method: 'POST', data }),
   uploadAvatar: (filePath) => new Promise((resolve, reject) => {
     wx.uploadFile({
       url: `${BASE_URL}/auth/upload-avatar`,

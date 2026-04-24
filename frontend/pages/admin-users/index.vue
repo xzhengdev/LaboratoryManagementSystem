@@ -44,6 +44,7 @@
             <view class="pill" @click="openUserDialog(item)">编辑</view>
             <view class="pill" @click="toggleStatus(item)">{{ item.status === 'active' ? '停用' : '启用' }}</view>
             <view class="pill pill-danger" @click="resetPassword(item)">重置密码</view>
+            <view class="pill pill-danger" :class="{ 'pill-disabled': isCurrentUser(item) }" @click="deleteUser(item)">删除</view>
           </view>
         </view>
         <view v-if="!filteredUsers.length" class="empty-state">暂无用户数据</view>
@@ -189,6 +190,9 @@ export default {
     userSubText(item) {
       return item?.email || item?.username || '--'
     },
+    isCurrentUser(item) {
+      return String(item?.id || '') === String(this.profile?.id || '')
+    },
     async loadData() {
       const [users, campuses] = await Promise.all([api.users(), api.campuses()])
       this.campuses = (Array.isArray(campuses) ? campuses : []).map((item) => ({ id: item.id, campus_name: item.campus_name }))
@@ -292,6 +296,28 @@ export default {
       } catch (error) {
         uni.showToast({ title: error?.message || '重置密码失败', icon: 'none' })
       }
+    },
+    async deleteUser(item) {
+      if (this.isCurrentUser(item)) {
+        uni.showToast({ title: '不能删除当前登录账号', icon: 'none' })
+        return
+      }
+      uni.showModal({
+        title: '确认删除用户',
+        content: `确定删除“${item.real_name || item.username}”吗？已有预约、审批或日志记录的用户将无法删除，建议改为停用。`,
+        confirmText: '删除',
+        confirmColor: '#d93434',
+        success: async (res) => {
+          if (!res.confirm) return
+          try {
+            await api.deleteUser(item.id)
+            await this.loadData()
+            uni.showToast({ title: '删除成功', icon: 'success' })
+          } catch (error) {
+            uni.showToast({ title: error?.message || '删除失败', icon: 'none' })
+          }
+        }
+      })
     }
   }
 }
@@ -568,6 +594,11 @@ page {
 .pill-danger {
   border-color: #efcaca;
   color: #c94747;
+}
+
+.pill-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .admin-modal-mask {

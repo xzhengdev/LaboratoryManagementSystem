@@ -135,6 +135,77 @@
   color: rgba(0,0,0,0.35);
 }
 
+.info-action {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10rpx;
+}
+
+.info-action__text {
+  font-size: 28rpx;
+  color: #0071e3;
+  font-weight: 600;
+}
+
+.info-action__arrow {
+  font-size: 40rpx;
+  color: rgba(0,0,0,0.28);
+  line-height: 1;
+}
+
+.password-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0,0,0,0.36);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+  box-sizing: border-box;
+}
+
+.password-dialog {
+  width: 100%;
+  border-radius: 28rpx;
+  background: #fff;
+  padding: 34rpx 30rpx 28rpx;
+  box-shadow: 0 24rpx 80rpx rgba(0,0,0,0.22);
+  box-sizing: border-box;
+}
+
+.password-dialog__title {
+  color: #111;
+  font-size: 34rpx;
+  font-weight: 700;
+  margin-bottom: 24rpx;
+}
+
+.password-input {
+  height: 84rpx;
+  line-height: 84rpx;
+  border-radius: 16rpx;
+  background: #f4f6f9;
+  color: #111;
+  font-size: 28rpx;
+  padding: 0 22rpx;
+  box-sizing: border-box;
+  margin-bottom: 18rpx;
+}
+
+.password-dialog__actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 8rpx;
+}
+
+.password-dialog__btn {
+  flex: 1;
+  margin: 0;
+}
+
 /* ===== 输入框 ===== */
 .edit-input {
   flex: 1;

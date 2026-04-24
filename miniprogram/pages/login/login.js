@@ -87,6 +87,13 @@ Page({
 
     try {
       const res = await api.login({ username, password })
+      if (!['student', 'teacher'].includes(res?.user?.role)) {
+        wx.showToast({
+          title: '小程序仅支持学生和教师登录',
+          icon: 'none'
+        })
+        return
+      }
       setSession(res.token, res.user)
 
       if (this.data.rememberPassword) {
