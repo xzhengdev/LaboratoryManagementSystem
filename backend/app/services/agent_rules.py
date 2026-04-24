@@ -64,6 +64,22 @@ def build_followup_question(
         )
 
     if tool == "recommend_lab":
+        has_fixed_time = bool(
+            (form or {}).get("date")
+            and (form or {}).get("start_time")
+            and (form or {}).get("end_time")
+        )
+        if has_fixed_time:
+            return (
+                "要不要就用这个实验室提交预约？",
+                {
+                    "expected_tool": "create_reservation",
+                    "required_response": ["要", "好", "可以", "继续", "创建预约", "预约", "就这个", "确定", "提交"],
+                    "context_preserve": True,
+                    "preserve_fields": ["lab_id", "date", "start_time", "end_time", "participant_count", "purpose"],
+                    "auto_fill": True,
+                },
+            )
         return (
             "要不要我基于这个实验室继续推荐具体可用时间段？",
             {

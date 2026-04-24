@@ -39,6 +39,7 @@ MAX_HISTORY_SUMMARY_CHARS = 280
 DEFAULT_AGENT_TIMEZONE = "Asia/Shanghai"
 FOLLOWUP_CONTEXT_TTL_SECONDS = 600
 WEEKDAY_CN = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
+ACTIVE_SCHEDULE_STATUSES = {"pending", "approved"}
 
 #xinzhu修改
 AGENT_TOOL_SCHEMAS: Dict[str, Dict[str, Any]] = {
@@ -333,6 +334,11 @@ def _detect_date(text: str) -> Optional[str]:
     relative = _resolve_relative_date(msg)
     if relative:
         return relative
+
+    weekday = _detect_weekday_date(msg, today)
+    if weekday:
+        return weekday
+
     m = re.search(r"(20\d{2}-\d{1,2}-\d{1,2})", msg)
     if m:
         try:
@@ -348,10 +354,43 @@ def _detect_date(text: str) -> Optional[str]:
             return None
     return None
 
- # 将中文时间表达规范化为 24 小时制时间字符串（HH:MM）
+
+def _detect_weekday_date(text: str, today: date) -> Optional[str]:
+    weekday_map = {
+        "一": 0, "1": 0, "二": 1, "2": 1, "三": 2, "3": 2,
+        "四": 3, "4": 3, "五": 4, "5": 4, "六": 5, "6": 5,
+        "日": 6, "天": 6, "7": 6,
+    }
+    m = re.search(r"(下)?(?:周|星期|礼拜)([一二三四五六日天1-7])", text or "")
+    if not m:
+        return None
+    target = weekday_map.get(m.group(2))
+    if target is None:
+        return None
+    delta = (target - today.weekday()) % 7
+    if m.group(1) or delta == 0:
+        delta += 7
+    return (today + timedelta(days=delta)).isoformat()
+
+
+def _cn_number_to_int(value: str) -> Optional[int]:
+    token = str(value or "").strip()
+    if token.isdigit():
+        return int(token)
+    mapping = {
+        "零": 0, "〇": 0, "一": 1, "二": 2, "两": 2, "三": 3,
+        "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9,
+        "十": 10, "十一": 11, "十二": 12,
+    }
+    return mapping.get(token)
+
+
+# 将中文时间表达规范化为 24 小时制时间字符串（HH:MM）
 def _normalize_clock(hour: int, minute: int, period: Optional[str]) -> str:
     h = max(0, min(23, hour))
     m = max(0, min(59, minute))
+    if period == "早上":
+        period = "上午"
     if period in {"下午", "晚上"} and h < 12:
         h += 12
     if period == "中午" and h < 11:
@@ -367,19 +406,30 @@ def _detect_time_range(text: str) -> Tuple[Optional[str], Optional[str]]:
     if m:
         return m.group(1), m.group(2)
     m2 = re.search(
-        r"(上午|下午|晚上|中午)?\s*(\d{1,2})点(?:([0-5]?\d)分?)?\s*(?:-|到|至)\s*(上午|下午|晚上|中午)?\s*(\d{1,2})点(?:([0-5]?\d)分?)?",
+        r"(上午|下午|晚上|中午|早上)?\s*([0-9一二两三四五六七八九十]{1,3})点(?:(半)|([0-5]?\d)分?)?\s*(?:-|到|至)\s*(上午|下午|晚上|中午|早上)?\s*([0-9一二两三四五六七八九十]{1,3})点(?:(半)|([0-5]?\d)分?)?",
         msg,
     )
     if m2:
-        p1, h1, m1, p2, h2, m2_ = m2.groups()
-        return _normalize_clock(int(h1), int(m1 or 0), p1), _normalize_clock(int(h2), int(m2_ or 0), p2)
+        p1, h1, half1, min1, p2, h2, half2, min2 = m2.groups()
+        hour1 = _cn_number_to_int(h1)
+        hour2 = _cn_number_to_int(h2)
+        if hour1 is None or hour2 is None:
+            return None, None
+        if not p2:
+            p2 = p1
+        minute1 = 30 if half1 else int(min1 or 0)
+        minute2 = 30 if half2 else int(min2 or 0)
+        return _normalize_clock(hour1, minute1, p1), _normalize_clock(hour2, minute2, p2)
     m3 = re.search(r"(\d{1,2}:\d{2})\s*(?:开始|开[始场]|起)", msg)
     if m3:
         return m3.group(1), None
-    m4 = re.search(r"(上午|下午|晚上|中午)?\s*(\d{1,2})点(?:([0-5]?\d)分?)?\s*(?:开始|开[始场]|起)", msg)
+    m4 = re.search(r"(上午|下午|晚上|中午|早上)?\s*([0-9一二两三四五六七八九十]{1,3})点(?:(半)|([0-5]?\d)分?)?\s*(?:开始|开[始场]|起)", msg)
     if m4:
-        p, h, mm = m4.groups()
-        return _normalize_clock(int(h), int(mm or 0), p), None
+        p, h, half, mm = m4.groups()
+        hour = _cn_number_to_int(h)
+        if hour is None:
+            return None, None
+        return _normalize_clock(hour, 30 if half else int(mm or 0), p), None
     return None, None
 
 
@@ -695,7 +745,7 @@ def _is_lab_related(text: str) -> bool:
         # ===== 实验室基础词 =====
         "实验室", "lab", "实验间", "教室", "机房",
         # ===== 预约相关 =====
-        "预约", "预定", "约", "约实验室", "订实验室", "创建预约",
+        "预约", "预定", "约实验室", "订实验室", "创建预约",
         "取消预约", "修改预约", "更改预约", "调整预约", "预约记录",
         "我的预约", "预约列表", "预约信息", "预约详情",
         # ===== 排期/空闲相关 =====
@@ -712,9 +762,6 @@ def _is_lab_related(text: str) -> bool:
         "实验室详情", "实验室信息", "实验室介绍", "实验室情况",
         "位置", "容量", "设备", "有什么设备", "在哪",
         "能坐多少人", "实验室类型",
-        # ===== 时间表达 =====
-        "今天", "明天", "后天", "上午", "下午", "晚上", "中午",
-        "几点", "开始", "结束", "到", "至", "时段", "时间段",
         # ===== 条件筛选 =====
         "校区", "海淀", "丰台", "海南", "校本部",
         "计算机", "化学", "物理", "生物", "电子", "语音", "ai", "人工智能",
@@ -933,6 +980,12 @@ def _validate_schedule_window(schedule: Dict[str, Any], start_time: str, end_tim
 
     return None
 
+
+def _is_active_schedule_reservation(row: Dict[str, Any]) -> bool:
+    status = str((row or {}).get("status") or "").strip().lower()
+    return not status or status in ACTIVE_SCHEDULE_STATUSES
+
+
 def _free_slots_from_schedule(schedule: Dict[str, Any]) -> List[Tuple[int, int]]:
     open_time = schedule.get("open_time")
     close_time = schedule.get("close_time")
@@ -944,7 +997,10 @@ def _free_slots_from_schedule(schedule: Dict[str, Any]) -> List[Tuple[int, int]]
     if open_m >= close_m:
         return []
 
-    reservations = schedule.get("reservations") or []
+    reservations = [
+        row for row in (schedule.get("reservations") or [])
+        if _is_active_schedule_reservation(row)
+    ]
     occupied: List[Tuple[int, int]] = []
 
     for r in reservations:
@@ -1057,7 +1113,11 @@ def _recommend_time(date_text: str, lab_id: Optional[int], preference: str) -> T
     for item in result["schedules"]:
         lab, schedule = item["lab"], item["schedule"]
         open_m, close_m = _to_minutes(schedule["open_time"]), _to_minutes(schedule["close_time"])
-        occupied = sorted([(_to_minutes(r["start_time"][:5]), _to_minutes(r["end_time"][:5])) for r in schedule.get("reservations") or []])
+        occupied = sorted([
+            (_to_minutes(r["start_time"][:5]), _to_minutes(r["end_time"][:5]))
+            for r in schedule.get("reservations") or []
+            if _is_active_schedule_reservation(r)
+        ])
         free, cur = [], open_m
         for s, e in occupied:
             if s > cur:
@@ -1385,6 +1445,8 @@ def _llm_agent_decide(context: str, history: List[Dict[str, Any]], form: Dict[st
     # ==================== 3. 构建提示词 ====================
     # 将系统状态、工具定义、历史记录等信息组装成提示词
     # LLM 会根据这些信息做出决策
+    now = _localized_now()
+    inferred_intent = _extract_intent(context)
     prompt = f"""
 你是实验室预约 Agent 规划器。每次只能做一步:
 1) 选择一个工具执行，或
@@ -1395,6 +1457,17 @@ def _llm_agent_decide(context: str, history: List[Dict[str, Any]], form: Dict[st
 - 如果信息不足以完成用户目标，优先继续推进：调用工具或明确追问缺失信息，不要空泛结束。
 - 只有在“已满足用户请求”或“明确无法继续且已说明缺什么”时才 done=true。
 - 用户目标若是创建预约，不要停在“推荐/查询”中间结果，应继续到可提交或明确缺参。
+- 如果用户想创建预约但缺 lab_id，且已有日期/校区/人数/类型/偏好等条件，优先调用 recommend_lab，不要直接要求用户手填实验室ID。
+- 如果已有 lab_id、date、start_time、end_time、participant_count、purpose，优先调用 create_reservation。
+- 如果用户在推荐结果后说“就这个/可以/确定/提交/预约”，应结合当前表单继续 create_reservation。
+- 查询、推荐、检查冲突这类工具成功后，如果用户只是查询，可以 done=true；如果用户目标是创建预约，继续推进到创建或追问。
+- 不要输出工具清单、内部字段名或 JSON 解释给用户；reply 只写自然中文。
+
+当前时间:
+{now.strftime("%Y-%m-%d %H:%M:%S")}（{WEEKDAY_CN[now.weekday()]}）
+
+规则引擎初判意图:
+{inferred_intent}
 
 工具:
 {json.dumps(tools, ensure_ascii=False)}
@@ -1501,11 +1574,94 @@ def _normalize_nav_path(path: str) -> str:
     return mapping.get(raw, raw)
 
 
+def _llm_compose_tool_reply(
+    tool: str,
+    tool_result: Dict[str, Any],
+    planner_reply: str,
+    params: Dict[str, Any],
+    form: Optional[Dict[str, Any]],
+    user_input: str,
+) -> str:
+    if not _llm_agent_enabled():
+        return ""
+
+    factual = str(tool_result.get("data") or "").strip()
+    if not factual or tool_result.get("error_code") == "missing_fields":
+        return ""
+    if tool in {"navigate", "fill_form", "submit_form"}:
+        return ""
+
+    raw_context = ""
+    try:
+        raw_context = json.dumps(tool_result.get("raw"), ensure_ascii=False, default=str)[:1200]
+    except Exception:
+        raw_context = ""
+
+    prompt = f"""
+你是实验室预约系统里的中文助手。请基于“工具事实结果”回复用户。
+
+要求:
+- 只能使用工具事实结果、工具参数、当前表单中的信息，不要编造实验室、时间、规则或预约状态。
+- 不要提到“工具”“JSON”“模型”“trace_id”等内部实现。
+- 如果结果是列表，保留编号、实验室ID或预约ID，方便用户继续说“第一个/ID xx”。
+- 如果用户正在推进预约流程，结尾给一个自然的下一步提示，例如“要用第一个继续预约吗？”或“回复‘提交’即可创建预约”。
+- 如果工具失败，先说明失败原因，再给一个可执行的补救建议。
+- 回复控制在 6 行以内，语气简洁、像真实助手。
+
+用户原话:
+{user_input}
+
+工具名称:
+{tool}
+
+工具参数:
+{json.dumps(params or {}, ensure_ascii=False, default=str)}
+
+当前表单:
+{json.dumps(form or {}, ensure_ascii=False, default=str)}
+
+工具是否成功:
+{bool(tool_result.get("ok"))}
+
+错误码:
+{tool_result.get("error_code") or ""}
+
+规划器原回复:
+{planner_reply or ""}
+
+工具事实结果:
+{factual}
+
+原始结构化结果摘要:
+{raw_context}
+""".strip()
+
+    try:
+        reply = _call_llm_messages(
+            [
+                {"role": "system", "content": "你是严谨的中文业务助手，只能基于给定事实作答。"},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.2,
+        )
+        return _prettify_agent_reply(reply)
+    except Exception:
+        return ""
+
+
 def _tool_reply_prefer_facts(
-    tool: str, tool_result: Dict[str, Any], planner_reply: str, params: Dict[str, Any]
+    tool: str,
+    tool_result: Dict[str, Any],
+    planner_reply: str,
+    params: Dict[str, Any],
+    form: Optional[Dict[str, Any]] = None,
+    user_input: str = "",
 ) -> str:
     factual = str(tool_result.get("data") or "").strip()
     if factual:
+        composed = _llm_compose_tool_reply(tool, tool_result, planner_reply, params, form, user_input)
+        if composed:
+            return composed
         return factual
 
     if planner_reply:
@@ -1619,6 +1775,10 @@ def _needs_create_flow_clarification(form: Dict[str, Any], user_input: str) -> L
     if not _wants_create_flow(user_input):
         return []
 
+    return _create_flow_missing_fields(form)
+
+
+def _create_flow_missing_fields(form: Dict[str, Any]) -> List[str]:
     current = dict(form or {})
     missing: List[str] = []
 
@@ -1812,7 +1972,7 @@ def _continue_followup_context(user, text: str, session: Dict[str, Any], trace_i
 
     if result.get("ok"):
         _clear_followup_context(session)
-        reply = str(result.get("data") or "处理成功。")
+        reply = _tool_reply_prefer_facts(expected_tool, result, "", params, form, text)
         form = _sync_form_from_tool_result(form, expected_tool, result)
         session["reservation_form"] = form
 
@@ -1965,7 +2125,10 @@ def _handle_check_availability(tool: str, params: Dict[str, Any], user, session:
     st = _to_minutes(start_time)
     et = _to_minutes(end_time)
 
-    rows = schedule.get("reservations") or []
+    rows = [
+        row for row in (schedule.get("reservations") or [])
+        if _is_active_schedule_reservation(row)
+    ]
     conflicts = []
     for r in rows:
         try:
@@ -2122,7 +2285,10 @@ def _handle_update_reservation(tool: str, params: Dict[str, Any], user, session:
     st = _to_minutes(new_start)
     et = _to_minutes(new_end)
 
-    rows = schedule.get("reservations") or []
+    rows = [
+        row for row in (schedule.get("reservations") or [])
+        if _is_active_schedule_reservation(row)
+    ]
     for r in rows:
         rid = _safe_int(r.get("id"))
         if rid == reservation.id:
@@ -2141,9 +2307,9 @@ def _handle_update_reservation(tool: str, params: Dict[str, Any], user, session:
             )
 
     try:
-        reservation.reservation_date = new_date
-        reservation.start_time = new_start
-        reservation.end_time = new_end
+        reservation.reservation_date = target_date
+        reservation.start_time = datetime.strptime(new_start, "%H:%M").time()
+        reservation.end_time = datetime.strptime(new_end, "%H:%M").time()
         db.session.commit()
 
         return _tool_result(
@@ -2283,6 +2449,15 @@ def _fallback_rule_chat(user, text: str, session: Dict[str, Any]) -> Any:
             params["lab_id"] = lid
         return _tool_call("query_schedule", params, "我来帮你查排期。")
     if intent == "create_reservation":
+        form = dict(session.get("reservation_form") or {})
+        form = _extract_form_from_text(user, text, form, session)
+        session["reservation_form"] = form
+        if not form.get("lab_id") and form.get("date"):
+            params: Dict[str, Any] = {"date": form.get("date")}
+            for key in ["campus", "type", "participant_count", "preference"]:
+                if form.get(key) not in [None, ""]:
+                    params[key] = form.get(key)
+            return _tool_call("recommend_lab", params, "我先帮你选一个合适的实验室。")
         return _tool_call("create_reservation", {}, "我来帮你创建预约。")
     if intent == "update_reservation":
         rid = _detect_reservation_id_or_choice(text, session)
@@ -2408,7 +2583,7 @@ def _rule_agent_chat(user, text: str, session: Dict[str, Any], trace_id: str) ->
     elif tool in {"create_reservation", "update_reservation"} and tool_result.get("ok"):
         actions = [{"label": "查看我的预约", "path": "/pages/my-reservations/my-reservations"}]
 
-    reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params)
+    reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params, form, text)
     followup_text, followup_cfg = _build_followup_question(tool, tool_result, form)
     if isinstance(followup_cfg, dict):
         _set_followup_context(session, tool, followup_cfg, form)
@@ -2444,7 +2619,7 @@ def _continue_pending_action(user, text: str, session: Dict[str, Any], trace_id:
     # 创建预约在“规划阶段”的追问不直接执行工具；
     # 当高层信息补齐后，交回 agent_loop 继续推荐/检查/创建。
     if tool == "create_reservation":
-        create_flow_missing = _needs_create_flow_clarification(form, text)
+        create_flow_missing = _create_flow_missing_fields(form)
         if create_flow_missing:
             session["pending_action"] = {
                 "tool": tool,
@@ -2499,7 +2674,7 @@ def _continue_pending_action(user, text: str, session: Dict[str, Any], trace_id:
         session["pending_action"] = None
         _debug_log(trace_id, "pending_action_cleared", tool=tool)
         return {
-            "reply": str(result.get("data") or "处理成功。"),
+            "reply": _tool_reply_prefer_facts(tool, result, "", params, form, text),
             "actions": [{"label": "查看我的预约", "path": "/pages/my-reservations/my-reservations"}]
             if tool in {"create_reservation", "update_reservation", "cancel_reservation"}
             else [],
@@ -2882,7 +3057,7 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
         # 4.2 我的预约 / 取消预约
         if tool in {"my_reservations", "cancel_reservation"}:
             _clear_followup_context(session)
-            reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params)
+            reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params, form, user_input)
             _debug_log(trace_id, "done_return", step=step, reply_preview=reply[:120])
             return {
                 "reply": reply,
@@ -2893,7 +3068,7 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
         # 4.3 创建 / 修改预约
         if tool in {"create_reservation", "update_reservation"}:
             _clear_followup_context(session)
-            reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params)
+            reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params, form, user_input)
             _debug_log(trace_id, "done_return", step=step, reply_preview=reply[:120])
             return {
                 "reply": reply,
@@ -2914,7 +3089,7 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
             }:
                 _debug_log(trace_id, "route", target="continue_planning", reason="create_flow_not_finished", step=step, tool=tool)
             else:
-                reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params)
+                reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params, form, user_input)
                 followup_text, followup_cfg = _build_followup_question(tool, tool_result, form)
                 if isinstance(followup_cfg, dict):
                     _set_followup_context(session, tool, followup_cfg, form)
@@ -2941,7 +3116,7 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
             }:
                 _debug_log(trace_id, "route", target="continue_planning", reason="done_but_create_flow_not_finished", step=step, tool=tool)
             else:
-                final_reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params)
+                final_reply = _tool_reply_prefer_facts(tool, tool_result, planner_reply, params, form, user_input)
                 followup_text, followup_cfg = _build_followup_question(tool, tool_result, form)
                 if isinstance(followup_cfg, dict):
                     _set_followup_context(session, tool, followup_cfg, form)
@@ -2990,7 +3165,6 @@ def _agent_loop(user, user_input: str, session: Dict[str, Any], trace_id: str) -
     )
 
 def chat(user, message):
-    print("=========================================================下一轮对话============================================================")
     """
     对话主入口函数 - 处理用户消息并返回 Agent 响应
     这是整个 Agent 系统的统一入口，负责：
