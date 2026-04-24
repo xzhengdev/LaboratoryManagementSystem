@@ -1,21 +1,18 @@
 <view class="detail-page">
-  <!-- Hero -->
   <view class="hero" style="background:{{color}}">
     <view class="hero-char">{{lab.lab_name ? lab.lab_name[0] : ''}}</view>
     <view class="hero-info">
       <text class="hero-name">{{lab.lab_name}}</text>
-      <text class="hero-loc">📍 {{lab.location || '暂无位置'}}</text>
+      <text class="hero-loc">位置 {{lab.location || '暂无位置'}}</text>
     </view>
   </view>
 
-  <!-- Tabs -->
   <view class="tabs">
     <view class="tab {{activeTab==='info'?'active':''}}" bindtap="switchTab" data-tab="info">概览</view>
     <view class="tab {{activeTab==='equip'?'active':''}}" bindtap="switchTab" data-tab="equip">设备</view>
     <view class="tab {{activeTab==='schedule'?'active':''}}" bindtap="switchTab" data-tab="schedule">排期</view>
   </view>
 
-  <!-- 概览 -->
   <view wx:if="{{activeTab==='info'}}">
     <view class="card info-grid">
       <view class="info-item">
@@ -31,42 +28,41 @@
         <text class="info-key">关闭时间</text>
       </view>
       <view class="info-item">
-        <text class="info-val {{lab.status==='open'?'green':'gray'}}">{{lab.status==='open'?'开放':'关闭'}}</text>
+        <text class="info-val {{lab.current_status_class}}">{{lab.current_status_text}}</text>
         <text class="info-key">当前状态</text>
       </view>
     </view>
+
     <view class="card" wx:if="{{lab.description}}">
       <text class="card-title">实验室简介</text>
       <text class="desc-text">{{lab.description}}</text>
     </view>
   </view>
 
-  <!-- 设备 -->
   <view wx:if="{{activeTab==='equip'}}">
     <view wx:if="{{equipment.length===0}}" class="empty-tip">暂无设备信息</view>
     <view wx:for="{{equipment}}" wx:key="id" class="card equip-item">
       <text class="equip-name">{{item.equipment_name}}</text>
-      <text class="equip-qty">× {{item.quantity}}</text>
+      <text class="equip-qty">x {{item.quantity}}</text>
     </view>
   </view>
 
-  <!-- 排期 -->
   <view wx:if="{{activeTab==='schedule'}}">
     <view class="date-picker-row card">
       <text class="date-label">选择日期</text>
       <picker mode="date" value="{{scheduleDate}}" bindchange="onDateChange">
-        <view class="date-val">{{scheduleDate}} ›</view>
+        <view class="date-val">{{scheduleDate}} ></view>
       </picker>
     </view>
+
     <view wx:if="{{schedule.length===0}}" class="empty-tip">当日暂无预约</view>
     <view wx:for="{{schedule}}" wx:key="id" class="card schedule-item">
-      <view class="schedule-time">{{item.start_time}} – {{item.end_time}}</view>
+      <view class="schedule-time">{{item.start_time}} - {{item.end_time}}</view>
       <view class="schedule-user">{{item.username || '已预约'}}</view>
       <view class="status-tag status-{{item.status}}">{{statusText[item.status]}}</view>
     </view>
   </view>
 
-  <!-- Reserve button -->
   <view class="reserve-bar">
     <button class="btn-primary reserve-btn" bindtap="goReserve">立即预约</button>
   </view>
