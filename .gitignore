@@ -47,3 +47,6 @@ miniprogram/project.private.config.json
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Presentation
+答辩PPT/
