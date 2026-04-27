@@ -55,8 +55,39 @@
           <view class="profile-page__form-actions">
             <view class="profile-page__btn primary" :class="{ disabled: !isEditing }" @click="saveProfile">保存更改</view>
             <view class="profile-page__btn light" @click="cancelEdit">取消</view>
+            <view class="profile-page__btn light" @click="openPasswordDialog">修改密码</view>
             <view class="profile-page__btn danger" @click="logout">退出登录</view>
           </view>
+        </view>
+      </view>
+    </view>
+
+    <view v-if="passwordDialogVisible" class="profile-page__modal-mask" @click="closePasswordDialog">
+      <view class="profile-page__password-modal" @click.stop>
+        <view class="profile-page__password-head">
+          <view>
+            <view class="profile-page__password-title">修改密码</view>
+            <view class="profile-page__password-sub">验证原密码后更新登录密码</view>
+          </view>
+          <view class="profile-page__password-close" @click="closePasswordDialog">×</view>
+        </view>
+        <view class="profile-page__password-fields">
+          <view class="profile-page__field">
+            <view class="profile-page__label">原密码</view>
+            <input v-model.trim="passwordForm.old_password" class="profile-page__input profile-page__input-field" password placeholder="请输入当前密码" />
+          </view>
+          <view class="profile-page__field">
+            <view class="profile-page__label">新密码</view>
+            <input v-model.trim="passwordForm.new_password" class="profile-page__input profile-page__input-field" password placeholder="至少 6 位" />
+          </view>
+          <view class="profile-page__field">
+            <view class="profile-page__label">确认新密码</view>
+            <input v-model.trim="passwordForm.confirm_password" class="profile-page__input profile-page__input-field" password placeholder="再次输入新密码" />
+          </view>
+        </view>
+        <view class="profile-page__form-actions profile-page__password-actions">
+          <view class="profile-page__btn light" @click="closePasswordDialog">取消</view>
+          <view class="profile-page__btn primary" :class="{ disabled: changingPassword }" @click="changePassword">确认修改</view>
         </view>
       </view>
     </view>
@@ -87,6 +118,13 @@ export default {
         email: '',
         phone: '',
         avatar_url: ''
+      },
+      passwordDialogVisible: false,
+      changingPassword: false,
+      passwordForm: {
+        old_password: '',
+        new_password: '',
+        confirm_password: ''
       }
     }
   },
@@ -197,6 +235,56 @@ export default {
     logout() {
       clearSession()
       openPage(routes.login, { replace: true })
+    },
+    resetPasswordForm() {
+      this.passwordForm = {
+        old_password: '',
+        new_password: '',
+        confirm_password: ''
+      }
+    },
+    openPasswordDialog() {
+      this.passwordDialogVisible = true
+    },
+    closePasswordDialog() {
+      if (this.changingPassword) return
+      this.passwordDialogVisible = false
+      this.resetPasswordForm()
+    },
+    async changePassword() {
+      if (this.changingPassword) return
+      const oldPassword = this.passwordForm.old_password
+      const newPassword = this.passwordForm.new_password
+      const confirmPassword = this.passwordForm.confirm_password
+
+      if (!oldPassword) {
+        uni.showToast({ title: '请输入原密码', icon: 'none' })
+        return
+      }
+      if (!newPassword || newPassword.length < 6) {
+        uni.showToast({ title: '新密码至少 6 位', icon: 'none' })
+        return
+      }
+      if (newPassword !== confirmPassword) {
+        uni.showToast({ title: '两次输入的新密码不一致', icon: 'none' })
+        return
+      }
+
+      this.changingPassword = true
+      try {
+        await api.changePassword({
+          old_password: oldPassword,
+          new_password: newPassword,
+          confirm_password: confirmPassword
+        })
+        this.resetPasswordForm()
+        this.passwordDialogVisible = false
+        uni.showToast({ title: '密码修改成功', icon: 'success' })
+      } catch (error) {
+        uni.showToast({ title: error?.message || '密码修改失败', icon: 'none' })
+      } finally {
+        this.changingPassword = false
+      }
     }
   }
 }
@@ -472,6 +560,72 @@ export default {
 .profile-page__input-field {
   width: 100%;
   box-sizing: border-box;
+}
+
+.profile-page__modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(10, 26, 45, 0.42);
+  backdrop-filter: blur(4rpx);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32rpx;
+  box-sizing: border-box;
+}
+
+.profile-page__password-modal {
+  width: 720rpx;
+  max-width: calc(100vw - 64rpx);
+  border-radius: 26rpx;
+  background: #ffffff;
+  padding: 28rpx;
+  box-shadow: 0 30rpx 80rpx rgba(9, 36, 69, 0.22);
+}
+
+.profile-page__password-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.profile-page__password-title {
+  color: #082248;
+  font-size: 34rpx;
+  font-weight: 800;
+}
+
+.profile-page__password-sub {
+  margin-top: 6rpx;
+  color: #60738c;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.profile-page__password-close {
+  width: 54rpx;
+  height: 54rpx;
+  border-radius: 999rpx;
+  background: #edf3fb;
+  color: #476183;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34rpx;
+  line-height: 1;
+}
+
+.profile-page__password-fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14rpx;
+}
+
+.profile-page__password-actions {
+  justify-content: flex-end;
 }
 
 
