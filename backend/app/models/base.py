@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 
 from app.extensions import db
 
@@ -7,6 +8,8 @@ def serialize_value(value):
     # 把 datetime / date / time 这类对象转为字符串，便于直接输出给前端。
     if value is None:
         return None
+    if isinstance(value, Decimal):
+        return float(value)
     if hasattr(value, "isoformat"):
         return value.isoformat()
     return value

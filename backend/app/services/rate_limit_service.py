@@ -101,3 +101,26 @@ def enforce_approve_reservation_rate_limit(user_id):
         error_code=42912,
     )
 
+
+def enforce_create_asset_request_rate_limit(user_id):
+    enforce_user_rate_limit(
+        action="create_asset_request",
+        user_id=user_id,
+        limit_per_window=current_app.config.get(
+            "RATE_LIMIT_CREATE_ASSET_REQUEST_PER_MIN", 20
+        ),
+        window_seconds=60,
+        error_code=42921,
+    )
+
+
+def enforce_submit_daily_report_rate_limit(user_id):
+    enforce_user_rate_limit(
+        action="submit_daily_report",
+        user_id=user_id,
+        limit_per_window=current_app.config.get(
+            "RATE_LIMIT_SUBMIT_DAILY_REPORT_PER_MIN", 30
+        ),
+        window_seconds=60,
+        error_code=42931,
+    )

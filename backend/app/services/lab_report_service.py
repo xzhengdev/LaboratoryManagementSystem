@@ -1,0 +1,199 @@
+﻿from datetime import datetime
+
+from app.models import FileObject, LabDailyReport, Laboratory, OperationLog
+from app.services.db_router_service import campus_db_session, get_routed_campus_ids
+from app.services.event_bus_service import publish_async_event
+from app.utils.exceptions import AppError
+from app.utils.validators import parse_date
+
+
+def _write_log(session, user_id, action, detail):
+    session.add(OperationLog(user_id=user_id, module="daily_report", action=action, detail=detail))
+
+
+def _bind_photo_file_ids(session, current_user, campus_id, report_id, file_ids):
+    if not file_ids:
+        return
+    normalized = []
+    for item in file_ids:
+        try:
+            value = int(item)
+            if value > 0:
+                normalized.append(value)
+        except Exception:
+            continue
+
+    if not normalized:
+        return
+
+    photos = session.query(FileObject).filter(FileObject.id.in_(normalized)).all()
+    photo_map = {row.id: row for row in photos}
+    for file_id in normalized:
+        photo = photo_map.get(file_id)
+        if not photo:
+            raise AppError(f"图片文件不存在: {file_id}", 404, 40411)
+        if photo.campus_id != campus_id:
+            raise AppError("图片与日报所属校区不一致", 400, 40091)
+        if photo.created_by != current_user.id and current_user.role != "system_admin":
+            raise AppError("不能绑定其他用户上传的图片", 403, 40351)
+        if photo.biz_type not in {"daily_report_temp", "daily_report_photo"}:
+            raise AppError("图片类型不合法，无法绑定到日报")
+        photo.biz_type = "daily_report_photo"
+        photo.biz_id = report_id
+
+
+def _resolve_campus_for_report(current_user, lab_id):
+    if not lab_id:
+        raise AppError("lab_id 不能为空")
+
+    if current_user.role == "system_admin":
+        campus_ids = get_routed_campus_ids()
+    else:
+        if not current_user.campus_id:
+            raise AppError("当前用户未绑定校区", 400, 40092)
+        campus_ids = [current_user.campus_id]
+
+    # 在分库场景下，按候选校区尝试查找该实验室。
+    for campus_id in campus_ids:
+        with campus_db_session(campus_id) as session:
+            lab = session.query(Laboratory).get(int(lab_id))
+            if lab:
+                return campus_id, lab
+
+    # 回退默认库一次，避免未开启分库时因 campus_ids 为空导致误判。
+    with campus_db_session(0) as session:
+        lab = session.query(Laboratory).get(int(lab_id))
+        if lab:
+            if current_user.role != "system_admin" and current_user.campus_id != lab.campus_id:
+                raise AppError("只能提交本校区实验室日报", 403, 40353)
+            return lab.campus_id, lab
+
+    raise AppError("实验室不存在", 404, 40401)
+
+
+def create_daily_report(current_user, payload):
+    if current_user.role not in {"student", "teacher", "lab_admin", "system_admin"}:
+        raise AppError("当前角色不支持提交日报", 403, 40352)
+
+    lab_id = int(payload.get("lab_id") or 0)
+    campus_id, lab = _resolve_campus_for_report(current_user, lab_id)
+
+    report_date = parse_date(payload.get("report_date"), "report_date")
+    content = str(payload.get("content") or "").strip()
+    if not content:
+        raise AppError("日报内容不能为空")
+
+    file_ids = payload.get("photo_file_ids") or []
+    if not isinstance(file_ids, list):
+        raise AppError("photo_file_ids 必须是数组")
+
+    with campus_db_session(campus_id) as session:
+        try:
+            item = LabDailyReport(
+                campus_id=campus_id,
+                lab_id=lab.id,
+                reporter_id=current_user.id,
+                report_date=report_date,
+                content=content,
+                status="pending",
+            )
+            session.add(item)
+            session.flush()
+            _bind_photo_file_ids(session, current_user, campus_id, item.id, file_ids)
+            _write_log(session, current_user.id, "create", f"提交实验室日报#{item.id}")
+            session.commit()
+            result = item.to_dict()
+            publish_async_event(
+                "daily_report.created",
+                {
+                    "report_id": item.id,
+                    "campus_id": item.campus_id,
+                    "lab_id": item.lab_id,
+                    "report_date": item.report_date.isoformat(),
+                    "status": item.status,
+                },
+            )
+            return result
+        except Exception:
+            session.rollback()
+            raise
+
+
+def _list_reports_in_one_campus(session, current_user, filters):
+    query = session.query(LabDailyReport).order_by(LabDailyReport.created_at.desc())
+    if current_user.role in {"student", "teacher"}:
+        query = query.filter_by(reporter_id=current_user.id)
+
+    if filters.get("lab_id"):
+        query = query.filter_by(lab_id=int(filters["lab_id"]))
+    if filters.get("status"):
+        query = query.filter_by(status=str(filters["status"]).strip())
+    if filters.get("report_date"):
+        query = query.filter_by(report_date=parse_date(filters.get("report_date"), "report_date"))
+
+    return [item.to_dict() for item in query.all()]
+
+
+def list_daily_reports(current_user, filters):
+    if filters.get("campus_id"):
+        target_campus_id = int(filters["campus_id"])
+        if current_user.role == "lab_admin" and target_campus_id != current_user.campus_id:
+            raise AppError("只能查看本校区日报", 403, 40357)
+        with campus_db_session(target_campus_id) as session:
+            return _list_reports_in_one_campus(session, current_user, filters)
+
+    if current_user.role == "system_admin":
+        campus_ids = get_routed_campus_ids()
+        if not campus_ids:
+            with campus_db_session(0) as session:
+                return _list_reports_in_one_campus(session, current_user, filters)
+        rows = []
+        for campus_id in campus_ids:
+            with campus_db_session(campus_id) as session:
+                rows.extend(_list_reports_in_one_campus(session, current_user, filters))
+        rows.sort(key=lambda item: item.get("created_at") or "", reverse=True)
+        return rows
+
+    with campus_db_session(current_user.campus_id) as session:
+        return _list_reports_in_one_campus(session, current_user, filters)
+
+
+def review_daily_report(current_user, report_item, review_status, review_remark=""):
+    if current_user.role not in {"lab_admin", "system_admin"}:
+        raise AppError("只有管理员可以审核日报", 403, 40354)
+
+    with campus_db_session(report_item.campus_id) as session:
+        item = session.query(LabDailyReport).get(int(report_item.id))
+        if not item:
+            raise AppError("日报不存在", 404, 40413)
+
+        if current_user.role == "lab_admin" and current_user.campus_id != item.campus_id:
+            raise AppError("只能审核本校区日报", 403, 40355)
+        if item.status != "pending":
+            raise AppError("当前日报不在待审核状态")
+
+        status = str(review_status or "").strip().lower()
+        if status not in {"approved", "rejected"}:
+            raise AppError("review_status 只能是 approved 或 rejected")
+
+        try:
+            item.status = status
+            item.reviewer_id = current_user.id
+            item.review_remark = str(review_remark or "")[:255]
+            item.reviewed_at = datetime.utcnow()
+            _write_log(session, current_user.id, "review", f"审核日报#{item.id}: {status}")
+            session.commit()
+            result = item.to_dict()
+            publish_async_event(
+                f"daily_report.{status}",
+                {
+                    "report_id": item.id,
+                    "campus_id": item.campus_id,
+                    "lab_id": item.lab_id,
+                    "status": item.status,
+                },
+            )
+            return result
+        except Exception:
+            session.rollback()
+            raise

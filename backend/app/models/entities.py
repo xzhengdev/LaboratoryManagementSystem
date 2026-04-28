@@ -2,6 +2,7 @@ from datetime import datetime
 import json
 
 from werkzeug.security import check_password_hash, generate_password_hash
+from sqlalchemy.orm import object_session
 
 from app.extensions import db
 from .base import BaseModel, serialize_value
@@ -229,3 +230,222 @@ class OperationLog(db.Model):
         if extra:
             data.update(extra)
         return data
+
+
+class FileObject(BaseModel):
+    # 文件元数据表：真实文件存储在本地目录或 SeaweedFS，这里保存索引和权限信息。
+    __tablename__ = "file_objects"
+    __table_args__ = (
+        db.Index("idx_file_object_campus_biz", "campus_id", "biz_type", "biz_id"),
+        db.Index("idx_file_object_file_id", "file_id"),
+    )
+
+    campus_id = db.Column(db.Integer, db.ForeignKey("campuses.id"), nullable=False)
+    biz_type = db.Column(db.String(50), nullable=False)
+    biz_id = db.Column(db.Integer)
+    file_id = db.Column(db.String(255), nullable=False)
+    original_name = db.Column(db.String(255), nullable=False)
+    storage_backend = db.Column(db.String(30), default="local", nullable=False)
+    url = db.Column(db.String(500), nullable=False)
+    mime_type = db.Column(db.String(100))
+    size = db.Column(db.Integer, default=0, nullable=False)
+    sha256 = db.Column(db.String(64), nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    status = db.Column(db.String(20), default="active", nullable=False)
+
+    campus = db.relationship("Campus")
+    uploader = db.relationship("User")
+
+    def to_dict(self, extra=None):
+        return super().to_dict(
+            {
+                "campus_name": self.campus.campus_name if self.campus else None,
+                "uploader_name": self.uploader.real_name if self.uploader else None,
+                **(extra or {}),
+            }
+        )
+
+
+class AssetBudget(BaseModel):
+    # 校区资产预算表：保存总额度、锁定额度和已使用额度。
+    __tablename__ = "asset_budgets"
+    __table_args__ = (
+        db.UniqueConstraint("campus_id", name="uq_asset_budget_campus"),
+    )
+
+    campus_id = db.Column(db.Integer, db.ForeignKey("campuses.id"), nullable=False)
+    total_amount = db.Column(db.Numeric(12, 2), default=0, nullable=False)
+    locked_amount = db.Column(db.Numeric(12, 2), default=0, nullable=False)
+    used_amount = db.Column(db.Numeric(12, 2), default=0, nullable=False)
+    remark = db.Column(db.String(255))
+
+    campus = db.relationship("Campus")
+
+    def to_dict(self, extra=None):
+        available = float((self.total_amount or 0) - (self.locked_amount or 0) - (self.used_amount or 0))
+        return super().to_dict(
+            {
+                "campus_name": self.campus.campus_name if self.campus else None,
+                "available_amount": available,
+                **(extra or {}),
+            }
+        )
+
+
+class AssetPurchaseRequest(BaseModel):
+    # 资产购置申报表：提交申报时锁定预算，审批后转为已用或释放锁定。
+    __tablename__ = "asset_purchase_requests"
+    __table_args__ = (
+        db.Index("idx_asset_request_campus_status", "campus_id", "status"),
+        db.UniqueConstraint("request_no", name="uq_asset_request_no"),
+    )
+
+    request_no = db.Column(db.String(40), nullable=False)
+    campus_id = db.Column(db.Integer, db.ForeignKey("campuses.id"), nullable=False)
+    lab_id = db.Column(db.Integer, db.ForeignKey("laboratories.id"))
+    requester_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    asset_name = db.Column(db.String(100), nullable=False)
+    category = db.Column(db.String(50), nullable=False)
+    quantity = db.Column(db.Integer, default=1, nullable=False)
+    unit_price = db.Column(db.Numeric(12, 2), nullable=False)
+    amount = db.Column(db.Numeric(12, 2), nullable=False)
+    reason = db.Column(db.Text)
+    status = db.Column(db.String(20), default="pending", nullable=False)
+    reviewer_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    review_remark = db.Column(db.String(255))
+    reviewed_at = db.Column(db.DateTime)
+
+    campus = db.relationship("Campus")
+    lab = db.relationship("Laboratory")
+    requester = db.relationship("User", foreign_keys=[requester_id])
+    reviewer = db.relationship("User", foreign_keys=[reviewer_id])
+
+    def to_dict(self, extra=None):
+        return super().to_dict(
+            {
+                "campus_name": self.campus.campus_name if self.campus else None,
+                "lab_name": self.lab.lab_name if self.lab else None,
+                "requester_name": self.requester.real_name if self.requester else None,
+                "reviewer_name": self.reviewer.real_name if self.reviewer else None,
+                **(extra or {}),
+            }
+        )
+
+
+class AssetBudgetLedger(BaseModel):
+    # 预算流水表：记录锁定、释放、转已用等动作，方便审计。
+    __tablename__ = "asset_budget_ledgers"
+    __table_args__ = (
+        db.Index("idx_asset_budget_ledger_request", "request_id"),
+    )
+
+    campus_id = db.Column(db.Integer, db.ForeignKey("campuses.id"), nullable=False)
+    request_id = db.Column(db.Integer, db.ForeignKey("asset_purchase_requests.id"))
+    op_type = db.Column(db.String(30), nullable=False)
+    amount = db.Column(db.Numeric(12, 2), nullable=False)
+    before_locked = db.Column(db.Numeric(12, 2), nullable=False)
+    after_locked = db.Column(db.Numeric(12, 2), nullable=False)
+    before_used = db.Column(db.Numeric(12, 2), nullable=False)
+    after_used = db.Column(db.Numeric(12, 2), nullable=False)
+    operator_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    remark = db.Column(db.String(255))
+
+    campus = db.relationship("Campus")
+    request = db.relationship("AssetPurchaseRequest")
+    operator = db.relationship("User")
+
+    def to_dict(self, extra=None):
+        return super().to_dict(
+            {
+                "campus_name": self.campus.campus_name if self.campus else None,
+                "operator_name": self.operator.real_name if self.operator else None,
+                **(extra or {}),
+            }
+        )
+
+
+class AssetItem(BaseModel):
+    # 资产台账表：审批通过并入库后形成正式资产记录。
+    __tablename__ = "asset_items"
+    __table_args__ = (
+        db.Index("idx_asset_item_campus_status", "campus_id", "status"),
+        db.UniqueConstraint("asset_code", name="uq_asset_code"),
+    )
+
+    asset_code = db.Column(db.String(40), nullable=False)
+    campus_id = db.Column(db.Integer, db.ForeignKey("campuses.id"), nullable=False)
+    lab_id = db.Column(db.Integer, db.ForeignKey("laboratories.id"))
+    request_id = db.Column(db.Integer, db.ForeignKey("asset_purchase_requests.id"))
+    asset_name = db.Column(db.String(100), nullable=False)
+    category = db.Column(db.String(50), nullable=False)
+    price = db.Column(db.Numeric(12, 2), nullable=False)
+    status = db.Column(db.String(20), default="in_use", nullable=False)
+    description = db.Column(db.Text)
+
+    campus = db.relationship("Campus")
+    lab = db.relationship("Laboratory")
+    request = db.relationship("AssetPurchaseRequest")
+
+    def to_dict(self, extra=None):
+        active_session = object_session(self)
+        photos = []
+        if active_session is not None:
+            photos = (
+                active_session.query(FileObject)
+                .filter_by(biz_type="asset_photo", biz_id=self.id, status="active")
+                .order_by(FileObject.created_at.desc())
+                .all()
+            )
+        return super().to_dict(
+            {
+                "campus_name": self.campus.campus_name if self.campus else None,
+                "lab_name": self.lab.lab_name if self.lab else None,
+                "photos": [item.to_dict() for item in photos],
+                **(extra or {}),
+            }
+        )
+
+
+class LabDailyReport(BaseModel):
+    # 实验室日报表：学生/教师通过小程序拍照上报，管理员审核。
+    __tablename__ = "lab_daily_reports"
+    __table_args__ = (
+        db.Index("idx_daily_report_campus_status", "campus_id", "status"),
+        db.Index("idx_daily_report_lab_date", "lab_id", "report_date"),
+    )
+
+    campus_id = db.Column(db.Integer, db.ForeignKey("campuses.id"), nullable=False)
+    lab_id = db.Column(db.Integer, db.ForeignKey("laboratories.id"), nullable=False)
+    reporter_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    report_date = db.Column(db.Date, nullable=False)
+    content = db.Column(db.Text)
+    status = db.Column(db.String(20), default="pending", nullable=False)
+    reviewer_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    review_remark = db.Column(db.String(255))
+    reviewed_at = db.Column(db.DateTime)
+
+    campus = db.relationship("Campus")
+    lab = db.relationship("Laboratory")
+    reporter = db.relationship("User", foreign_keys=[reporter_id])
+    reviewer = db.relationship("User", foreign_keys=[reviewer_id])
+
+    def to_dict(self, extra=None):
+        active_session = object_session(self)
+        photos = []
+        if active_session is not None:
+            photos = (
+                active_session.query(FileObject)
+                .filter_by(biz_type="daily_report_photo", biz_id=self.id, status="active")
+                .order_by(FileObject.created_at.desc())
+                .all()
+            )
+        return super().to_dict(
+            {
+                "campus_name": self.campus.campus_name if self.campus else None,
+                "lab_name": self.lab.lab_name if self.lab else None,
+                "reporter_name": self.reporter.real_name if self.reporter else None,
+                "reviewer_name": self.reviewer.real_name if self.reviewer else None,
+                "photos": [item.to_dict() for item in photos],
+                **(extra or {}),
+            }
+        )

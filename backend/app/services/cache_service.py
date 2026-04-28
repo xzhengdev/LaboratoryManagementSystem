@@ -35,19 +35,20 @@ def _get_ttl(config_key, default_value):
         return default_value
 
 
-def lab_schedule_cache_key(lab_id, reservation_date):
+def lab_schedule_cache_key(lab_id, reservation_date, campus_id=None):
     if isinstance(reservation_date, date):
         date_text = reservation_date.isoformat()
     else:
         date_text = str(reservation_date)
-    return f"{LAB_SCHEDULE_CACHE_PREFIX}{lab_id}:{date_text}"
+    campus_part = "all" if campus_id is None else str(campus_id)
+    return f"{LAB_SCHEDULE_CACHE_PREFIX}{campus_part}:{lab_id}:{date_text}"
 
 
-def get_cached_lab_schedule(lab_id, reservation_date):
+def get_cached_lab_schedule(lab_id, reservation_date, campus_id=None):
     client = _redis_client()
     if client is None:
         return None
-    key = lab_schedule_cache_key(lab_id, reservation_date)
+    key = lab_schedule_cache_key(lab_id, reservation_date, campus_id=campus_id)
     try:
         raw = client.get(key)
         if not raw:
@@ -57,11 +58,11 @@ def get_cached_lab_schedule(lab_id, reservation_date):
         return None
 
 
-def set_cached_lab_schedule(lab_id, reservation_date, payload):
+def set_cached_lab_schedule(lab_id, reservation_date, payload, campus_id=None):
     client = _redis_client()
     if client is None:
         return
-    key = lab_schedule_cache_key(lab_id, reservation_date)
+    key = lab_schedule_cache_key(lab_id, reservation_date, campus_id=campus_id)
     serialized = _safe_json_dumps(payload)
     if not serialized:
         return
@@ -72,19 +73,20 @@ def set_cached_lab_schedule(lab_id, reservation_date, payload):
         return
 
 
-def invalidate_lab_schedule_cache(lab_id, reservation_date=None):
+def invalidate_lab_schedule_cache(lab_id, reservation_date=None, campus_id=None):
     client = _redis_client()
     if client is None:
         return
     if reservation_date is not None:
-        key = lab_schedule_cache_key(lab_id, reservation_date)
+        key = lab_schedule_cache_key(lab_id, reservation_date, campus_id=campus_id)
         try:
             client.delete(key)
         except Exception:
             return
         return
 
-    pattern = f"{LAB_SCHEDULE_CACHE_PREFIX}{lab_id}:*"
+    campus_part = "all" if campus_id is None else str(campus_id)
+    pattern = f"{LAB_SCHEDULE_CACHE_PREFIX}{campus_part}:{lab_id}:*"
     try:
         for key in client.scan_iter(match=pattern, count=200):
             client.delete(key)
@@ -136,4 +138,3 @@ def invalidate_statistics_cache():
             client.delete(key)
     except Exception:
         return
-

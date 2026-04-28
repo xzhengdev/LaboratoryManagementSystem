@@ -144,6 +144,12 @@ class Config:
     RATE_LIMIT_APPROVE_RESERVATION_PER_MIN = int(
         os.getenv("RATE_LIMIT_APPROVE_RESERVATION_PER_MIN", "60")
     )
+    RATE_LIMIT_CREATE_ASSET_REQUEST_PER_MIN = int(
+        os.getenv("RATE_LIMIT_CREATE_ASSET_REQUEST_PER_MIN", "20")
+    )
+    RATE_LIMIT_SUBMIT_DAILY_REPORT_PER_MIN = int(
+        os.getenv("RATE_LIMIT_SUBMIT_DAILY_REPORT_PER_MIN", "30")
+    )
 
     # ---------- 异步事件队列 ----------
     ENABLE_ASYNC_EVENTS = os.getenv("ENABLE_ASYNC_EVENTS", "0").strip().lower() in {
@@ -160,6 +166,20 @@ class Config:
     # ---------- 文件存储配置 ----------
     # 上传文件的存放目录名（默认为 uploads）
     UPLOAD_DIRNAME = os.getenv("UPLOAD_DIRNAME", "uploads")
+    SEAWEEDFS_UPLOAD_URL = os.getenv("SEAWEEDFS_UPLOAD_URL", "").strip()
+    SEAWEEDFS_PUBLIC_URL = os.getenv("SEAWEEDFS_PUBLIC_URL", "").strip()
+    SEAWEEDFS_TIMEOUT_SECONDS = float(os.getenv("SEAWEEDFS_TIMEOUT_SECONDS", "8"))
+
+    # ---------- 校区分库路由 ----------
+    ENABLE_CAMPUS_DB_ROUTING = os.getenv("ENABLE_CAMPUS_DB_ROUTING", "0").strip().lower() in {
+        "1",
+        "true",
+        "on",
+        "yes",
+    }
+    # 示例: {"1":"mysql+pymysql://.../lab_campus_a","2":"mysql+pymysql://.../lab_campus_b"}
+    CAMPUS_DB_URI_MAP = os.getenv("CAMPUS_DB_URI_MAP", "").strip()
+    SUMMARY_DB_URL = os.getenv("SUMMARY_DB_URL", "").strip()
 
     # ---------- AI 助手（Agent）配置 ----------
     # AI 服务提供商：支持 "rule"（规则引擎）、"deepseek"、"openai" 等

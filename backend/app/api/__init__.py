@@ -1,9 +1,11 @@
 from .agent import agent_bp
 from .approvals import approval_bp
+from .assets import asset_bp
 from .auth import auth_bp
 from .campuses import campus_bp
 from .equipment import equipment_bp
 from .health import health_bp
+from .lab_reports import lab_report_bp
 from .labs import lab_bp
 from .operation_logs import operation_log_bp
 from .reservations import reservation_bp
@@ -21,9 +23,11 @@ def register_blueprints(app):
         health_bp,
         reservation_bp,
         approval_bp,
+        asset_bp,
         operation_log_bp,
         statistics_bp,
         user_bp,
         agent_bp,
+        lab_report_bp,
     ]:
         app.register_blueprint(blueprint, url_prefix="/api")
