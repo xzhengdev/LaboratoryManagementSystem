@@ -1,6 +1,7 @@
 from flask import Blueprint, request
 
 from app.models import Reservation
+from app.services.rate_limit_service import enforce_approve_reservation_rate_limit
 from app.services.reservation_service import approve_reservation
 from app.utils.decorators import get_current_user, role_required
 from app.utils.response import success
@@ -25,9 +26,11 @@ def pending_approvals():
 def approve_api(reservation_id):
     # 审批动作接口：approval_status 取 approved 或 rejected。
     payload = request.get_json(silent=True) or {}
+    current_user = get_current_user()
+    enforce_approve_reservation_rate_limit(current_user.id)
     item = Reservation.query.get_or_404(reservation_id)
     data = approve_reservation(
-        get_current_user(),
+        current_user,
         item,
         payload.get("approval_status", ""),
         payload.get("remark", ""),

@@ -1,5 +1,7 @@
 const { request, BASE_URL } = require('./request')
 const { getToken } = require('./session')
+const createIdempotencyKey = () =>
+  `resv-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 
 const api = {
   login: (data) => request({ url: '/auth/login', method: 'POST', data }),
@@ -36,7 +38,15 @@ const api = {
   labDetail: (id) => request({ url: `/labs/${id}` }),
   labSchedule: (id, date) => request({ url: `/labs/${id}/schedule`, data: { date } }),
   equipment: (params = {}) => request({ url: '/equipment', data: params }),
-  createReservation: (data) => request({ url: '/reservations', method: 'POST', data }),
+  createReservation: (data, options = {}) =>
+    request({
+      url: '/reservations',
+      method: 'POST',
+      data,
+      headers: {
+        'Idempotency-Key': options.idempotencyKey || createIdempotencyKey()
+      }
+    }),
   myReservations: () => request({ url: '/reservations/my' }),
   reservationDetail: (id) => request({ url: `/reservations/${id}` }),
   cancelReservation: (id) => request({ url: `/reservations/${id}/cancel`, method: 'POST' }),

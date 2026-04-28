@@ -3,6 +3,7 @@ from .approvals import approval_bp
 from .auth import auth_bp
 from .campuses import campus_bp
 from .equipment import equipment_bp
+from .health import health_bp
 from .labs import lab_bp
 from .operation_logs import operation_log_bp
 from .reservations import reservation_bp
@@ -17,6 +18,7 @@ def register_blueprints(app):
         campus_bp,
         lab_bp,
         equipment_bp,
+        health_bp,
         reservation_bp,
         approval_bp,
         operation_log_bp,

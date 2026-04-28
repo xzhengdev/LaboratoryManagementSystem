@@ -115,6 +115,10 @@ class Equipment(BaseModel):
 class Reservation(BaseModel):
     # 预约表：记录预约人、实验室、日期、时间段、人数与审批状态。
     __tablename__ = "reservations"
+    __table_args__ = (
+        db.Index("idx_reservation_lab_date_status", "lab_id", "reservation_date", "status"),
+        db.Index("idx_reservation_user_created_at", "user_id", "created_at"),
+    )
 
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     campus_id = db.Column(db.Integer, db.ForeignKey("campuses.id"), nullable=False)
@@ -140,6 +144,33 @@ class Reservation(BaseModel):
                 **(extra or {}),
             }
         )
+
+
+class IdempotencyRecord(BaseModel):
+    # 幂等记录表：防止重复提交导致重复业务写入。
+    __tablename__ = "idempotency_records"
+    __table_args__ = (
+        db.UniqueConstraint(
+            "user_id",
+            "endpoint",
+            "idempotency_key",
+            name="uq_idempotency_user_endpoint_key",
+        ),
+        db.Index("idx_idempotency_expires_at", "expires_at"),
+    )
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    endpoint = db.Column(db.String(64), nullable=False)
+    idempotency_key = db.Column(db.String(128), nullable=False)
+    request_hash = db.Column(db.String(64), nullable=False)
+    status = db.Column(db.String(20), default="processing", nullable=False)
+    response_payload = db.Column(db.Text)
+    reservation_id = db.Column(db.Integer, db.ForeignKey("reservations.id"))
+    http_status = db.Column(db.Integer, default=200, nullable=False)
+    error_message = db.Column(db.String(255))
+    expires_at = db.Column(db.DateTime, nullable=False)
+
+    user = db.relationship("User")
 
 
 class Approval(db.Model):

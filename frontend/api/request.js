@@ -5,7 +5,7 @@ import { getApiBaseUrl } from '../common/platform'
 // H5/PC、小程序会在 platform.js 中根据运行环境自动切换。
 const BASE_URL = getApiBaseUrl()
 
-export function request({ url, method = 'GET', data = {} }) {
+export function request({ url, method = 'GET', data = {}, headers = {} }) {
   return new Promise((resolve, reject) => {
     uni.request({
       url: `${BASE_URL}${url}`,
@@ -13,7 +13,8 @@ export function request({ url, method = 'GET', data = {} }) {
       data,
       header: {
         // 所有需要鉴权的接口都通过 Authorization 头部传递 JWT。
-        Authorization: getToken() ? `Bearer ${getToken()}` : ''
+        Authorization: getToken() ? `Bearer ${getToken()}` : '',
+        ...headers
       },
       success: (res) => {
         const payload = res.data || {}

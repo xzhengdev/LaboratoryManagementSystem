@@ -4,7 +4,7 @@ from flask import Flask, send_from_directory
 
 from app.api import register_blueprints
 from app.config import DevelopmentConfig
-from app.extensions import cors, db, jwt, migrate
+from app.extensions import cors, db, init_redis, jwt, migrate
 from app.utils.exceptions import AppError
 from app.utils.response import fail
 
@@ -64,6 +64,7 @@ def create_app(config_class=DevelopmentConfig):
     migrate.init_app(app, db)
     jwt.init_app(app)
     cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
+    init_redis(app)
 
     # 注册蓝图、异常处理和 CLI 命令。
     register_blueprints(app)

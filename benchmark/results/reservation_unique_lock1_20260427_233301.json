@@ -1,0 +1,31 @@
+﻿{
+  "params": {
+    "concurrency": 80,
+    "total": 400,
+    "idempotency_mode": "unique",
+    "target_slot": "2026-05-01 19:00-20:00",
+    "lab_id": 17,
+    "campus_id": 5
+  },
+  "timing": {
+    "elapsed_seconds": 6.371,
+    "throughput_rps": 62.78,
+    "latency_ms": {
+      "p50": 1127.37,
+      "p95": 2193.06,
+      "p99": 2839.73,
+      "max": 3505.39
+    }
+  },
+  "http_status_distribution": {
+    "500": 400
+  },
+  "business_code_distribution": {
+    "50041": 400
+  },
+  "reservation_write_result": {
+    "returned_records": 0,
+    "unique_reservation_ids": 0,
+    "duplicate_id_count": 0
+  }
+}

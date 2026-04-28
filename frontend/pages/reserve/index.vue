@@ -333,6 +333,8 @@ export default {
       labIndex: 0,
       labOptions: [],
       schedule: {},
+      submitting: false,
+      currentIdempotencyKey: '',
       form: {
         campus_id: '',
         lab_id: '',
@@ -559,16 +561,19 @@ export default {
       this.labIndex = Number(event.detail.value || 0)
       this.syncLabToForm()
       await this.loadSchedule()
+      this.currentIdempotencyKey = ''
       this.ensureValidTimeRange(true)
     },
     async setField(key, value) {
       this.form[key] = value
+      this.currentIdempotencyKey = ''
       if (key === 'reservation_date' && this.form.lab_id) {
         await this.loadSchedule()
       }
       this.ensureValidTimeRange(true)
     },
     async submit() {
+      if (this.submitting) return
       if (!this.form.lab_id) {
         uni.showToast({ title: '请选择实验室', icon: 'none' })
         return
@@ -627,20 +632,31 @@ export default {
         return
       }
 
-      const createdReservation = await api.createReservation({
-        ...this.form,
-        participant_count: participantCount
-      })
+      const idempotencyKey = this.currentIdempotencyKey || `reserve-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+      this.currentIdempotencyKey = idempotencyKey
+      this.submitting = true
+      try {
+        const createdReservation = await api.createReservation(
+          {
+            ...this.form,
+            participant_count: participantCount
+          },
+          { idempotencyKey }
+        )
 
-      uni.showToast({ title: '预约已提交', icon: 'success' })
-      setTimeout(
-        () =>
-          openPage(
-            createdReservation?.id ? routes.reservationDetail : routes.myReservations,
-            createdReservation?.id ? { query: { id: createdReservation.id }, replace: true } : { replace: true }
-          ),
-        500
-      )
+        uni.showToast({ title: '预约已提交', icon: 'success' })
+        this.currentIdempotencyKey = ''
+        setTimeout(
+          () =>
+            openPage(
+              createdReservation?.id ? routes.reservationDetail : routes.myReservations,
+              createdReservation?.id ? { query: { id: createdReservation.id }, replace: true } : { replace: true }
+            ),
+          500
+        )
+      } finally {
+        this.submitting = false
+      }
     }
   }
 }

@@ -1,0 +1,124 @@
+version: "3.9"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: lab-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: lab_reservation
+      MYSQL_ROOT_HOST: "%"
+    ports:
+      - "3308:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p123456"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: lab-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  backend1:
+    build:
+      context: ../..
+      dockerfile: infra/docker/backend.Dockerfile
+    container_name: lab-backend-1
+    environment:
+      SECRET_KEY: lab-reservation-secret-key-for-dev-2026
+      JWT_SECRET_KEY: lab-jwt-secret-key-for-dev-2026-32bytes
+      DATABASE_URL: mysql+pymysql://root:123456@mysql:3306/lab_reservation?charset=utf8mb4
+      REDIS_URL: redis://redis:6379/0
+      ENABLE_DISTRIBUTED_LOCK: "1"
+      ENABLE_IDEMPOTENCY: "1"
+      ENABLE_ASYNC_EVENTS: "1"
+      ASYNC_EVENT_QUEUE_NAME: lab:events
+      ASYNC_EVENT_BLOCK_TIMEOUT_SECONDS: "5"
+      ENABLE_RATE_LIMIT: "1"
+      RATE_LIMIT_CREATE_RESERVATION_PER_MIN: "60"
+      RATE_LIMIT_APPROVE_RESERVATION_PER_MIN: "120"
+      AGENT_PROVIDER: rule
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: ["python", "start_server.py"]
+
+  backend2:
+    build:
+      context: ../..
+      dockerfile: infra/docker/backend.Dockerfile
+    container_name: lab-backend-2
+    environment:
+      SECRET_KEY: lab-reservation-secret-key-for-dev-2026
+      JWT_SECRET_KEY: lab-jwt-secret-key-for-dev-2026-32bytes
+      DATABASE_URL: mysql+pymysql://root:123456@mysql:3306/lab_reservation?charset=utf8mb4
+      REDIS_URL: redis://redis:6379/0
+      ENABLE_DISTRIBUTED_LOCK: "1"
+      ENABLE_IDEMPOTENCY: "1"
+      ENABLE_ASYNC_EVENTS: "1"
+      ASYNC_EVENT_QUEUE_NAME: lab:events
+      ASYNC_EVENT_BLOCK_TIMEOUT_SECONDS: "5"
+      ENABLE_RATE_LIMIT: "1"
+      RATE_LIMIT_CREATE_RESERVATION_PER_MIN: "60"
+      RATE_LIMIT_APPROVE_RESERVATION_PER_MIN: "120"
+      AGENT_PROVIDER: rule
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: ["python", "start_server.py"]
+
+  event-worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/backend.Dockerfile
+    container_name: lab-event-worker
+    environment:
+      SECRET_KEY: lab-reservation-secret-key-for-dev-2026
+      JWT_SECRET_KEY: lab-jwt-secret-key-for-dev-2026-32bytes
+      DATABASE_URL: mysql+pymysql://root:123456@mysql:3306/lab_reservation?charset=utf8mb4
+      REDIS_URL: redis://redis:6379/0
+      ENABLE_DISTRIBUTED_LOCK: "1"
+      ENABLE_IDEMPOTENCY: "1"
+      ENABLE_ASYNC_EVENTS: "1"
+      ASYNC_EVENT_QUEUE_NAME: lab:events
+      ASYNC_EVENT_BLOCK_TIMEOUT_SECONDS: "5"
+      ENABLE_RATE_LIMIT: "1"
+      AGENT_PROVIDER: rule
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      backend1:
+        condition: service_started
+    command: ["python", "scripts/event_worker.py", "--worker-name", "worker-stage-c"]
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: lab-nginx
+    depends_on:
+      backend1:
+        condition: service_started
+      backend2:
+        condition: service_started
+    ports:
+      - "8080:80"
+    volumes:
+      - ../nginx/lab-stage-c.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  mysql_data:
+  redis_data:

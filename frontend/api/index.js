@@ -3,6 +3,8 @@ import { getToken } from "../common/session";
 import { getApiBaseUrl } from "../common/platform";
 
 const BASE_URL = getApiBaseUrl();
+const createIdempotencyKey = () =>
+  `resv-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 export const api = {
   login: (data) => request({ url: "/auth/login", method: "POST", data }),
@@ -169,8 +171,15 @@ export const api = {
   labDetail: (id) => request({ url: `/labs/${id}` }),
   labSchedule: (id, date) =>
     request({ url: `/labs/${id}/schedule`, data: { date } }),
-  createReservation: (data) =>
-    request({ url: "/reservations", method: "POST", data }),
+  createReservation: (data, options = {}) =>
+    request({
+      url: "/reservations",
+      method: "POST",
+      data,
+      headers: {
+        "Idempotency-Key": options.idempotencyKey || createIdempotencyKey(),
+      },
+    }),
   myReservations: () => request({ url: "/reservations/my" }),
   reservations: (params = {}) =>
     request({ url: "/reservations", data: params }),

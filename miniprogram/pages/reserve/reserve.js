@@ -100,6 +100,7 @@ Page({
       participant_count: 1,
       purpose: ''
     },
+    currentIdempotencyKey: '',
     loading: false,
     statusText: STATUS_TEXT,
     openTime: '08:00',
@@ -148,13 +149,14 @@ Page({
       {
         'form.date': e.detail.value,
         'form.start_time': '',
-        'form.end_time': ''
+        'form.end_time': '',
+        currentIdempotencyKey: ''
       },
       () => this.loadSchedule()
     )
   },
   onPurpose(e) {
-    this.setData({ 'form.purpose': e.detail.value })
+    this.setData({ 'form.purpose': e.detail.value, currentIdempotencyKey: '' })
   },
   openTimePanel(e) {
     const field = e.currentTarget.dataset.field
@@ -186,7 +188,8 @@ Page({
       this.setData(
         {
           'form.start_time': value,
-          'form.end_time': ''
+          'form.end_time': '',
+          currentIdempotencyKey: ''
         },
         () => {
           this.rebuildAvailability(false)
@@ -200,7 +203,7 @@ Page({
       return
     }
     if (field === 'end') {
-      this.setData({ 'form.end_time': value }, () => {
+      this.setData({ 'form.end_time': value, currentIdempotencyKey: '' }, () => {
         this.rebuildAvailability(false)
         this.closeTimePanel()
       })
@@ -307,11 +310,13 @@ Page({
   },
   incCount() {
     const n = this.data.form.participant_count
-    if (n < (this.data.lab.capacity || 99)) this.setData({ 'form.participant_count': n + 1 })
+    if (n < (this.data.lab.capacity || 99)) {
+      this.setData({ 'form.participant_count': n + 1, currentIdempotencyKey: '' })
+    }
   },
   decCount() {
     const n = this.data.form.participant_count
-    if (n > 1) this.setData({ 'form.participant_count': n - 1 })
+    if (n > 1) this.setData({ 'form.participant_count': n - 1, currentIdempotencyKey: '' })
   },
   async doSubmit() {
     const { form, minDate, maxDate } = this.data
@@ -357,6 +362,10 @@ Page({
 
     this.setData({ loading: true })
     try {
+      const idempotencyKey =
+        this.data.currentIdempotencyKey ||
+        `reserve-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+      this.setData({ currentIdempotencyKey: idempotencyKey })
       const res = await api.createReservation({
         campus_id: campusId,
         lab_id: this.labId,
@@ -365,8 +374,9 @@ Page({
         end_time: form.end_time,
         participant_count: form.participant_count,
         purpose: form.purpose
-      })
+      }, { idempotencyKey })
       wx.showToast({ title: '预约成功', icon: 'success' })
+      this.setData({ currentIdempotencyKey: '' })
       setTimeout(() => {
         wx.redirectTo({ url: `/pages/reservation-detail/reservation-detail?id=${res.id}` })
       }, 1200)

@@ -37,6 +37,9 @@ def build_database_uri():
             f"@{mysql_host}:{mysql_port}/{mysql_db}?charset=utf8mb4"
         )
 
+    # 方式3：兜底回退到 SQLite（开发环境免配置可直接运行）
+    return "sqlite:///lab_dev.db"
+
 
 # ==================== LLM模型默认值获取 ====================
 def default_agent_model(provider):
@@ -94,6 +97,65 @@ class Config:
     # ---------- JSON 响应配置 ----------
     # 允许 JSON 响应中包含中文（不转义为 Unicode 编码）
     JSON_AS_ASCII = False
+
+    # ---------- Redis 与分布式并发控制 ----------
+    REDIS_URL = os.getenv("REDIS_URL", "").strip()
+    ENABLE_DISTRIBUTED_LOCK = os.getenv("ENABLE_DISTRIBUTED_LOCK", "0").strip().lower() in {
+        "1",
+        "true",
+        "on",
+        "yes",
+    }
+    REDIS_LOCK_TTL_SECONDS = int(os.getenv("REDIS_LOCK_TTL_SECONDS", "15"))
+    REDIS_LOCK_WAIT_TIMEOUT_SECONDS = float(
+        os.getenv("REDIS_LOCK_WAIT_TIMEOUT_SECONDS", "3")
+    )
+    REDIS_LOCK_RETRY_INTERVAL_SECONDS = float(
+        os.getenv("REDIS_LOCK_RETRY_INTERVAL_SECONDS", "0.1")
+    )
+
+    # ---------- 幂等控制 ----------
+    ENABLE_IDEMPOTENCY = os.getenv("ENABLE_IDEMPOTENCY", "1").strip().lower() in {
+        "1",
+        "true",
+        "on",
+        "yes",
+    }
+    IDEMPOTENCY_TTL_SECONDS = int(os.getenv("IDEMPOTENCY_TTL_SECONDS", "300"))
+
+    # ---------- 缓存 ----------
+    LAB_SCHEDULE_CACHE_TTL_SECONDS = int(
+        os.getenv("LAB_SCHEDULE_CACHE_TTL_SECONDS", "30")
+    )
+    STATISTICS_CACHE_TTL_SECONDS = int(
+        os.getenv("STATISTICS_CACHE_TTL_SECONDS", "45")
+    )
+
+    # ---------- 限流 ----------
+    ENABLE_RATE_LIMIT = os.getenv("ENABLE_RATE_LIMIT", "0").strip().lower() in {
+        "1",
+        "true",
+        "on",
+        "yes",
+    }
+    RATE_LIMIT_CREATE_RESERVATION_PER_MIN = int(
+        os.getenv("RATE_LIMIT_CREATE_RESERVATION_PER_MIN", "30")
+    )
+    RATE_LIMIT_APPROVE_RESERVATION_PER_MIN = int(
+        os.getenv("RATE_LIMIT_APPROVE_RESERVATION_PER_MIN", "60")
+    )
+
+    # ---------- 异步事件队列 ----------
+    ENABLE_ASYNC_EVENTS = os.getenv("ENABLE_ASYNC_EVENTS", "0").strip().lower() in {
+        "1",
+        "true",
+        "on",
+        "yes",
+    }
+    ASYNC_EVENT_QUEUE_NAME = os.getenv("ASYNC_EVENT_QUEUE_NAME", "lab:events")
+    ASYNC_EVENT_BLOCK_TIMEOUT_SECONDS = int(
+        os.getenv("ASYNC_EVENT_BLOCK_TIMEOUT_SECONDS", "5")
+    )
 
     # ---------- 文件存储配置 ----------
     # 上传文件的存放目录名（默认为 uploads）

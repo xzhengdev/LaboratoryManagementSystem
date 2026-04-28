@@ -12,7 +12,15 @@ if BACKEND_ROOT not in sys.path:
 
 from app import create_app
 from app.extensions import db
-from app.models import Approval, Campus, Equipment, Laboratory, Reservation, User
+from app.models import (
+    Approval,
+    Campus,
+    Equipment,
+    IdempotencyRecord,
+    Laboratory,
+    Reservation,
+    User,
+)
 
 
 LEGACY_CAMPUS_NAMES = {
@@ -401,6 +409,7 @@ def seed_data():
                 )
             )
         db.session.add_all(rows)
+        IdempotencyRecord.query.delete(synchronize_session=False)
 
         db.session.commit()
 

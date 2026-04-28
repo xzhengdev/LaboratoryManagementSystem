@@ -10,6 +10,7 @@ function request({
   url,
   method = 'GET',
   data = {},
+  headers = {},
   loading = true,
   loadingTitle = '加载中',
   timeout = 15000
@@ -29,7 +30,8 @@ function request({
       timeout,
       header: {
         'Content-Type': 'application/json',
-        Authorization: getToken() ? `Bearer ${getToken()}` : ''
+        Authorization: getToken() ? `Bearer ${getToken()}` : '',
+        ...headers
       },
       success(res) {
         console.log('[MP][REQUEST]', method, url, 'status=', res.statusCode, 'payload=', res.data)

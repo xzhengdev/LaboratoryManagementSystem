@@ -5,6 +5,7 @@
 from sqlalchemy import case, func
 
 from app.models import Campus, Laboratory, Reservation
+from app.services.cache_service import get_cached_statistics, set_cached_statistics
 
 
 def _reservation_scope(campus_id=None):
@@ -71,13 +72,17 @@ def get_overview(campus_id=None):
             - approved_count: 已批准的预约数量
             - pending_count: 待审批的预约数量
     """
+    cached = get_cached_statistics("overview", campus_id)
+    if isinstance(cached, dict):
+        return cached
+
     # 获取预约查询作用域
     reservation_query = _reservation_scope(campus_id=campus_id)
     
     # 获取实验室查询作用域
     laboratory_query = _laboratory_scope(campus_id=campus_id)
 
-    return {
+    result = {
         # 校区数量：如果指定了校区ID则返回1，否则统计所有校区
         "campus_count": 1 if campus_id is not None else Campus.query.count(),
         
@@ -93,6 +98,8 @@ def get_overview(campus_id=None):
         # 待审批的预约数量
         "pending_count": reservation_query.filter(Reservation.status == "pending").count(),
     }
+    set_cached_statistics("overview", campus_id, result)
+    return result
 
 
 def get_campus_statistics(campus_id=None):
@@ -111,6 +118,10 @@ def get_campus_statistics(campus_id=None):
             - lab_count: 该校区的实验室数量
             - reservation_count: 该校区的预约总数
     """
+    cached = get_cached_statistics("campus", campus_id)
+    if isinstance(cached, list):
+        return cached
+
     # 构建多表关联查询
     # 1. 以校区表为主表
     # 2. 左连接实验室表（按校区ID关联）
@@ -138,7 +149,7 @@ def get_campus_statistics(campus_id=None):
     rows = query.group_by(Campus.id, Campus.campus_name).all()
 
     # 将查询结果转换为字典列表并返回
-    return [
+    result = [
         {
             "campus_id": row.id,
             "campus_name": row.campus_name,
@@ -149,6 +160,8 @@ def get_campus_statistics(campus_id=None):
         }
         for row in rows
     ]
+    set_cached_statistics("campus", campus_id, result)
+    return result
 
 
 def get_lab_usage(campus_id=None):
@@ -170,6 +183,10 @@ def get_lab_usage(campus_id=None):
             - reservation_count: 该实验室的预约总数（所有状态）
             - approved_count: 该实验室已批准的预约数量
     """
+    cached = get_cached_statistics("lab_usage", campus_id)
+    if isinstance(cached, list):
+        return cached
+
     # 构建多表关联查询
     # 1. 以实验室表为主表
     # 2. 左连接预约表（按实验室ID关联）
@@ -197,7 +214,7 @@ def get_lab_usage(campus_id=None):
     rows = query.group_by(Laboratory.id, Laboratory.lab_name, Laboratory.campus_id).all()
 
     # 将查询结果转换为字典列表并返回
-    return [
+    result = [
         {
             "lab_id": row.id,
             "lab_name": row.lab_name,
@@ -209,3 +226,5 @@ def get_lab_usage(campus_id=None):
         }
         for row in rows
     ]
+    set_cached_statistics("lab_usage", campus_id, result)
+    return result
