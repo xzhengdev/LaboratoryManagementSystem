@@ -27,42 +27,35 @@
       </view>
       <text class="entry-label">校区</text>
     </view>
-    <view class="entry-item" bindtap="goLabs">
+
+    <view wx:if="{{!isTeacher}}" class="entry-item" bindtap="goDailyReport">
       <view class="entry-icon" style="background:#FFF3E0">
-        <image class="entry-icon-image" src="/assets/tabbar/labs.png" mode="aspectFit" />
-      </view>
-      <text class="entry-label">实验室</text>
-    </view>
-    <view class="entry-item" bindtap="goReservations">
-      <view class="entry-icon" style="background:#E8F5E9">
         <image class="entry-icon-image" src="/assets/tabbar/reserve.png" mode="aspectFit" />
       </view>
-      <text class="entry-label">我的预约</text>
+      <text class="entry-label">实验室日报</text>
     </view>
+    <view wx:else class="entry-item" bindtap="goAssetRequests">
+      <view class="entry-icon" style="background:#E8EEFF">
+        <image class="entry-icon-image" src="/assets/tabbar/reserve.png" mode="aspectFit" />
+      </view>
+      <text class="entry-label">资产申报</text>
+    </view>
+
+    <view class="entry-item entry-item--with-badge" bindtap="goNotifications">
+      <view class="entry-icon" style="background:#E8F5E9">
+        <image class="entry-icon-image" src="/assets/tabbar/mine.png" mode="aspectFit" />
+      </view>
+      <view wx:if="{{unreadNoticeCount > 0}}" class="entry-corner-badge {{unreadNoticeCount > 99 ? 'entry-corner-badge--pill' : ''}}">
+        <text class="entry-corner-badge-text">{{unreadNoticeCount > 99 ? '99+' : unreadNoticeCount}}</text>
+      </view>
+      <text class="entry-label">信息中心</text>
+    </view>
+
     <view class="entry-item" bindtap="goAgent">
       <view class="entry-icon" style="background:#F3E5F5">
         <image class="entry-icon-image" src="/assets/logo.png" mode="aspectFit" />
       </view>
       <text class="entry-label">AI助手</text>
-    </view>
-  </view>
-
-  <view wx:if="{{canReportDaily}}" class="daily-report-entry" bindtap="goDailyReport">
-    <view class="daily-report-entry__left">
-      <text class="daily-report-entry__title">实验室日报</text>
-      <text class="daily-report-entry__sub">拍照上报每日实验室使用情况</text>
-    </view>
-    <text class="daily-report-entry__arrow">></text>
-  </view>
-
-  <view class="notice-entry" bindtap="goNotifications">
-    <view class="notice-entry__left">
-      <text class="notice-entry__title">消息中心</text>
-      <text class="notice-entry__sub">查看日报审核结果与系统通知</text>
-    </view>
-    <view class="notice-entry__right">
-      <text wx:if="{{unreadNoticeCount > 0}}" class="notice-badge">{{unreadNoticeCount}}</text>
-      <text class="notice-entry__arrow">></text>
     </view>
   </view>
 

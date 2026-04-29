@@ -1,0 +1,43 @@
+<view class="page">
+  <view class="card budget-card">
+    <view class="title">预算概览</view>
+    <view class="budget-row">
+      <text>总额度：{{budget ? budget.total_amount : '0.00'}}</text>
+      <text>可用：{{budget ? budget.available_amount : '0.00'}}</text>
+    </view>
+    <view class="budget-row">
+      <text>锁定：{{budget ? budget.locked_amount : '0.00'}}</text>
+      <text>已用：{{budget ? budget.used_amount : '0.00'}}</text>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="title">新建资产申报</view>
+    <picker mode="selector" range="{{labs}}" range-key="name" value="{{labIndex}}" bindchange="onLabChange">
+      <view class="input">使用实验室：{{selectedLabName}}</view>
+    </picker>
+    <input class="input" placeholder="资产名称（如 示波器）" value="{{form.asset_name}}" data-field="asset_name" bindinput="onInput" />
+    <input class="input" placeholder="资产类别（如 教学设备）" value="{{form.category}}" data-field="category" bindinput="onInput" />
+    <view class="inline-row">
+      <input class="input half" type="number" placeholder="数量" value="{{form.quantity}}" data-field="quantity" bindinput="onInput" />
+      <input class="input half" type="digit" placeholder="单价（元）" value="{{form.unit_price}}" data-field="unit_price" bindinput="onInput" />
+    </view>
+    <textarea class="textarea" placeholder="申报理由（可选）" value="{{form.reason}}" data-field="reason" bindinput="onInput" />
+    <view class="amount">预计金额：￥{{amountText}}</view>
+    <button class="submit-btn" loading="{{submitting}}" bindtap="submitRequest">提交申报</button>
+  </view>
+
+  <view class="card">
+    <view class="title">我的申报记录</view>
+    <view wx:if="{{requests.length === 0}}" class="empty">暂无申报记录</view>
+    <view wx:for="{{requests}}" wx:key="id" class="item">
+      <view class="item-top">
+        <text class="name">{{item.asset_name}}</text>
+        <text class="status status-{{item.status}}">{{item.status_text}}</text>
+      </view>
+      <view class="meta">数量 {{item.quantity}} · 单价 ￥{{item.unit_price}} · 金额 ￥{{item.amount}}</view>
+      <view class="meta">编号 {{item.request_no}}</view>
+      <view class="meta">提交时间 {{item.created_at}}</view>
+    </view>
+  </view>
+</view>

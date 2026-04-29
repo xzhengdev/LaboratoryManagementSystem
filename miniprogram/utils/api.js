@@ -5,6 +5,8 @@ const createIdempotencyKey = () =>
   `resv-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 const createDailyReportIdempotencyKey = () =>
   `daily-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+const createAssetRequestIdempotencyKey = () =>
+  `asset-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 
 const normalizeMediaUrl = (rawUrl) => {
   const text = String(rawUrl || '').trim()
@@ -142,6 +144,17 @@ const api = {
       photos: normalizePhotoObjects(item && item.photos)
     }))
   },
+  assetCurrentBudget: (params = {}) => request({ url: '/asset-budgets/current', data: params }),
+  myAssetRequests: (params = {}) => request({ url: '/asset-requests', data: params }),
+  createAssetRequest: (data, options = {}) =>
+    request({
+      url: '/asset-requests',
+      method: 'POST',
+      data,
+      headers: {
+        'Idempotency-Key': options.idempotencyKey || createAssetRequestIdempotencyKey()
+      }
+    }),
   notifications: (params = {}) => request({ url: '/notifications', data: params }),
   unreadNotifications: () => request({ url: '/notifications/unread-count' }),
   readNotification: (id) => request({ url: `/notifications/${id}/read`, method: 'POST' }),

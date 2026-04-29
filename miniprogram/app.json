@@ -4,6 +4,7 @@
     "pages/home/home",
     "pages/labs/labs",
     "pages/daily-report/daily-report",
+    "pages/asset-requests/asset-requests",
     "pages/notifications/notifications",
     "pages/my-reservations/my-reservations",
     "pages/profile/profile",

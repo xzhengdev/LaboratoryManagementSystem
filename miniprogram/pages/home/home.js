@@ -1,14 +1,15 @@
 const { api } = require('../../utils/api')
-const { isLoggedIn, getProfile } = require('../../utils/session')
+const { getProfile, isLoggedIn } = require('../../utils/session')
 
 Page({
   data: {
+    profileRole: '',
+    isTeacher: false,
     labs: [],
-    canReportDaily: false,
     unreadNoticeCount: 0,
     banners: [
       { title: '智慧实验室预约', sub: '随时随地，快速锁定实验资源', image: '/assets/logo.png' },
-      { title: '跨校区协同', sub: '多校区资源统一查看与调度', image: '/assets/logo.png' },
+      { title: '跨校区协作', sub: '多校区资源统一查看与调度', image: '/assets/logo.png' },
       { title: 'AI 智能助手', sub: '自然语言查询预约和排期信息', image: '/assets/logo.png' }
     ]
   },
@@ -17,9 +18,14 @@ Page({
       wx.redirectTo({ url: '/pages/login/login' })
       return
     }
-    const profile = getProfile()
+    const profile = getProfile() || {}
     const role = String(profile.role || '')
-    this.setData({ canReportDaily: role === 'student' })
+    const isTeacher = role === 'teacher'
+    this.setData({
+      profileRole: role,
+      isTeacher
+    })
+
     this.loadBanners()
     this.loadLabs()
     this.loadUnreadNotifications()
@@ -52,19 +58,17 @@ Page({
   async loadUnreadNotifications() {
     try {
       const result = await api.unreadNotifications()
-      const unreadCount = Number(result?.unread_count || 0)
-      const lastCount = Number(wx.getStorageSync('last_notice_count') || 0)
+      const unreadCount = Number(result && result.unread_count ? result.unread_count : 0)
       this.setData({ unreadNoticeCount: unreadCount })
-      if (unreadCount > 0 && unreadCount !== lastCount) {
-        wx.setStorageSync('last_notice_count', unreadCount)
-        wx.showToast({ title: `你有${unreadCount}条审核消息`, icon: 'none' })
-      }
-    } catch (_) {}
+    } catch (_) {
+      this.setData({ unreadNoticeCount: 0 })
+    }
   },
   goCampuses() { wx.navigateTo({ url: '/pages/campuses/campuses' }) },
   goLabs() { wx.switchTab({ url: '/pages/labs/labs' }) },
   goReservations() { wx.switchTab({ url: '/pages/my-reservations/my-reservations' }) },
   goDailyReport() { wx.navigateTo({ url: '/pages/daily-report/daily-report' }) },
+  goAssetRequests() { wx.navigateTo({ url: '/pages/asset-requests/asset-requests' }) },
   goNotifications() { wx.navigateTo({ url: '/pages/notifications/notifications' }) },
   goAgent() { wx.navigateTo({ url: '/pages/agent/agent' }) },
   goLabDetail(e) {
