@@ -51,8 +51,10 @@
             v-for="entry in homeEntries"
             :key="entry.path"
             class="student-home__entry-card"
+            :class="{ 'student-home__entry-card--featured': !!entry.featured }"
             @click="go(entry.path)"
           >
+            <view v-if="entry.badgeText" class="student-home__entry-badge">{{ entry.badgeText }}</view>
             <view class="student-home__entry-icon" :class="entry.iconClass">{{ entry.icon }}</view>
             <view class="student-home__entry-title">{{ entry.title }}</view>
             <view class="student-home__entry-desc">{{ entry.desc }}</view>
@@ -148,7 +150,8 @@ export default {
       routes,
       profile: {},
       featuredLabs: [],
-      heroBanners: HERO_BANNERS
+      heroBanners: HERO_BANNERS,
+      unreadCount: 0
     }
   },
   computed: {
@@ -158,18 +161,22 @@ export default {
     homeEntries() {
       return [
         {
-          title: '校区资源',
-          desc: '探索不同校区的尖端设施与空间布局',
-          path: routes.campuses,
+          title: '日报上报',
+          desc: '学生端拍照提交实验室日报，管理员可统一审核',
+          path: routes.dailyReport,
           icon: '◧',
-          iconClass: 'blue'
+          iconClass: 'blue',
+          featured: true,
+          badgeText: '重点'
         },
         {
-          title: '实验室列表',
-          desc: '精准查找并一键预约最理想的实验空间',
-          path: routes.labs,
+          title: '消息提醒',
+          desc: '集中查看日报审核结果与业务通知，避免遗漏反馈',
+          path: routes.notifications,
           icon: '⌬',
-          iconClass: 'cyan'
+          iconClass: 'cyan',
+          featured: true,
+          badgeText: this.unreadCount > 99 ? '99+' : (this.unreadCount > 0 ? `${this.unreadCount}` : '')
         },
         {
           title: '我的预约',
@@ -214,7 +221,11 @@ export default {
     },
     async loadData() {
       try {
-        const labsRes = await api.labs({ page: 1, page_size: 6 })
+        const [labsRes, unreadInfo] = await Promise.all([
+          api.labs({ page: 1, page_size: 6 }),
+          api.notificationUnreadCount()
+        ])
+        this.unreadCount = Number(unreadInfo?.unread_count || 0)
         const labs = labsRes?.list || labsRes?.data || (Array.isArray(labsRes) ? labsRes : [])
         this.featuredLabs = labs.slice(0, 3).map((lab, index) => ({
           ...lab,
@@ -225,6 +236,7 @@ export default {
           statusClass: lab.status === 'active' ? (index % 2 === 0 ? 'active' : 'demand') : 'disabled'
         }))
       } catch (error) {
+        this.unreadCount = 0
         this.featuredLabs = []
       }
     }
@@ -394,6 +406,7 @@ filter: brightness(1.08) contrast(1.05);
 }
 
 .student-home__entry-card {
+  position: relative;
   min-height: 212rpx;
   padding: 28rpx 24rpx;
   border-radius: 24rpx;
@@ -410,6 +423,30 @@ filter: brightness(1.08) contrast(1.05);
   transform: translateY(-4rpx);
   border-color: rgba(74, 165, 242, 0.36);
   box-shadow: 0 20rpx 40rpx rgba(22, 44, 79, 0.1);
+}
+
+.student-home__entry-card--featured {
+  border-color: rgba(88, 157, 228, 0.52);
+  background: linear-gradient(145deg, #ffffff 0%, #f2f8ff 100%);
+  box-shadow: 0 16rpx 34rpx rgba(49, 108, 176, 0.14);
+}
+
+.student-home__entry-badge {
+  position: absolute;
+  right: 16rpx;
+  top: 14rpx;
+  min-width: 54rpx;
+  height: 36rpx;
+  padding: 0 10rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #2f82d9 0%, #56b4ff 100%);
+  color: #fff;
+  font-size: 20rpx;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8rpx 16rpx rgba(54, 133, 213, 0.28);
 }
 
 .student-home__entry-icon {
