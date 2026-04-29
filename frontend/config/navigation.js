@@ -6,6 +6,9 @@
   labDetail: '/pages/lab-detail/index',
   schedule: '/pages/schedule/index',
   reserve: '/pages/reserve/index',
+  assetRequests: '/pages/asset-requests/index',
+  dailyReport: '/pages/daily-report/index',
+  notifications: '/pages/notifications/index',
   myReservations: '/pages/my-reservations/index',
   reservationDetail: '/pages/reservation-detail/index',
   profile: '/pages/profile/index',
@@ -14,6 +17,8 @@
   adminLabs: '/pages/admin-labs/index',
   adminEquipment: '/pages/admin-equipment/index',
   adminApprovals: '/pages/admin-approvals/index',
+  adminAssetRequests: '/pages/admin-asset-requests/index',
+  adminDailyReports: '/pages/admin-daily-reports/index',
   adminUsers: '/pages/admin-users/index',
   adminProfile: '/pages/admin-profile/index',
   adminLogs: '/pages/admin-logs/index',
@@ -31,6 +36,8 @@ export const userTopNav = [
   { key: 'home', title: '首页', path: routes.home },
   { key: 'campuses', title: '校区资源', path: routes.campuses },
   { key: 'labs', title: '实验室预约', path: routes.labs },
+  { key: 'dailyReport', title: '日报上报', path: routes.dailyReport },
+  { key: 'notifications', title: '消息提醒', path: routes.notifications },
   { key: 'reservations', title: '我的预约', path: routes.myReservations },
   { key: 'agent', title: 'AI 助手', path: routes.agent },
   { key: 'profile', title: '个人中心', path: routes.profile }
@@ -70,6 +77,20 @@ export const adminMenus = [
     title: '预约审批',
     desc: '处理预约审批',
     path: routes.adminApprovals,
+    group: '预约管理'
+  },
+  {
+    key: 'assetRequests',
+    title: '资产审批',
+    desc: '处理教师资产申报与预算流转',
+    path: routes.adminAssetRequests,
+    group: '预约管理'
+  },
+  {
+    key: 'dailyReports',
+    title: '日报审核',
+    desc: '审核学生/教师提交的实验室日报',
+    path: routes.adminDailyReports,
     group: '预约管理'
   },
   {
@@ -158,6 +179,8 @@ export function getUserTopNavByRole(role) {
       { key: 'campuses', title: '校区资源', path: routes.campuses },
       { key: 'labs', title: '实验室', path: routes.labs },
       { key: 'reserve', title: '教学预约', path: routes.reserve },
+      { key: 'assetRequests', title: '资产申报', path: routes.assetRequests },
+      { key: 'notifications', title: '消息提醒', path: routes.notifications },
       { key: 'reservations', title: '我的预约', path: routes.myReservations },
       { key: 'agent', title: 'AI 助手', path: routes.agent }
     ]

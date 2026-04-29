@@ -37,7 +37,8 @@ def init_redis(app):
             redis_url,
             decode_responses=True,
             socket_connect_timeout=1,
-            socket_timeout=1,
+            # 允许 BLPOP 等阻塞命令正常等待，避免异步 worker 误超时退出。
+            socket_timeout=10,
         )
         client.ping()
         redis_client = client

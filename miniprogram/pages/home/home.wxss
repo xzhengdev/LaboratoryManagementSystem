@@ -102,6 +102,88 @@
   color: rgba(0,0,0,0.6);
 }
 
+.daily-report-entry {
+  margin-top: 8rpx;
+  margin-bottom: 12rpx;
+  padding: 20rpx 22rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid #d6e6f6;
+  background: linear-gradient(135deg, #ffffff 0%, #edf6ff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.daily-report-entry__left {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.daily-report-entry__title {
+  color: #153252;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.daily-report-entry__sub {
+  color: #5f7793;
+  font-size: 22rpx;
+}
+
+.daily-report-entry__arrow {
+  color: #507098;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.notice-entry {
+  margin-bottom: 12rpx;
+  padding: 18rpx 22rpx;
+  border-radius: 18rpx;
+  border: 1rpx solid #e0e7f2;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.notice-entry__left {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.notice-entry__title {
+  color: #1b3553;
+  font-size: 27rpx;
+  font-weight: 700;
+}
+
+.notice-entry__sub {
+  color: #6e8198;
+  font-size: 22rpx;
+}
+
+.notice-entry__right {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.notice-badge {
+  min-width: 34rpx;
+  height: 34rpx;
+  line-height: 34rpx;
+  border-radius: 999rpx;
+  padding: 0 8rpx;
+  box-sizing: border-box;
+  text-align: center;
+  color: #fff;
+  font-size: 20rpx;
+  background: #e64545;
+}
+
 /* ===== 标题 ===== */
 .section-title {
   font-size: 32rpx;

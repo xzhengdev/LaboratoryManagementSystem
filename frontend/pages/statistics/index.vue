@@ -41,6 +41,52 @@
         </view>
       </view>
     </view>
+
+    <view class="admin-kpi-grid daily-kpi-grid">
+      <view class="admin-kpi-card" v-for="item in dailyOverviewCards" :key="item.label">
+        <view class="admin-kpi-card__label">{{ item.label }}</view>
+        <view class="admin-kpi-card__value">{{ item.value }}</view>
+      </view>
+    </view>
+
+    <view class="admin-panels-grid">
+      <bar-chart-card title="日报按校区统计" subtitle="对比各校区日报上报总量" :data="dailyCampusChart" />
+      <bar-chart-card title="日报按实验室统计" subtitle="对比实验室日报上报总量" :data="dailyLabChart" />
+    </view>
+
+    <view v-if="isSystemView" class="card summary-card">
+      <view class="summary-card__head">
+        <view>
+          <view class="title">中心汇总总表（按日快照）</view>
+          <view class="summary-card__sub">快照日期：{{ summaryLatest.snapshot_date || '--' }}</view>
+        </view>
+        <view class="summary-card__actions">
+          <view class="pill" @click="reloadSummary">刷新快照</view>
+          <view class="pill" :class="{ disabled: syncingSummary }" @click="syncSummary">
+            {{ syncingSummary ? '同步中...' : '立即同步' }}
+          </view>
+        </view>
+      </view>
+      <view v-if="!summaryRows.length" class="empty-text">暂无汇总快照，请先点击“立即同步”。</view>
+      <view v-else class="summary-table">
+        <view class="summary-row summary-row--head">
+          <text>校区</text>
+          <text>预约</text>
+          <text>资产申报</text>
+          <text>资产数</text>
+          <text>日报</text>
+          <text>预算可用</text>
+        </view>
+        <view class="summary-row" v-for="item in summaryRows" :key="item.id">
+          <text>{{ item.campus_name }}</text>
+          <text>{{ item.reservation_count || 0 }}</text>
+          <text>{{ item.asset_request_count || 0 }}</text>
+          <text>{{ item.asset_item_count || 0 }}</text>
+          <text>{{ item.daily_report_count || 0 }}</text>
+          <text>¥{{ moneyText(item.asset_budget_available_amount) }}</text>
+        </view>
+      </view>
+    </view>
   </admin-layout>
 </template>
 
@@ -59,7 +105,12 @@ export default {
       profile: {},
       overview: {},
       campusStats: [],
-      usageStats: []
+      usageStats: [],
+      dailyOverview: {},
+      dailyCampusStats: [],
+      dailyLabStats: [],
+      summaryLatest: {},
+      syncingSummary: false
     }
   },
   computed: {
@@ -138,6 +189,32 @@ export default {
         '通过量与待审批量可辅助安排管理员排班。',
         '高负载实验室可优先延长开放时段或增加设备。'
       ]
+    },
+    dailyOverviewCards() {
+      return [
+        { label: '日报总数', value: this.dailyOverview.daily_report_count || 0 },
+        { label: '待审核日报', value: this.dailyOverview.daily_report_pending_count || 0 },
+        { label: '已通过日报', value: this.dailyOverview.daily_report_approved_count || 0 },
+        { label: '已驳回日报', value: this.dailyOverview.daily_report_rejected_count || 0 }
+      ]
+    },
+    dailyCampusChart() {
+      return this.dailyCampusStats.map((item) => ({
+        label: item.campus_name,
+        value: item.daily_report_count || 0
+      }))
+    },
+    dailyLabChart() {
+      const sorted = [...this.dailyLabStats].sort(
+        (a, b) => (Number(b.daily_report_count) || 0) - (Number(a.daily_report_count) || 0)
+      )
+      return sorted.slice(0, 8).map((item) => ({
+        label: item.lab_name,
+        value: item.daily_report_count || 0
+      }))
+    },
+    summaryRows() {
+      return Array.isArray(this.summaryLatest?.rows) ? this.summaryLatest.rows : []
     }
   },
   async onShow() {
@@ -145,16 +222,56 @@ export default {
     this.profile = getProfile()
     if (!canViewStatistics(this.profile.role)) return
 
-    this.overview = await api.statisticsOverview()
-    this.campusStats = await api.statisticsCampus()
-    this.usageStats = await api.statisticsUsage()
+    const [
+      overview,
+      campusStats,
+      usageStats,
+      dailyOverview,
+      dailyCampusStats,
+      dailyLabStats
+    ] = await Promise.all([
+      api.statisticsOverview(),
+      api.statisticsCampus(),
+      api.statisticsUsage(),
+      api.statisticsDailyReportOverview(),
+      api.statisticsDailyReportCampus(),
+      api.statisticsDailyReportLab()
+    ])
+    this.overview = overview
+    this.campusStats = campusStats
+    this.usageStats = usageStats
+    this.dailyOverview = dailyOverview
+    this.dailyCampusStats = dailyCampusStats
+    this.dailyLabStats = dailyLabStats
+    if (this.isSystemView) {
+      await this.reloadSummary()
+    }
   },
   methods: {
+    moneyText(value) {
+      const num = Number(value || 0)
+      if (!Number.isFinite(num)) return '0.00'
+      return num.toFixed(2)
+    },
     pillText(item) {
       const campusName = this.campusStats.length ? this.campusStats[0].campus_name : '当前校区'
       if (!this.isSystemView) return campusName
       const key = String(item.campus_id || '')
       return this.campusNameMap[key] || item.campus_name || '未分配校区'
+    },
+    async reloadSummary() {
+      this.summaryLatest = await api.latestSummary()
+    },
+    async syncSummary() {
+      if (this.syncingSummary) return
+      this.syncingSummary = true
+      try {
+        await api.syncSummary()
+        uni.showToast({ title: '汇总同步完成', icon: 'success' })
+        await this.reloadSummary()
+      } finally {
+        this.syncingSummary = false
+      }
     }
   }
 }
@@ -192,6 +309,10 @@ export default {
   grid-template-columns: 1fr 1fr;
   gap: 16rpx;
   margin-bottom: 18rpx;
+}
+
+.daily-kpi-grid {
+  margin-top: 6rpx;
 }
 
 .ranking-item + .ranking-item {
@@ -250,6 +371,72 @@ export default {
   background: #f3f7fd;
   color: #4f6178;
   font-size: 23rpx;
+}
+
+.summary-card {
+  margin-top: 2rpx;
+}
+
+.summary-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14rpx;
+}
+
+.summary-card__sub {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #6c7f96;
+}
+
+.summary-card__actions {
+  display: flex;
+  gap: 10rpx;
+}
+
+.summary-card__actions .pill {
+  height: 46rpx;
+  padding: 0 14rpx;
+  border-radius: 12rpx;
+  border: 1rpx solid #d9e4f2;
+  color: #476183;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+}
+
+.pill.disabled {
+  opacity: 0.6;
+}
+
+.summary-table {
+  margin-top: 14rpx;
+}
+
+.summary-row {
+  display: grid;
+  grid-template-columns: 1.2fr .7fr .9fr .8fr .7fr 1fr;
+  gap: 10rpx;
+  padding: 14rpx 10rpx;
+  border-bottom: 1rpx solid #edf3fb;
+  color: #223b58;
+  font-size: 22rpx;
+}
+
+.summary-row--head {
+  font-weight: 700;
+  color: #5f7390;
+  background: #f4f8fd;
+  border-radius: 10rpx;
+  border-bottom: none;
+}
+
+.empty-text {
+  margin-top: 12rpx;
+  color: #7a8ca3;
+  font-size: 22rpx;
 }
 
 @media screen and (max-width: 1200px) {

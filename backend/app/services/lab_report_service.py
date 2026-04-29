@@ -1,8 +1,10 @@
 ﻿from datetime import datetime
+from flask import current_app
 
 from app.models import FileObject, LabDailyReport, Laboratory, OperationLog
 from app.services.db_router_service import campus_db_session, get_routed_campus_ids
 from app.services.event_bus_service import publish_async_event
+from app.services.notification_service import create_notification
 from app.utils.exceptions import AppError
 from app.utils.validators import parse_date
 
@@ -72,8 +74,8 @@ def _resolve_campus_for_report(current_user, lab_id):
 
 
 def create_daily_report(current_user, payload):
-    if current_user.role not in {"student", "teacher", "lab_admin", "system_admin"}:
-        raise AppError("当前角色不支持提交日报", 403, 40352)
+    if current_user.role != "student":
+        raise AppError("日报提交仅支持学生端", 403, 40352)
 
     lab_id = int(payload.get("lab_id") or 0)
     campus_id, lab = _resolve_campus_for_report(current_user, lab_id)
@@ -181,6 +183,26 @@ def review_daily_report(current_user, report_item, review_status, review_remark=
             item.reviewer_id = current_user.id
             item.review_remark = str(review_remark or "")[:255]
             item.reviewed_at = datetime.utcnow()
+            notify_title = "实验室日报审核结果"
+            notify_content = (
+                f"你在 {item.report_date.isoformat()} 提交的实验室日报已{ '通过' if status == 'approved' else '驳回' }。"
+            )
+            if item.review_remark:
+                notify_content = f"{notify_content} 审核意见：{item.review_remark}"
+            try:
+                create_notification(
+                    session,
+                    campus_id=item.campus_id,
+                    user_id=item.reporter_id,
+                    title=notify_title,
+                    content=notify_content,
+                    level="success" if status == "approved" else "warning",
+                    biz_type="daily_report_review",
+                    biz_id=item.id,
+                )
+            except Exception as notify_error:
+                # ??????????????????????
+                current_app.logger.warning("create daily report notification failed: %s", notify_error)
             _write_log(session, current_user.id, "review", f"审核日报#{item.id}: {status}")
             session.commit()
             result = item.to_dict()

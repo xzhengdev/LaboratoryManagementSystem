@@ -3,6 +3,8 @@
     "pages/login/login",
     "pages/home/home",
     "pages/labs/labs",
+    "pages/daily-report/daily-report",
+    "pages/notifications/notifications",
     "pages/my-reservations/my-reservations",
     "pages/profile/profile",
     "pages/campuses/campuses",

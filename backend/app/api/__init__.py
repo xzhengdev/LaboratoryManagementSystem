@@ -7,6 +7,7 @@ from .equipment import equipment_bp
 from .health import health_bp
 from .lab_reports import lab_report_bp
 from .labs import lab_bp
+from .notifications import notification_bp
 from .operation_logs import operation_log_bp
 from .reservations import reservation_bp
 from .statistics import statistics_bp
@@ -25,6 +26,7 @@ def register_blueprints(app):
         approval_bp,
         asset_bp,
         operation_log_bp,
+        notification_bp,
         statistics_bp,
         user_bp,
         agent_bp,

@@ -5,7 +5,7 @@
 
 from sqlalchemy import case, func
 
-from app.models import Campus, Laboratory, Reservation
+from app.models import Campus, LabDailyReport, Laboratory, Reservation
 from app.services.cache_service import get_cached_statistics, set_cached_statistics
 from app.services.db_router_service import campus_db_session, get_routed_campus_ids
 
@@ -192,4 +192,181 @@ def get_lab_usage(campus_id=None):
             result.extend(_lab_usage_in_session(session, cid))
 
     set_cached_statistics("lab_usage", campus_id, result)
+    return result
+
+
+def _daily_report_overview_in_one_campus(session):
+    query = session.query(LabDailyReport)
+    return {
+        "daily_report_count": int(query.count()),
+        "daily_report_pending_count": int(query.filter(LabDailyReport.status == "pending").count()),
+        "daily_report_approved_count": int(query.filter(LabDailyReport.status == "approved").count()),
+        "daily_report_rejected_count": int(query.filter(LabDailyReport.status == "rejected").count()),
+    }
+
+
+def get_daily_report_overview(campus_id=None):
+    cached = get_cached_statistics("daily_report_overview", campus_id)
+    if isinstance(cached, dict):
+        return cached
+
+    if not _is_sharded_mode():
+        query = LabDailyReport.query
+        if campus_id is not None:
+            query = query.filter(LabDailyReport.campus_id == int(campus_id))
+        result = {
+            "daily_report_count": int(query.count()),
+            "daily_report_pending_count": int(query.filter(LabDailyReport.status == "pending").count()),
+            "daily_report_approved_count": int(query.filter(LabDailyReport.status == "approved").count()),
+            "daily_report_rejected_count": int(query.filter(LabDailyReport.status == "rejected").count()),
+        }
+        set_cached_statistics("daily_report_overview", campus_id, result)
+        return result
+
+    totals = {
+        "daily_report_count": 0,
+        "daily_report_pending_count": 0,
+        "daily_report_approved_count": 0,
+        "daily_report_rejected_count": 0,
+    }
+    for cid in _campus_ids_for_scope(campus_id):
+        with campus_db_session(cid) as session:
+            part = _daily_report_overview_in_one_campus(session)
+        for key in totals.keys():
+            totals[key] += int(part[key])
+
+    set_cached_statistics("daily_report_overview", campus_id, totals)
+    return totals
+
+
+def get_daily_report_campus_statistics(campus_id=None):
+    cached = get_cached_statistics("daily_report_campus", campus_id)
+    if isinstance(cached, list):
+        return cached
+
+    if not _is_sharded_mode():
+        query = (
+            Campus.query
+            .outerjoin(LabDailyReport, LabDailyReport.campus_id == Campus.id)
+            .with_entities(
+                Campus.id.label("campus_id"),
+                Campus.campus_name.label("campus_name"),
+                func.count(LabDailyReport.id).label("daily_report_count"),
+                func.sum(case((LabDailyReport.status == "pending", 1), else_=0)).label("pending_count"),
+                func.sum(case((LabDailyReport.status == "approved", 1), else_=0)).label("approved_count"),
+                func.sum(case((LabDailyReport.status == "rejected", 1), else_=0)).label("rejected_count"),
+            )
+        )
+        if campus_id is not None:
+            query = query.filter(Campus.id == int(campus_id))
+        rows = query.group_by(Campus.id, Campus.campus_name).all()
+        result = [
+            {
+                "campus_id": int(row.campus_id),
+                "campus_name": row.campus_name,
+                "daily_report_count": int(row.daily_report_count or 0),
+                "pending_count": int(row.pending_count or 0),
+                "approved_count": int(row.approved_count or 0),
+                "rejected_count": int(row.rejected_count or 0),
+            }
+            for row in rows
+        ]
+        set_cached_statistics("daily_report_campus", campus_id, result)
+        return result
+
+    result = []
+    for cid in _campus_ids_for_scope(campus_id):
+        with campus_db_session(cid) as session:
+            row = (
+                session.query(
+                    func.count(LabDailyReport.id).label("daily_report_count"),
+                    func.sum(case((LabDailyReport.status == "pending", 1), else_=0)).label("pending_count"),
+                    func.sum(case((LabDailyReport.status == "approved", 1), else_=0)).label("approved_count"),
+                    func.sum(case((LabDailyReport.status == "rejected", 1), else_=0)).label("rejected_count"),
+                )
+                .one()
+            )
+            result.append(
+                {
+                    "campus_id": int(cid),
+                    "campus_name": _campus_name_from_session(session, cid),
+                    "daily_report_count": int(row.daily_report_count or 0),
+                    "pending_count": int(row.pending_count or 0),
+                    "approved_count": int(row.approved_count or 0),
+                    "rejected_count": int(row.rejected_count or 0),
+                }
+            )
+
+    set_cached_statistics("daily_report_campus", campus_id, result)
+    return result
+
+
+def get_daily_report_lab_statistics(campus_id=None):
+    cached = get_cached_statistics("daily_report_lab", campus_id)
+    if isinstance(cached, list):
+        return cached
+
+    if not _is_sharded_mode():
+        query = (
+            Laboratory.query
+            .outerjoin(LabDailyReport, LabDailyReport.lab_id == Laboratory.id)
+            .with_entities(
+                Laboratory.id.label("lab_id"),
+                Laboratory.lab_name.label("lab_name"),
+                Laboratory.campus_id.label("campus_id"),
+                func.count(LabDailyReport.id).label("daily_report_count"),
+                func.sum(case((LabDailyReport.status == "approved", 1), else_=0)).label("approved_count"),
+                func.sum(case((LabDailyReport.status == "pending", 1), else_=0)).label("pending_count"),
+                func.sum(case((LabDailyReport.status == "rejected", 1), else_=0)).label("rejected_count"),
+            )
+        )
+        if campus_id is not None:
+            query = query.filter(Laboratory.campus_id == int(campus_id))
+        rows = query.group_by(Laboratory.id, Laboratory.lab_name, Laboratory.campus_id).all()
+        result = [
+            {
+                "lab_id": int(row.lab_id),
+                "lab_name": row.lab_name,
+                "campus_id": int(row.campus_id) if row.campus_id is not None else None,
+                "daily_report_count": int(row.daily_report_count or 0),
+                "approved_count": int(row.approved_count or 0),
+                "pending_count": int(row.pending_count or 0),
+                "rejected_count": int(row.rejected_count or 0),
+            }
+            for row in rows
+        ]
+        set_cached_statistics("daily_report_lab", campus_id, result)
+        return result
+
+    result = []
+    for cid in _campus_ids_for_scope(campus_id):
+        with campus_db_session(cid) as session:
+            rows = (
+                session.query(
+                    Laboratory.id.label("lab_id"),
+                    Laboratory.lab_name.label("lab_name"),
+                    Laboratory.campus_id.label("campus_id"),
+                    func.count(LabDailyReport.id).label("daily_report_count"),
+                    func.sum(case((LabDailyReport.status == "approved", 1), else_=0)).label("approved_count"),
+                    func.sum(case((LabDailyReport.status == "pending", 1), else_=0)).label("pending_count"),
+                    func.sum(case((LabDailyReport.status == "rejected", 1), else_=0)).label("rejected_count"),
+                )
+                .outerjoin(LabDailyReport, LabDailyReport.lab_id == Laboratory.id)
+                .group_by(Laboratory.id, Laboratory.lab_name, Laboratory.campus_id)
+                .all()
+            )
+            for row in rows:
+                result.append(
+                    {
+                        "lab_id": int(row.lab_id),
+                        "lab_name": row.lab_name,
+                        "campus_id": int(row.campus_id) if row.campus_id is not None else int(cid),
+                        "daily_report_count": int(row.daily_report_count or 0),
+                        "approved_count": int(row.approved_count or 0),
+                        "pending_count": int(row.pending_count or 0),
+                        "rejected_count": int(row.rejected_count or 0),
+                    }
+                )
+
+    set_cached_statistics("daily_report_lab", campus_id, result)
     return result

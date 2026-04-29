@@ -1,0 +1,72 @@
+<view class="page">
+  <view class="card">
+    <view class="title">填写实验室日报</view>
+
+    <view class="form-row">
+      <text class="label">实验室</text>
+      <picker range="{{labs}}" range-key="lab_name" value="{{labIndex}}" bindchange="onLabChange">
+        <view class="value">{{labIndex >= 0 ? labs[labIndex].lab_name : '请选择实验室'}}</view>
+      </picker>
+    </view>
+
+    <view class="form-row">
+      <text class="label">日报日期</text>
+      <picker mode="date" value="{{form.report_date}}" bindchange="onDateChange">
+        <view class="value">{{form.report_date}}</view>
+      </picker>
+    </view>
+
+    <view class="form-col">
+      <text class="label">日报内容</text>
+      <textarea
+        class="textarea"
+        placeholder="填写今日实验室使用情况、卫生情况、设备状态等"
+        value="{{form.content}}"
+        bindinput="onContentInput"
+        maxlength="500"
+      />
+      <text class="char-count">{{form.content.length}}/500</text>
+    </view>
+
+    <view class="form-col">
+      <view class="upload-head">
+        <text class="label">现场图片</text>
+        <button class="btn-upload" bindtap="choosePhotos">拍照/上传</button>
+      </view>
+      <view class="photo-grid">
+        <view wx:for="{{photoDrafts}}" wx:key="index" class="photo-wrap">
+          <image class="photo" src="{{item.url || item.localPath}}" mode="aspectFill" data-index="{{index}}" bindtap="previewDraftPhotos" />
+          <view class="remove" data-index="{{index}}" bindtap="removePhoto">×</view>
+        </view>
+        <view wx:if="{{!photoDrafts.length}}" class="photo-empty">请上传实验室现场图片</view>
+      </view>
+    </view>
+
+    <button class="btn-submit" loading="{{submitting}}" bindtap="submitReport">提交日报</button>
+  </view>
+
+  <view class="card">
+    <view class="title">我的日报记录</view>
+    <view wx:if="{{!reports.length}}" class="empty">暂无记录</view>
+    <view wx:for="{{reports}}" wx:key="id" wx:for-index="rowIndex" class="record">
+      <view class="record-head">
+        <text>{{item.report_date}} · {{item.lab_name || '--'}}</text>
+        <text class="status status-{{item.status}}">{{statusText(item.status)}}</text>
+      </view>
+      <text class="record-content">{{item.content || '--'}}</text>
+      <view class="thumb-row" wx:if="{{item.photos && item.photos.length}}">
+        <image
+          wx:for="{{item.photos}}"
+          wx:key="id"
+          wx:for-index="photoIndex"
+          class="thumb"
+          src="{{item.url}}"
+          mode="aspectFill"
+          data-row-index="{{rowIndex}}"
+          data-index="{{photoIndex}}"
+          bindtap="previewReportPhotos"
+        />
+      </view>
+    </view>
+  </view>
+</view>

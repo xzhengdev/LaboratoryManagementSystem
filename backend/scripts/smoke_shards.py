@@ -33,24 +33,34 @@ def main():
     with app.app_context():
         client = app.test_client()
 
-        login_resp = client.post(
+        teacher_login_resp = client.post(
             "/api/auth/login",
-            json={"username": "labadmin1", "password": "123456"},
+            json={"username": "teacher1", "password": "123456"},
         )
-        login_data = assert_ok(login_resp, "登录")
-        token = login_data["token"]
-        profile = login_data["user"]
-        campus_id = profile.get("campus_id")
+        teacher_login_data = assert_ok(teacher_login_resp, "教师登录")
+        teacher_token = teacher_login_data["token"]
+        teacher_profile = teacher_login_data["user"]
+        campus_id = teacher_profile.get("campus_id")
+        teacher_headers = {"Authorization": f"Bearer {teacher_token}"}
 
-        headers = {"Authorization": f"Bearer {token}"}
+        student_login_resp = client.post(
+            "/api/auth/login",
+            json={"username": "student1", "password": "123456"},
+        )
+        student_login_data = assert_ok(student_login_resp, "学生登录")
+        student_token = student_login_data["token"]
+        student_profile = student_login_data["user"]
+        if student_profile.get("campus_id") != campus_id:
+            raise RuntimeError("冒烟测试要求 student1 与 teacher1 在同一校区")
+        student_headers = {"Authorization": f"Bearer {student_token}"}
 
-        labs_resp = client.get(f"/api/labs?campus_id={campus_id}", headers=headers)
+        labs_resp = client.get(f"/api/labs?campus_id={campus_id}", headers=teacher_headers)
         labs = assert_ok(labs_resp, "查询实验室")
         if not labs:
             raise RuntimeError("当前校区无实验室，请先执行 seed.py + seed_shards.py")
         lab_id = labs[0]["id"]
 
-        budget_resp = client.get("/api/asset-budgets/current", headers=headers)
+        budget_resp = client.get("/api/asset-budgets/current", headers=teacher_headers)
         budget = assert_ok(budget_resp, "查询预算")
 
         target_day = (date.today() + timedelta(days=1)).isoformat()
@@ -58,7 +68,7 @@ def main():
         for start_time, end_time in [("10:00", "11:00"), ("11:00", "12:00"), ("14:00", "15:00")]:
             reservation_resp = client.post(
                 "/api/reservations",
-                headers={**headers, "Idempotency-Key": f"smoke-{uuid.uuid4().hex}"},
+                headers={**teacher_headers, "Idempotency-Key": f"smoke-{uuid.uuid4().hex}"},
                 json={
                     "campus_id": campus_id,
                     "lab_id": lab_id,
@@ -75,7 +85,7 @@ def main():
 
         asset_req_resp = client.post(
             "/api/asset-requests",
-            headers={**headers, "Idempotency-Key": f"asset-{uuid.uuid4().hex}"},
+            headers={**teacher_headers, "Idempotency-Key": f"asset-{uuid.uuid4().hex}"},
             json={
                 "campus_id": campus_id,
                 "lab_id": lab_id,
@@ -90,7 +100,7 @@ def main():
 
         upload_resp = client.post(
             "/api/lab-reports/photos/upload",
-            headers=headers,
+            headers=student_headers,
             data={
                 "lab_id": str(lab_id),
                 "file": (io.BytesIO(PNG_1X1), "daily.png"),
@@ -101,7 +111,7 @@ def main():
 
         report_resp = client.post(
             "/api/lab-reports",
-            headers=headers,
+            headers=student_headers,
             json={
                 "lab_id": lab_id,
                 "report_date": date.today().isoformat(),

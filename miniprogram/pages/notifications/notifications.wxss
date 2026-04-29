@@ -1,0 +1,91 @@
+.page {
+  min-height: 100vh;
+  background: #f5f7fb;
+  padding: 20rpx;
+  box-sizing: border-box;
+}
+
+.toolbar {
+  margin-bottom: 16rpx;
+}
+
+.btn-read-all {
+  margin: 0;
+  height: 64rpx;
+  line-height: 64rpx;
+  border-radius: 14rpx;
+  border: 1rpx solid #d6e4f5;
+  background: #eef6ff;
+  color: #245586;
+  font-size: 23rpx;
+}
+
+.list-card {
+  border-radius: 18rpx;
+  border: 1rpx solid #e1e9f4;
+  background: #fff;
+  overflow: hidden;
+}
+
+.item {
+  padding: 18rpx 20rpx;
+  border-bottom: 1rpx solid #eef2f8;
+}
+
+.item:last-child {
+  border-bottom: none;
+}
+
+.item-read {
+  opacity: 0.75;
+}
+
+.item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10rpx;
+}
+
+.item-title {
+  color: #183453;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.item-time {
+  color: #7d8fa6;
+  font-size: 20rpx;
+}
+
+.item-content {
+  margin-top: 8rpx;
+  color: #496280;
+  font-size: 23rpx;
+  line-height: 1.55;
+}
+
+.item-foot {
+  margin-top: 8rpx;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.item-status {
+  font-size: 20rpx;
+}
+
+.status-unread {
+  color: #d14343;
+}
+
+.status-read {
+  color: #7f90a6;
+}
+
+.empty {
+  padding: 36rpx 20rpx;
+  color: #8297af;
+  font-size: 23rpx;
+  text-align: center;
+}

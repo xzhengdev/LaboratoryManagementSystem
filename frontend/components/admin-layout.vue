@@ -102,6 +102,8 @@ export default {
         labs: '/static/icons/labs.png',
         equipment: '/static/icons/equipment.png',
         approvals: '/static/icons/approvals.png',
+        assetRequests: '/static/icons/equipment.png',
+        dailyReports: '/static/icons/approvals.png',
         users: '/static/icons/users.png',
         logs: '/static/icons/statistics.png',
         statistics: '/static/icons/statistics.png',

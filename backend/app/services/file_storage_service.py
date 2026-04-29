@@ -1,4 +1,5 @@
-﻿import hashlib
+import hashlib
+import json
 import os
 from datetime import datetime
 from uuid import uuid4
@@ -50,27 +51,162 @@ def _save_local(file_bytes, filename, campus_id, biz_type):
     }
 
 
-def _save_seaweedfs(file_bytes, filename):
+def _parse_campus_seaweedfs_map():
+    raw = str(current_app.config.get("SEAWEEDFS_CAMPUS_CONFIG_MAP", "")).strip()
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except Exception:
+        current_app.logger.warning("SEAWEEDFS_CAMPUS_CONFIG_MAP 不是合法 JSON，已忽略")
+        return {}
+
+    result = {}
+    for key, value in (data or {}).items():
+        try:
+            campus_id = int(key)
+        except Exception:
+            continue
+
+        if isinstance(value, str):
+            upload_url = value.strip()
+            public_url = ""
+            timeout_seconds = None
+        else:
+            upload_url = str((value or {}).get("upload_url") or "").strip()
+            public_url = str((value or {}).get("public_url") or "").strip()
+            write_url = str((value or {}).get("write_url") or "").strip()
+            raw_timeout = (value or {}).get("timeout_seconds")
+            try:
+                timeout_seconds = float(raw_timeout) if raw_timeout is not None else None
+            except Exception:
+                timeout_seconds = None
+
+        if not upload_url:
+            continue
+
+        result[campus_id] = {
+            "upload_url": upload_url,
+            "public_url": public_url.rstrip("/"),
+            "write_url": write_url.rstrip("/"),
+            "timeout_seconds": timeout_seconds,
+        }
+    return result
+
+
+def _resolve_seaweedfs_target(campus_id):
+    campus_map = _parse_campus_seaweedfs_map()
+    try:
+        cid = int(campus_id)
+    except Exception:
+        cid = None
+
+    if cid is not None and cid in campus_map:
+        row = campus_map[cid]
+        timeout = row.get("timeout_seconds")
+        if timeout is None:
+            timeout = float(current_app.config.get("SEAWEEDFS_TIMEOUT_SECONDS", 8))
+        return row["upload_url"], row.get("public_url", ""), row.get("write_url", ""), float(timeout)
+
     upload_url = str(current_app.config.get("SEAWEEDFS_UPLOAD_URL", "")).strip()
     public_base_url = str(current_app.config.get("SEAWEEDFS_PUBLIC_URL", "")).strip().rstrip("/")
+    write_base_url = str(current_app.config.get("SEAWEEDFS_WRITE_URL", "")).strip().rstrip("/")
+    timeout_seconds = float(current_app.config.get("SEAWEEDFS_TIMEOUT_SECONDS", 8))
+    return upload_url, public_base_url, write_base_url, timeout_seconds
+
+
+def _save_seaweedfs(file_bytes, filename, campus_id):
+    upload_url, public_base_url, write_base_url, timeout_seconds = _resolve_seaweedfs_target(campus_id)
     if not upload_url:
         return None
 
-    try:
-        response = requests.post(
-            upload_url,
-            files={"file": (filename, file_bytes)},
-            timeout=float(current_app.config.get("SEAWEEDFS_TIMEOUT_SECONDS", 8)),
-        )
-        response.raise_for_status()
-        data = response.json() if response.content else {}
-    except Exception as exc:
-        raise AppError(f"SeaweedFS 上传失败: {exc}", 502, 50231)
+    upload_url = upload_url.rstrip("/")
 
-    file_id = str(data.get("fid") or data.get("file_id") or data.get("name") or "").strip()
+    # 兼容旧配置：直接 POST 到 /submit
+    if upload_url.endswith("/submit"):
+        try:
+            response = requests.post(
+                upload_url,
+                files={"file": (filename, file_bytes)},
+                timeout=timeout_seconds,
+            )
+            response.raise_for_status()
+            data = response.json() if response.content else {}
+        except Exception as exc:
+            raise AppError(f"SeaweedFS 上传失败: {exc}", 502, 50231)
+
+        file_id = str(data.get("fid") or data.get("file_id") or data.get("name") or "").strip()
+        if not file_id:
+            raise AppError("SeaweedFS 未返回文件标识", 502, 50232)
+
+        if data.get("url"):
+            url = str(data.get("url")).strip()
+        elif public_base_url:
+            url = f"{public_base_url}/{file_id}"
+        else:
+            url = file_id
+
+        return {
+            "storage_backend": "seaweedfs",
+            "file_id": file_id,
+            "url": url,
+        }
+
+    # 新流程：先向 master 申请 fid，再写入 volume 节点
+    try:
+        assign_resp = requests.get(
+            f"{upload_url}/dir/assign",
+            timeout=timeout_seconds,
+        )
+        assign_resp.raise_for_status()
+        assign_data = assign_resp.json() if assign_resp.content else {}
+    except Exception as exc:
+        raise AppError(f"SeaweedFS 分配文件ID失败: {exc}", 502, 50231)
+
+    file_id = str(assign_data.get("fid") or "").strip()
     if not file_id:
-        raise AppError("SeaweedFS 未返回文件标识", 502, 50232)
-    url = data.get("url") or f"{public_base_url}/{file_id}" if public_base_url else file_id
+        raise AppError("SeaweedFS 未返回 fid", 502, 50232)
+
+    candidates = []
+    if write_base_url:
+        candidates.append(f"{write_base_url}/{file_id}")
+    raw_write_target = str(assign_data.get("url") or "").strip()
+    if raw_write_target:
+        if raw_write_target.startswith("http://") or raw_write_target.startswith("https://"):
+            candidates.append(f"{raw_write_target.rstrip('/')}/{file_id}")
+        else:
+            candidates.append(f"http://{raw_write_target.rstrip('/')}/{file_id}")
+    if public_base_url:
+        candidates.append(f"{public_base_url}/{file_id}")
+
+    last_error = None
+    for target in candidates:
+        try:
+            write_resp = requests.post(
+                target,
+                files={"file": (filename, file_bytes)},
+                timeout=timeout_seconds,
+            )
+            write_resp.raise_for_status()
+            last_error = None
+            break
+        except Exception as exc:
+            last_error = exc
+            continue
+    if last_error is not None:
+        raise AppError(f"SeaweedFS 写入失败: {last_error}", 502, 50233)
+
+    raw_public = str(assign_data.get("publicUrl") or "").strip()
+    if public_base_url:
+        url = f"{public_base_url}/{file_id}"
+    elif raw_public:
+        if raw_public.startswith("http://") or raw_public.startswith("https://"):
+            url = f"{raw_public.rstrip('/')}/{file_id}"
+        else:
+            url = f"http://{raw_public.rstrip('/')}/{file_id}"
+    else:
+        url = file_id
+
     return {
         "storage_backend": "seaweedfs",
         "file_id": file_id,
@@ -97,7 +233,7 @@ def save_image_file(current_user, file_storage, campus_id, biz_type, biz_id=None
         raise AppError("上传文件过大，请控制在 10MB 以内", 413, 41300)
 
     digest = hashlib.sha256(file_bytes).hexdigest()
-    storage_result = _save_seaweedfs(file_bytes, filename) or _save_local(
+    storage_result = _save_seaweedfs(file_bytes, filename, campus_id) or _save_local(
         file_bytes, filename, campus_id, biz_type
     )
 

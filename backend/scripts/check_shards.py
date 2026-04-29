@@ -22,6 +22,7 @@ REQUIRED_TABLES = [
     "asset_items",
     "file_objects",
     "lab_daily_reports",
+    "notification_messages",
 ]
 
 

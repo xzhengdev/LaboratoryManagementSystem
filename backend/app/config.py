@@ -167,8 +167,10 @@ class Config:
     # 上传文件的存放目录名（默认为 uploads）
     UPLOAD_DIRNAME = os.getenv("UPLOAD_DIRNAME", "uploads")
     SEAWEEDFS_UPLOAD_URL = os.getenv("SEAWEEDFS_UPLOAD_URL", "").strip()
+    SEAWEEDFS_WRITE_URL = os.getenv("SEAWEEDFS_WRITE_URL", "").strip()
     SEAWEEDFS_PUBLIC_URL = os.getenv("SEAWEEDFS_PUBLIC_URL", "").strip()
     SEAWEEDFS_TIMEOUT_SECONDS = float(os.getenv("SEAWEEDFS_TIMEOUT_SECONDS", "8"))
+    SEAWEEDFS_CAMPUS_CONFIG_MAP = os.getenv("SEAWEEDFS_CAMPUS_CONFIG_MAP", "").strip()
 
     # ---------- 校区分库路由 ----------
     ENABLE_CAMPUS_DB_ROUTING = os.getenv("ENABLE_CAMPUS_DB_ROUTING", "0").strip().lower() in {

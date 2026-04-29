@@ -47,6 +47,8 @@ def _find_report(current_user, report_id):
 @jwt_required()
 def upload_daily_report_photo_api():
     current_user = get_current_user()
+    if current_user.role != "student":
+        raise AppError("日报图片上传仅支持学生端", 403, 40358)
     file_storage = request.files.get("file")
     if not file_storage:
         raise AppError("缺少文件字段 file")
@@ -84,6 +86,8 @@ def upload_daily_report_photo_api():
 @jwt_required()
 def create_daily_report_api():
     current_user = get_current_user()
+    if current_user.role != "student":
+        raise AppError("日报提交仅支持学生端", 403, 40352)
     enforce_submit_daily_report_rate_limit(current_user.id)
     payload = request.get_json(silent=True) or {}
     result = create_daily_report(current_user, payload)

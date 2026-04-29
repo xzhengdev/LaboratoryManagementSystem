@@ -1,0 +1,41 @@
+services:
+  campus5-seaweed:
+    image: chrislusf/seaweedfs:3.74
+    container_name: campus5-seaweed
+    command: "server -ip.bind=0.0.0.0 -dir=/data"
+    ports:
+      - "18085:8080"  # volume upload/read: /submit and /<file_id>
+      - "19335:9333"  # master
+      - "18885:8888"  # filer
+    volumes:
+      - seaweed_campus5_data:/data
+    restart: unless-stopped
+
+  campus6-seaweed:
+    image: chrislusf/seaweedfs:3.74
+    container_name: campus6-seaweed
+    command: "server -ip.bind=0.0.0.0 -dir=/data"
+    ports:
+      - "18086:8080"
+      - "19336:9333"
+      - "18886:8888"
+    volumes:
+      - seaweed_campus6_data:/data
+    restart: unless-stopped
+
+  campus7-seaweed:
+    image: chrislusf/seaweedfs:3.74
+    container_name: campus7-seaweed
+    command: "server -ip.bind=0.0.0.0 -dir=/data"
+    ports:
+      - "18087:8080"
+      - "19337:9333"
+      - "18887:8888"
+    volumes:
+      - seaweed_campus7_data:/data
+    restart: unless-stopped
+
+volumes:
+  seaweed_campus5_data:
+  seaweed_campus6_data:
+  seaweed_campus7_data:

@@ -406,6 +406,37 @@ class AssetItem(BaseModel):
         )
 
 
+class NotificationMessage(BaseModel):
+    # 站内通知表：用于小程序端提醒业务结果（如日报审核结果）。
+    __tablename__ = "notification_messages"
+    __table_args__ = (
+        db.Index("idx_notification_user_read", "user_id", "is_read"),
+        db.Index("idx_notification_campus_biz", "campus_id", "biz_type", "biz_id"),
+    )
+
+    campus_id = db.Column(db.Integer, db.ForeignKey("campuses.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    title = db.Column(db.String(100), nullable=False)
+    content = db.Column(db.String(500), nullable=False)
+    level = db.Column(db.String(20), default="info", nullable=False)
+    biz_type = db.Column(db.String(50), nullable=False, default="general")
+    biz_id = db.Column(db.Integer)
+    is_read = db.Column(db.Boolean, default=False, nullable=False)
+    read_at = db.Column(db.DateTime)
+
+    campus = db.relationship("Campus")
+    user = db.relationship("User")
+
+    def to_dict(self, extra=None):
+        return super().to_dict(
+            {
+                "campus_name": self.campus.campus_name if self.campus else None,
+                "user_name": self.user.real_name if self.user else None,
+                **(extra or {}),
+            }
+        )
+
+
 class LabDailyReport(BaseModel):
     # 实验室日报表：学生/教师通过小程序拍照上报，管理员审核。
     __tablename__ = "lab_daily_reports"
@@ -449,3 +480,38 @@ class LabDailyReport(BaseModel):
                 **(extra or {}),
             }
         )
+
+
+class CampusSummarySnapshot(BaseModel):
+    # 中心汇总快照表：按天聚合各校区核心业务指标，支撑总表查询与答辩演示。
+    __tablename__ = "campus_summary_snapshots"
+    __table_args__ = (
+        db.UniqueConstraint("snapshot_date", "campus_id", name="uq_summary_snapshot_date_campus"),
+        db.Index("idx_summary_snapshot_date", "snapshot_date"),
+        db.Index("idx_summary_snapshot_campus", "campus_id"),
+    )
+
+    snapshot_date = db.Column(db.Date, nullable=False)
+    campus_id = db.Column(db.Integer, nullable=False)
+    campus_name = db.Column(db.String(100), nullable=False)
+
+    reservation_count = db.Column(db.Integer, default=0, nullable=False)
+    reservation_pending_count = db.Column(db.Integer, default=0, nullable=False)
+    reservation_approved_count = db.Column(db.Integer, default=0, nullable=False)
+    reservation_rejected_count = db.Column(db.Integer, default=0, nullable=False)
+
+    asset_request_count = db.Column(db.Integer, default=0, nullable=False)
+    asset_request_pending_count = db.Column(db.Integer, default=0, nullable=False)
+    asset_request_approved_count = db.Column(db.Integer, default=0, nullable=False)
+    asset_request_rejected_count = db.Column(db.Integer, default=0, nullable=False)
+
+    asset_item_count = db.Column(db.Integer, default=0, nullable=False)
+    asset_budget_total_amount = db.Column(db.Numeric(14, 2), default=0, nullable=False)
+    asset_budget_locked_amount = db.Column(db.Numeric(14, 2), default=0, nullable=False)
+    asset_budget_used_amount = db.Column(db.Numeric(14, 2), default=0, nullable=False)
+    asset_budget_available_amount = db.Column(db.Numeric(14, 2), default=0, nullable=False)
+
+    daily_report_count = db.Column(db.Integer, default=0, nullable=False)
+    daily_report_pending_count = db.Column(db.Integer, default=0, nullable=False)
+    daily_report_approved_count = db.Column(db.Integer, default=0, nullable=False)
+    daily_report_rejected_count = db.Column(db.Integer, default=0, nullable=False)

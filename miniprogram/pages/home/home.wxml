@@ -1,5 +1,13 @@
 <view class="home-page">
-  <swiper class="banner" autoplay interval="3000" circular indicator-dots indicator-color="rgba(255,255,255,0.5)" indicator-active-color="#fff">
+  <swiper
+    class="banner"
+    autoplay
+    interval="3000"
+    circular
+    indicator-dots
+    indicator-color="rgba(255,255,255,0.5)"
+    indicator-active-color="#fff"
+  >
     <swiper-item wx:for="{{banners}}" wx:key="index">
       <view class="banner-slide">
         <image class="banner-image" src="{{item.image}}" mode="aspectFill" />
@@ -36,6 +44,25 @@
         <image class="entry-icon-image" src="/assets/logo.png" mode="aspectFit" />
       </view>
       <text class="entry-label">AI助手</text>
+    </view>
+  </view>
+
+  <view wx:if="{{canReportDaily}}" class="daily-report-entry" bindtap="goDailyReport">
+    <view class="daily-report-entry__left">
+      <text class="daily-report-entry__title">实验室日报</text>
+      <text class="daily-report-entry__sub">拍照上报每日实验室使用情况</text>
+    </view>
+    <text class="daily-report-entry__arrow">></text>
+  </view>
+
+  <view class="notice-entry" bindtap="goNotifications">
+    <view class="notice-entry__left">
+      <text class="notice-entry__title">消息中心</text>
+      <text class="notice-entry__sub">查看日报审核结果与系统通知</text>
+    </view>
+    <view class="notice-entry__right">
+      <text wx:if="{{unreadNoticeCount > 0}}" class="notice-badge">{{unreadNoticeCount}}</text>
+      <text class="notice-entry__arrow">></text>
     </view>
   </view>
 

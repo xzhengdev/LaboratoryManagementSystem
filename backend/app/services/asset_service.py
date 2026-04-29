@@ -140,16 +140,15 @@ def update_budget_total(current_user, campus_id, total_amount, remark=""):
 
 
 def create_asset_request(current_user, payload, idempotency_key=""):
-    if current_user.role not in {"lab_admin", "system_admin"}:
-        raise AppError("仅管理员可提交资产申报", 403, 40342)
+    if current_user.role != "teacher":
+        raise AppError("资产申报仅支持教师发起", 403, 40342)
 
     campus_id = int(payload.get("campus_id") or 0)
-    if current_user.role == "lab_admin":
-        if not current_user.campus_id:
-            raise AppError("管理员账号未绑定校区", 400, 40083)
-        if campus_id and campus_id != current_user.campus_id:
-            raise AppError("只能提交本校区资产申报", 403, 40343)
-        campus_id = current_user.campus_id
+    if not current_user.campus_id:
+        raise AppError("教师账号未绑定校区", 400, 40083)
+    if campus_id and campus_id != current_user.campus_id:
+        raise AppError("只能提交本校区资产申报", 403, 40343)
+    campus_id = current_user.campus_id
     if not campus_id:
         raise AppError("campus_id 不能为空")
 

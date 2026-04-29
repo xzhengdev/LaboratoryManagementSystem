@@ -6,7 +6,18 @@
 
 from flask import Blueprint  # Flask核心：蓝图
 
-from app.services.statistics_service import get_campus_statistics, get_lab_usage, get_overview  # 统计服务
+from app.services.statistics_service import (
+    get_campus_statistics,
+    get_daily_report_campus_statistics,
+    get_daily_report_lab_statistics,
+    get_daily_report_overview,
+    get_lab_usage,
+    get_overview,
+)  # 统计服务
+from app.services.summary_sync_service import (
+    get_latest_campus_summary_rows,
+    sync_summary_for_system_admin,
+)
 from app.utils.decorators import get_current_user, role_required  # 用户获取、角色权限
 from app.utils.response import success  # 统一成功响应格式
 
@@ -137,4 +148,45 @@ def lab_usage_api():
     # 调用服务层获取实验室使用率数据
     result = get_lab_usage(campus_id=campus_id)
     
+    return success(result)
+
+
+@statistics_bp.get("/statistics/daily-report/overview")
+@role_required("lab_admin", "system_admin")
+def daily_report_overview_api():
+    current_user = get_current_user()
+    campus_id = current_user.campus_id if current_user.role == "lab_admin" else None
+    return success(get_daily_report_overview(campus_id=campus_id))
+
+
+@statistics_bp.get("/statistics/daily-report/campus")
+@role_required("lab_admin", "system_admin")
+def daily_report_campus_api():
+    current_user = get_current_user()
+    campus_id = current_user.campus_id if current_user.role == "lab_admin" else None
+    return success(get_daily_report_campus_statistics(campus_id=campus_id))
+
+
+@statistics_bp.get("/statistics/daily-report/lab")
+@role_required("lab_admin", "system_admin")
+def daily_report_lab_api():
+    current_user = get_current_user()
+    campus_id = current_user.campus_id if current_user.role == "lab_admin" else None
+    return success(get_daily_report_lab_statistics(campus_id=campus_id))
+
+
+@statistics_bp.post("/statistics/summary/sync")
+@role_required("system_admin")
+def sync_summary_api():
+    current_user = get_current_user()
+    result = sync_summary_for_system_admin(current_user)
+    return success(result, "中心汇总总表同步完成")
+
+
+@statistics_bp.get("/statistics/summary/latest")
+@role_required("lab_admin", "system_admin")
+def latest_summary_api():
+    current_user = get_current_user()
+    campus_id = current_user.campus_id if current_user.role == "lab_admin" else None
+    result = get_latest_campus_summary_rows(campus_id=campus_id)
     return success(result)

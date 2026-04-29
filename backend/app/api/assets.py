@@ -71,7 +71,7 @@ def update_budget_total_api(campus_id):
 
 
 @asset_bp.post("/asset-requests")
-@role_required("lab_admin", "system_admin")
+@jwt_required()
 def create_asset_request_api():
     current_user = get_current_user()
     enforce_create_asset_request_rate_limit(current_user.id)

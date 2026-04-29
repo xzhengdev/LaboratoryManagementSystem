@@ -1,0 +1,25 @@
+<view class="page">
+  <view class="toolbar">
+    <button class="btn-read-all" bindtap="markAllRead">全部设为已读</button>
+  </view>
+
+  <view class="list-card">
+    <view wx:if="{{!list.length}}" class="empty">暂无消息</view>
+    <view
+      wx:for="{{list}}"
+      wx:key="id"
+      class="item {{item.is_read ? 'item-read' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="openItem"
+    >
+      <view class="item-head">
+        <text class="item-title">{{item.title}}</text>
+        <text class="item-time">{{item.created_at ? item.created_at.slice(0, 19).replace('T', ' ') : '--'}}</text>
+      </view>
+      <text class="item-content">{{item.content}}</text>
+      <view class="item-foot">
+        <text class="item-status {{item.is_read ? 'status-read' : 'status-unread'}}">{{item.is_read ? '已读' : '未读'}}</text>
+      </view>
+    </view>
+  </view>
+</view>
