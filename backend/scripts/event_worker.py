@@ -15,6 +15,7 @@ from app import create_app
 import app.extensions as app_extensions
 from app.extensions import db
 from app.models import OperationLog, User
+from app.services.summary_sync_service import sync_campus_summary_snapshots
 
 
 SUPPORTED_EVENTS = {
@@ -22,6 +23,14 @@ SUPPORTED_EVENTS = {
     "reservation.cancelled",
     "reservation.approved",
     "reservation.rejected",
+    "asset.request.created",
+    "asset.request.approved",
+    "asset.request.rejected",
+    "asset.stocked_in",
+    "daily_report.created",
+    "daily_report.approved",
+    "daily_report.rejected",
+    "file.uploaded",
 }
 
 
@@ -87,6 +96,22 @@ def handle_event(app, event, worker_name):
     )
     db.session.add(row)
     db.session.commit()
+
+    campus_id = payload.get("campus_id")
+    try:
+        if campus_id is not None:
+            sync_campus_summary_snapshots(target_campus_ids=[campus_id])
+        else:
+            sync_campus_summary_snapshots()
+    except Exception as exc:
+        app.logger.warning(
+            "[%s] summary sync after event failed, event_type=%s, campus_id=%s, error=%s",
+            worker_name,
+            event_type,
+            campus_id,
+            exc,
+        )
+
     app.logger.info("[%s] processed event: %s", worker_name, event_type)
     return True
 

@@ -30,7 +30,18 @@ def _safe_decimal(value):
         return Decimal("0.00")
 
 
-def _campus_ids_for_sync():
+def _campus_ids_for_sync(target_campus_ids=None):
+    if target_campus_ids:
+        normalized = []
+        for item in target_campus_ids:
+            try:
+                cid = int(item)
+            except Exception:
+                continue
+            if cid not in normalized:
+                normalized.append(cid)
+        if normalized:
+            return normalized
     campus_ids = get_routed_campus_ids()
     return campus_ids or [0]
 
@@ -115,10 +126,10 @@ def _collect_one_campus_snapshot(campus_id):
         }
 
 
-def sync_campus_summary_snapshots(snapshot_date=None):
+def sync_campus_summary_snapshots(snapshot_date=None, target_campus_ids=None):
     target_date = snapshot_date or datetime.now(timezone.utc).date()
     rows = []
-    for campus_id in _campus_ids_for_sync():
+    for campus_id in _campus_ids_for_sync(target_campus_ids):
         rows.append(_collect_one_campus_snapshot(campus_id))
 
     with summary_db_session() as session:
