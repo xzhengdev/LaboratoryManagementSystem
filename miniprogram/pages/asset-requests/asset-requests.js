@@ -1,13 +1,17 @@
-﻿const { api } = require('../../utils/api')
+const { api } = require('../../utils/api')
 const { getProfile, isLoggedIn } = require('../../utils/session')
 
 Page({
   data: {
     profile: {},
-    requests: [],
+    summary: {
+      pending: 0,
+      approved: 0,
+      rejected: 0
+    },
     labs: [],
-    labIndex: 0,
-    selectedLabName: '不指定实验室',
+    labIndex: -1,
+    selectedLabName: '请选择实验室',
     form: {
       asset_name: '',
       category: '',
@@ -32,7 +36,7 @@ Page({
     }
     this.setData({ profile })
     this.loadLabs()
-    this.loadRequests()
+    this.loadSummary()
   },
 
   async loadLabs() {
@@ -42,26 +46,36 @@ Page({
         id: row.id,
         name: row.lab_name || `实验室${row.id}`
       }))
+      if (!list.length) {
+        this.setData({
+          labs: [],
+          labIndex: -1,
+          selectedLabName: '请先创建实验室'
+        })
+        return
+      }
       this.setData({
-        labs: [{ id: '', name: '不指定实验室' }, ...list],
+        labs: list,
         labIndex: 0,
-        selectedLabName: '不指定实验室'
+        selectedLabName: list[0].name
       })
     } catch (_) {}
   },
 
-  async loadRequests() {
+  async loadSummary() {
     try {
       const rows = await api.myAssetRequests()
       const list = Array.isArray(rows) ? rows : []
-      this.setData({
-        requests: list.map((item) => ({
-          ...item,
-          status_text: this.statusText(item.status)
-        }))
+      const summary = { pending: 0, approved: 0, rejected: 0 }
+      list.forEach((item) => {
+        const key = String(item.status || '').toLowerCase()
+        if (key === 'pending') summary.pending += 1
+        if (key === 'approved') summary.approved += 1
+        if (key === 'rejected') summary.rejected += 1
       })
+      this.setData({ summary })
     } catch (_) {
-      this.setData({ requests: [] })
+      this.setData({ summary: { pending: 0, approved: 0, rejected: 0 } })
     }
   },
 
@@ -79,10 +93,24 @@ Page({
     })
   },
 
+  resetForm() {
+    const selected = this.data.labs[0]
+    this.setData({
+      form: { asset_name: '', category: '', quantity: 1, unit_price: '', reason: '' },
+      labIndex: selected ? 0 : -1,
+      selectedLabName: selected ? selected.name : '请选择实验室',
+      amountText: '0.00'
+    })
+  },
+
+  goRecords() {
+    wx.navigateTo({ url: '/pages/asset-request-records/asset-request-records' })
+  },
+
   normalizePayload() {
     const selectedLab = this.data.labs[this.data.labIndex] || { id: '' }
     return {
-      lab_id: selectedLab.id || null,
+      lab_id: selectedLab.id || '',
       asset_name: String(this.data.form.asset_name || '').trim(),
       category: String(this.data.form.category || '').trim(),
       quantity: Number(this.data.form.quantity || 0),
@@ -92,6 +120,7 @@ Page({
   },
 
   validate(payload) {
+    if (!payload.lab_id) return '请选择实验室'
     if (!payload.asset_name) return '请填写资产名称'
     if (!payload.category) return '请填写资产类别'
     if (!Number.isFinite(payload.quantity) || payload.quantity <= 0) return '数量必须大于 0'
@@ -102,6 +131,10 @@ Page({
   async submitRequest() {
     if (this.data.submitting) return
     const payload = this.normalizePayload()
+    if (!this.data.labs.length) {
+      wx.showToast({ title: '当前校区暂无实验室，请先创建', icon: 'none' })
+      return
+    }
     const error = this.validate(payload)
     if (error) {
       wx.showToast({ title: error, icon: 'none' })
@@ -112,26 +145,15 @@ Page({
     try {
       await api.createAssetRequest(payload)
       wx.showToast({ title: '申报成功', icon: 'success' })
-      this.setData({
-        form: { asset_name: '', category: '', quantity: 1, unit_price: '', reason: '' },
-        labIndex: 0,
-        selectedLabName: '不指定实验室',
-        amountText: '0.00'
-      })
-      this.loadRequests()
+      this.resetForm()
+      this.loadSummary()
+      setTimeout(() => {
+        wx.navigateTo({ url: '/pages/asset-request-records/asset-request-records' })
+      }, 250)
     } catch (_) {
     } finally {
       this.setData({ submitting: false })
     }
-  },
-
-  statusText(status) {
-    const map = {
-      pending: '待审批',
-      approved: '已通过',
-      rejected: '已驳回'
-    }
-    return map[String(status || '').toLowerCase()] || String(status || '-')
   },
 
   refreshAmountText() {

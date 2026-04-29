@@ -1,31 +1,68 @@
-﻿<view class="page">
-  <view class="card">
-    <view class="title">新建资产申报</view>
-    <picker mode="selector" range="{{labs}}" range-key="name" value="{{labIndex}}" bindchange="onLabChange">
-      <view class="input">使用实验室：{{selectedLabName}}</view>
-    </picker>
-    <input class="input" placeholder="资产名称（如 示波器）" value="{{form.asset_name}}" data-field="asset_name" bindinput="onInput" />
-    <input class="input" placeholder="资产类别（如 教学设备）" value="{{form.category}}" data-field="category" bindinput="onInput" />
-    <view class="inline-row">
-      <input class="input half" type="number" placeholder="数量" value="{{form.quantity}}" data-field="quantity" bindinput="onInput" />
-      <input class="input half" type="digit" placeholder="单价（元）" value="{{form.unit_price}}" data-field="unit_price" bindinput="onInput" />
+<view class="page">
+  <view class="summary-card">
+    <view class="summary-title">教师资产申报</view>
+    <view class="summary-sub">提交后进入审批流程，审批通过后由管理员入库</view>
+    <view class="summary-grid">
+      <view class="summary-item">
+        <text class="summary-value">{{summary.pending}}</text>
+        <text class="summary-label">待审批</text>
+      </view>
+      <view class="summary-item">
+        <text class="summary-value">{{summary.approved}}</text>
+        <text class="summary-label">已通过</text>
+      </view>
+      <view class="summary-item">
+        <text class="summary-value">{{summary.rejected}}</text>
+        <text class="summary-label">已驳回</text>
+      </view>
     </view>
-    <textarea class="textarea" placeholder="申报理由（可选）" value="{{form.reason}}" data-field="reason" bindinput="onInput" />
-    <view class="amount">预计金额：￥{{amountText}}</view>
-    <button class="submit-btn" loading="{{submitting}}" bindtap="submitRequest">提交申报</button>
+    <view class="summary-link" bindtap="goRecords">查看申报记录 ></view>
   </view>
 
   <view class="card">
-    <view class="title">我的申报记录</view>
-    <view wx:if="{{requests.length === 0}}" class="empty">暂无申报记录</view>
-    <view wx:for="{{requests}}" wx:key="id" class="item">
-      <view class="item-top">
-        <text class="name">{{item.asset_name}}</text>
-        <text class="status status-{{item.status}}">{{item.status_text}}</text>
+    <view class="title">发起申报</view>
+
+    <view class="form-row">
+      <text class="label">使用实验室</text>
+      <picker mode="selector" range="{{labs}}" range-key="name" value="{{labIndex}}" bindchange="onLabChange">
+        <view class="value">{{selectedLabName}}</view>
+      </picker>
+    </view>
+
+    <view class="form-col">
+      <text class="label">资产名称</text>
+      <input class="input" placeholder="如：示波器" value="{{form.asset_name}}" data-field="asset_name" bindinput="onInput" />
+    </view>
+
+    <view class="form-col">
+      <text class="label">资产类别</text>
+      <input class="input" placeholder="如：教学设备" value="{{form.category}}" data-field="category" bindinput="onInput" />
+    </view>
+
+    <view class="inline-row">
+      <view class="half form-col">
+        <text class="label">数量</text>
+        <input class="input" type="number" placeholder="1" value="{{form.quantity}}" data-field="quantity" bindinput="onInput" />
       </view>
-      <view class="meta">数量 {{item.quantity}} · 单价 ￥{{item.unit_price}} · 金额 ￥{{item.amount}}</view>
-      <view class="meta">编号 {{item.request_no}}</view>
-      <view class="meta">提交时间 {{item.created_at}}</view>
+      <view class="half form-col">
+        <text class="label">单价（元）</text>
+        <input class="input" type="digit" placeholder="0.00" value="{{form.unit_price}}" data-field="unit_price" bindinput="onInput" />
+      </view>
+    </view>
+
+    <view class="form-col">
+      <text class="label">申报理由（可选）</text>
+      <textarea class="textarea" placeholder="说明购置用途与使用场景" value="{{form.reason}}" data-field="reason" bindinput="onInput" />
+    </view>
+
+    <view class="amount-box">
+      <text class="amount-label">预计金额</text>
+      <text class="amount-value">￥{{amountText}}</text>
+    </view>
+
+    <view class="btn-row">
+      <button class="btn btn-ghost" bindtap="resetForm">重置</button>
+      <button class="btn btn-primary" loading="{{submitting}}" bindtap="submitRequest">提交申报</button>
     </view>
   </view>
 </view>

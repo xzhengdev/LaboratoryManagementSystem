@@ -5,6 +5,7 @@
     "pages/labs/labs",
     "pages/daily-report/daily-report",
     "pages/asset-requests/asset-requests",
+    "pages/asset-request-records/asset-request-records",
     "pages/notifications/notifications",
     "pages/my-reservations/my-reservations",
     "pages/profile/profile",

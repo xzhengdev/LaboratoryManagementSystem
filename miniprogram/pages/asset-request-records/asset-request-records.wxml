@@ -1,0 +1,43 @@
+<view class="page">
+  <scroll-view scroll-x class="filter-scroll">
+    <view class="filter-tabs">
+      <view class="filter-tab {{activeStatus==='all'?'active':''}}" data-status="all" bindtap="setStatus">全部</view>
+      <view class="filter-tab {{activeStatus==='pending'?'active':''}}" data-status="pending" bindtap="setStatus">待审批</view>
+      <view class="filter-tab {{activeStatus==='approved'?'active':''}}" data-status="approved" bindtap="setStatus">已通过</view>
+      <view class="filter-tab {{activeStatus==='rejected'?'active':''}}" data-status="rejected" bindtap="setStatus">已驳回</view>
+    </view>
+  </scroll-view>
+
+  <view class="search-row">
+    <input class="search-input" placeholder="搜索申报单号/资产名称" value="{{keyword}}" bindinput="onKeywordInput" confirm-type="search" bindconfirm="applyFilter" />
+    <view class="search-btn" bindtap="applyFilter">查询</view>
+  </view>
+
+  <view class="overview">
+    <view class="overview-item">
+      <text class="overview-value">{{summary.total}}</text>
+      <text class="overview-label">总申报</text>
+    </view>
+    <view class="overview-item">
+      <text class="overview-value">{{summary.pending}}</text>
+      <text class="overview-label">待审批</text>
+    </view>
+    <view class="overview-item">
+      <text class="overview-value">{{summary.approved}}</text>
+      <text class="overview-label">已通过</text>
+    </view>
+  </view>
+
+  <view wx:if="{{list.length===0}}" class="empty-tip">当前筛选条件下暂无申报记录</view>
+  <view wx:for="{{list}}" wx:key="id" class="record-card">
+    <view class="record-head">
+      <text class="record-name">{{item.asset_name}}</text>
+      <view class="status-tag status-{{item.status}}">{{item.status_text}}</view>
+    </view>
+    <view class="record-row">编号：{{item.request_no || '--'}}</view>
+    <view class="record-row">类别：{{item.category || '--'}} · 数量 {{item.quantity || 0}}</view>
+    <view class="record-row">单价：￥{{item.unit_price_text}} · 金额：￥{{item.amount_text}}</view>
+    <view class="record-row">提交时间：{{item.created_text}}</view>
+    <view wx:if="{{item.review_remark}}" class="record-row">审核备注：{{item.review_remark}}</view>
+  </view>
+</view>
