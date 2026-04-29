@@ -348,12 +348,13 @@ export const api = {
     request({ url: "/statistics/summary/sync", method: "POST" }),
   latestSummary: () =>
     request({ url: "/statistics/summary/latest" }),
-  uploadAssetPhoto: (assetId, filePath) =>
+  uploadAssetPhoto: (assetId, filePath, data = {}) =>
     new Promise((resolve, reject) => {
       uni.uploadFile({
         url: `${BASE_URL}/assets/${assetId}/photos/upload`,
         filePath,
         name: "file",
+        formData: data,
         header: {
           Authorization: getToken() ? `Bearer ${getToken()}` : "",
         },

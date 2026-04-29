@@ -29,22 +29,52 @@ def _campus_candidates_for_user(current_user):
     return [current_user.campus_id or 0]
 
 
-def _find_asset_request(current_user, request_id):
-    for campus_id in _campus_candidates_for_user(current_user):
+def _find_asset_request(current_user, request_id, campus_id_hint=None):
+    candidates = _campus_candidates_for_user(current_user)
+    if campus_id_hint not in (None, "", 0, "0"):
+        try:
+            hint = int(campus_id_hint)
+        except Exception:
+            raise AppError("campus_id 参数不正确", 400, 40086)
+        if current_user.role == "lab_admin" and hint != current_user.campus_id:
+            raise AppError("只能操作本校区数据", 403, 40351)
+        candidates = [hint]
+
+    matches = []
+    for campus_id in candidates:
         with campus_db_session(campus_id) as session:
             item = session.query(AssetPurchaseRequest).get(int(request_id))
             if item:
-                return item
-    raise AppError("资产申报不存在", 404, 40412)
+                matches.append(item)
+    if not matches:
+        raise AppError("资产申报不存在", 404, 40412)
+    if len(matches) > 1 and current_user.role == "system_admin" and campus_id_hint in (None, "", 0, "0"):
+        raise AppError("跨校区存在相同ID，请携带 campus_id", 400, 40087)
+    return matches[0]
 
 
-def _find_asset_item(current_user, asset_id):
-    for campus_id in _campus_candidates_for_user(current_user):
+def _find_asset_item(current_user, asset_id, campus_id_hint=None):
+    candidates = _campus_candidates_for_user(current_user)
+    if campus_id_hint not in (None, "", 0, "0"):
+        try:
+            hint = int(campus_id_hint)
+        except Exception:
+            raise AppError("campus_id 参数不正确", 400, 40088)
+        if current_user.role == "lab_admin" and hint != current_user.campus_id:
+            raise AppError("只能操作本校区数据", 403, 40352)
+        candidates = [hint]
+
+    matches = []
+    for campus_id in candidates:
         with campus_db_session(campus_id) as session:
             item = session.query(AssetItem).get(int(asset_id))
             if item:
-                return item
-    raise AppError("资产不存在", 404, 40414)
+                matches.append(item)
+    if not matches:
+        raise AppError("资产不存在", 404, 40414)
+    if len(matches) > 1 and current_user.role == "system_admin" and campus_id_hint in (None, "", 0, "0"):
+        raise AppError("跨校区存在相同ID，请携带 campus_id", 400, 40089)
+    return matches[0]
 
 
 @asset_bp.get("/asset-budgets/current")
@@ -124,7 +154,7 @@ def list_asset_requests_api():
 def review_asset_request_api(request_id):
     current_user = get_current_user()
     payload = request.get_json(silent=True) or {}
-    item = _find_asset_request(current_user, request_id)
+    item = _find_asset_request(current_user, request_id, campus_id_hint=payload.get("campus_id"))
     result = review_asset_request(
         current_user,
         item,
@@ -139,7 +169,7 @@ def review_asset_request_api(request_id):
 def stock_in_asset_api(request_id):
     current_user = get_current_user()
     payload = request.get_json(silent=True) or {}
-    item = _find_asset_request(current_user, request_id)
+    item = _find_asset_request(current_user, request_id, campus_id_hint=payload.get("campus_id"))
     result = stock_in_asset(current_user, item, payload)
     return success(result, "资产入库成功")
 
@@ -156,7 +186,7 @@ def list_assets_api():
 @role_required("lab_admin", "system_admin")
 def upload_asset_photo_api(asset_id):
     current_user = get_current_user()
-    item = _find_asset_item(current_user, asset_id)
+    item = _find_asset_item(current_user, asset_id, campus_id_hint=request.form.get("campus_id"))
     if current_user.role == "lab_admin" and current_user.campus_id != item.campus_id:
         raise AppError("只能上传本校区资产图片", 403, 40348)
 

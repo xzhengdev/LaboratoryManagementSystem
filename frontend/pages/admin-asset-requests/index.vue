@@ -65,7 +65,7 @@
 
         <view v-if="!filteredList.length" class="empty-text">暂无资产申报记录</view>
 
-        <view v-for="item in filteredList" :key="item.id" class="table-row req-grid">
+        <view v-for="item in filteredList" :key="rowKey(item)" class="table-row req-grid">
           <view>
             <view class="mono">{{ item.request_no }}</view>
             <view class="row-sub">{{ timeText(item.created_at) }}</view>
@@ -103,7 +103,7 @@
 
         <view v-if="!filteredAssetRows.length" class="empty-text">暂无已入库资产</view>
 
-        <view v-for="item in filteredAssetRows" :key="item.id" class="table-row asset-grid">
+        <view v-for="item in filteredAssetRows" :key="rowKey(item)" class="table-row asset-grid">
           <text class="mono">{{ item.asset_code }}</text>
           <text>{{ item.asset_name }}</text>
           <text>{{ item.category }}</text>
@@ -308,8 +308,12 @@ export default {
       const set = new Set()
       this.assetList.forEach((item) => {
         const requestId = item?.request_id
-        if (requestId !== undefined && requestId !== null && requestId !== '') {
-          set.add(String(requestId))
+        const campusId = item?.campus_id
+        if (
+          requestId !== undefined && requestId !== null && requestId !== '' &&
+          campusId !== undefined && campusId !== null && campusId !== ''
+        ) {
+          set.add(`${campusId}:${requestId}`)
         }
       })
       return set
@@ -386,10 +390,21 @@ export default {
       this.stockStatusIndex = idx
       this.stockInForm.status = this.stockStatusOptions[idx]?.value || 'in_use'
     },
+    rowKey(item) {
+      const campusId = item?.campus_id ?? 'x'
+      const id = item?.id ?? 'x'
+      return `${campusId}-${id}`
+    },
     isRequestStocked(item) {
       const requestId = item?.id
-      if (requestId === undefined || requestId === null || requestId === '') return false
-      return this.stockedRequestIdSet.has(String(requestId))
+      const campusId = item?.campus_id
+      if (
+        requestId === undefined || requestId === null || requestId === '' ||
+        campusId === undefined || campusId === null || campusId === ''
+      ) {
+        return false
+      }
+      return this.stockedRequestIdSet.has(`${campusId}:${requestId}`)
     },
     async reloadAll() {
       const [requestList, assetList] = await Promise.all([
@@ -433,6 +448,7 @@ export default {
     },
     async approve(item, status) {
       await api.reviewAssetRequest(item.id, {
+        campus_id: item.campus_id,
         approval_status: status,
         remark: status === 'approved' ? '审批通过' : '审批驳回'
       })
@@ -479,6 +495,7 @@ export default {
       this.stockInSubmitting = true
       try {
         const createdAsset = await api.stockInAsset(this.currentRequest.id, {
+          campus_id: this.currentRequest.campus_id,
           asset_code: String(this.stockInForm.asset_code || '').trim(),
           status: this.stockInForm.status || 'in_use',
           spec_model,
@@ -506,7 +523,7 @@ export default {
         if (createdAsset?.id && filePaths.length) {
           for (const filePath of filePaths) {
             try {
-              await api.uploadAssetPhoto(createdAsset.id, filePath)
+              await api.uploadAssetPhoto(createdAsset.id, filePath, { campus_id: createdAsset.campus_id })
               uploadSuccess += 1
             } catch (_error) {
               uploadFailed += 1
