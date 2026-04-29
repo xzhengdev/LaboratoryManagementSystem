@@ -159,39 +159,58 @@ export default {
       return this.profile.real_name || this.profile.username || '同学'
     },
     homeEntries() {
-      return [
+      const commonEntries = [
         {
-          title: '日报上报',
-          desc: '学生端拍照提交实验室日报，管理员可统一审核',
-          path: routes.dailyReport,
-          icon: '◧',
-          iconClass: 'blue',
-          featured: true,
-          badgeText: '重点'
-        },
-        {
-          title: '消息提醒',
-          desc: '集中查看日报审核结果与业务通知，避免遗漏反馈',
+          title: '\u6d88\u606f\u63d0\u9192',
+          desc: '\u96c6\u4e2d\u67e5\u770b\u5ba1\u6838\u7ed3\u679c\u4e0e\u4e1a\u52a1\u901a\u77e5\uff0c\u907f\u514d\u9057\u6f0f\u53cd\u9988',
           path: routes.notifications,
-          icon: '⌬',
+          icon: '\u232c',
           iconClass: 'cyan',
           featured: true,
           badgeText: this.unreadCount > 99 ? '99+' : (this.unreadCount > 0 ? `${this.unreadCount}` : '')
         },
         {
-          title: '我的预约',
-          desc: '全方位管理您的实验行程与历史记录',
+          title: '\u6211\u7684\u9884\u7ea6',
+          desc: '\u5168\u65b9\u4f4d\u7ba1\u7406\u60a8\u7684\u5b9e\u9a8c\u884c\u7a0b\u4e0e\u5386\u53f2\u8bb0\u5f55',
           path: routes.myReservations,
-          icon: '☑',
+          icon: '\u2611',
           iconClass: 'indigo'
         },
         {
-          title: '智能助手',
-          desc: '利用 AI 快速查询状态或解答系统疑问',
+          title: '\u667a\u80fd\u52a9\u624b',
+          desc: '\u5229\u7528 AI \u5feb\u901f\u67e5\u8be2\u72b6\u6001\u6216\u89e3\u7b54\u7cfb\u7edf\u7591\u95ee',
           path: routes.agent,
-          icon: '✦',
+          icon: '\u2726',
           iconClass: 'gold'
         }
+      ]
+
+      if (this.profile.role === 'teacher') {
+        return [
+          {
+            title: '\u8d44\u4ea7\u7533\u62a5',
+            desc: '\u6559\u5e08\u63d0\u4ea4\u8bbe\u5907\u8d2d\u7f6e\u7533\u8bf7\uff0c\u89e6\u53d1\u9884\u7b97\u9501\u5b9a\u5e76\u8fdb\u5165\u5ba1\u6279\u6d41\u7a0b',
+            path: routes.assetRequests,
+            icon: '\u25e7',
+            iconClass: 'blue',
+            featured: true,
+            badgeText: '\u91cd\u70b9'
+          },
+          ...commonEntries
+        ]
+      }
+
+      return [
+        {
+          title: '\u65e5\u62a5\u4e0a\u62a5',
+          desc: '\u5b66\u751f\u7aef\u62cd\u7167\u63d0\u4ea4\u5b9e\u9a8c\u5ba4\u65e5\u62a5\uff0c\u7ba1\u7406\u5458\u53ef\u7edf\u4e00\u5ba1\u6838',
+          path: routes.dailyReport,
+          icon: '\u25e7',
+          iconClass: 'blue',
+          featured: true,
+          badgeText: '\u91cd\u70b9'
+        },
+        ...commonEntries
       ]
     }
   },

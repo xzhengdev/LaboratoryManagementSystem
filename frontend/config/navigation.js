@@ -176,8 +176,6 @@ export function getUserTopNavByRole(role) {
       { key: 'home', title: '首页', path: routes.home },
       { key: 'campuses', title: '校区资源', path: routes.campuses },
       { key: 'labs', title: '实验室', path: routes.labs },
-      { key: 'reserve', title: '教学预约', path: routes.reserve },
-      { key: 'assetRequests', title: '资产申报', path: routes.assetRequests },
       { key: 'reservations', title: '我的预约', path: routes.myReservations },
       { key: 'agent', title: 'AI 助手', path: routes.agent }
     ]
