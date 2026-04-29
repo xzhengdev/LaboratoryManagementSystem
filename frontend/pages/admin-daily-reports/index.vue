@@ -1,10 +1,14 @@
-<template>
+﻿<template>
   <admin-layout title="日报审核" subtitle="审核学生提交的实验室日报" active="dailyReports">
     <view class="card toolbar">
       <picker :range="statusOptions" range-key="label" @change="changeStatus">
         <view class="input toolbar-picker">{{ currentStatusText }}</view>
       </picker>
-      <input v-model="keyword" class="input toolbar-search" placeholder="搜索实验室/提交人/内容" />
+      <input
+        v-model="keyword"
+        class="input toolbar-search admin-toolbar-lite__search"
+        placeholder="搜索实验室/提交人/内容"
+      />
       <view class="toolbar-btn" @click="reload">刷新</view>
     </view>
 
@@ -87,7 +91,12 @@
 
         <view v-if="canReview(activeItem)" class="field">
           <text class="label">审核意见</text>
-          <textarea v-model="reviewRemark" class="input textarea" placeholder="请输入审核意见（可选）" maxlength="255" />
+          <textarea
+            v-model="reviewRemark"
+            class="input textarea"
+            placeholder="请输入审核意见（可选）"
+            maxlength="255"
+          />
         </view>
 
         <view class="drawer-actions" v-if="canReview(activeItem)">
@@ -213,31 +222,96 @@ page {
 }
 
 .toolbar {
-  margin-bottom: 24rpx;
+  margin-bottom: 28rpx;
   display: flex;
   align-items: center;
-  gap: 14rpx;
+  gap: 16rpx;
+  flex-wrap: nowrap;
+  border-radius: 26rpx;
+  background: #f0f4fa;
+  border: 1rpx solid #dce7f4;
+  box-shadow: 0 12rpx 32rpx rgba(16, 42, 73, 0.08);
+  transition: all 0.25s ease;
+  padding: 24rpx !important;
+}
+
+.toolbar:hover {
+  transform: translateY(-3rpx);
+  box-shadow: 0 18rpx 44rpx rgba(16, 42, 73, 0.1);
 }
 
 .toolbar-picker {
   min-width: 220rpx;
+  height: 68rpx;
+  padding: 0 24rpx;
+  border-radius: 24rpx;
+  border: 1rpx solid #e4ebf5;
+  background: #f4f7fc;
+  display: flex;
+  align-items: center;
+  color: #486280;
+  transition: all 0.2s ease;
 }
 
 .toolbar-search {
   flex: 1;
 }
 
+.admin-toolbar-lite__search {
+  flex: 1;
+  height: 68rpx;
+  padding: 0 24rpx;
+  border-radius: 24rpx;
+  background-color: #ffffff;
+  border: 1rpx solid #e4ebf5;
+  font-size: 24rpx;
+  color: #132d4d;
+  transition: all 0.2s ease;
+}
+
+.admin-toolbar-lite__search:focus {
+  border-color: #2c7da0;
+  background-color: #ffffff;
+  outline: none;
+  box-shadow: 0 0 0 4rpx rgba(44, 125, 160, 0.1);
+}
+
 .toolbar-btn {
-  width: 160rpx;
-  height: 64rpx;
-  border-radius: 18rpx;
-  background: #2c7da0;
-  color: #fff;
+  width: 190rpx;
+  flex-shrink: 0;
+  height: 68rpx;
+  padding: 0 16rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%);
+  border: 1rpx solid #c8e3f6;
+  color: #2b4864;
   font-size: 24rpx;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 8rpx 20rpx rgba(77, 123, 160, 0.18);
+  transition: all 0.2s ease;
+}
+
+.toolbar-btn:hover {
+  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%);
+  transform: translateY(-1rpx);
+  box-shadow: 0 12rpx 26rpx rgba(77, 123, 160, 0.24);
+}
+
+.toolbar .input {
+  height: 68rpx;
+  line-height: 68rpx;
+  border-radius: 24rpx;
+  font-size: 24rpx;
+  margin-top: 0;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+}
+
+.toolbar-picker:hover {
+  background: #ffffff;
 }
 
 .table-card {
@@ -335,13 +409,13 @@ page {
 .pill {
   padding: 0 14rpx;
   height: 46rpx;
-  border-radius: 12rpx;
-  border: 1rpx solid #d9e4f2;
-  color: #476183;
+  border-radius: 18rpx;
+  border: 1rpx solid #c8e3f6;
+  color: #2b4864;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
+  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%);
 }
 
 .empty-text {
@@ -438,21 +512,21 @@ page {
 .btn {
   flex: 1;
   height: 70rpx;
-  border-radius: 16rpx;
+  border-radius: 24rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  border: 1rpx solid #c8e3f6;
+  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%);
+  color: #2b4864;
   font-size: 24rpx;
   font-weight: 700;
 }
 
-.btn-approve {
-  background: #0f9d58;
-}
-
 .btn-reject {
-  background: #d64545;
+  background: #fff1f1;
+  border-color: #f0c9c9;
+  color: #b33d3d;
 }
 
 @media screen and (max-width: 768px) {

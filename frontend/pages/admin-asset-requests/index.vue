@@ -11,7 +11,7 @@
       <picker :range="statusOptions" range-key="label" @change="changeStatus">
         <view class="input toolbar-picker">{{ currentStatusText }}</view>
       </picker>
-      <input v-model="keyword" class="input toolbar-search" placeholder="搜索申报单号/设备名称/申请人" />
+      <input v-model="keyword" class="input toolbar-search admin-toolbar-lite__search" placeholder="搜索申报单号/设备名称/申请人" />
       <view class="toolbar-btn" @click="reloadAll">刷新</view>
     </view>
 
@@ -45,7 +45,7 @@
         <view class="actions">
           <view v-if="item.status === 'pending'" class="pill" @click="approve(item, 'approved')">通过</view>
           <view v-if="item.status === 'pending'" class="pill pill-danger" @click="approve(item, 'rejected')">驳回</view>
-          <view v-if="item.status === 'approved'" class="pill pill-primary" @click="stockIn(item)">入库</view>
+          <view v-if="item.status === 'approved'" class="pill pill-primary" @click="openStockInModal(item)">入库登记</view>
         </view>
       </view>
     </view>
@@ -55,19 +55,23 @@
         <text>资产编码</text>
         <text>设备名称</text>
         <text>类别</text>
+        <text>规格型号</text>
+        <text>厂家</text>
+        <text>存放位置</text>
         <text>金额</text>
-        <text>状态</text>
         <text>图片</text>
       </view>
 
-      <view v-if="!assetList.length" class="empty-text">暂无已入库资产</view>
+      <view v-if="!assetRows.length" class="empty-text">暂无已入库资产</view>
 
-      <view v-for="item in assetList" :key="item.id" class="table-row asset-grid">
+      <view v-for="item in assetRows" :key="item.id" class="table-row asset-grid">
         <text class="mono">{{ item.asset_code }}</text>
         <text>{{ item.asset_name }}</text>
         <text>{{ item.category }}</text>
+        <text>{{ item.meta.spec_model || '--' }}</text>
+        <text>{{ item.meta.manufacturer || '--' }}</text>
+        <text>{{ item.meta.storage_location || '--' }}</text>
         <text>{{ moneyText(item.price) }}</text>
-        <text class="status approved">{{ item.status || 'in_use' }}</text>
         <view class="asset-photo-cell">
           <view class="asset-photo-top">
             <text class="photo-count">共 {{ photoList(item).length }} 张</text>
@@ -84,6 +88,57 @@
         </view>
       </view>
     </view>
+
+    <view v-if="showStockInModal" class="stock-modal-mask" @click="closeStockInModal">
+      <view class="stock-modal" @click.stop>
+        <view class="stock-modal__head">
+          <view class="stock-modal__title">资产入库登记</view>
+          <view class="stock-modal__close" @click="closeStockInModal">×</view>
+        </view>
+
+        <view class="stock-modal__hint">
+          申报单：{{ currentRequest.request_no || '--' }} · {{ currentRequest.asset_name || '--' }}
+        </view>
+
+        <view class="stock-form-grid two">
+          <view class="field">
+            <view class="label">资产编号（可选）</view>
+            <input v-model="stockInForm.asset_code" class="input" placeholder="不填则系统自动生成" />
+          </view>
+          <view class="field">
+            <view class="label">资产状态</view>
+            <picker :range="stockStatusOptions" range-key="label" :value="stockStatusIndex" @change="changeStockStatus">
+              <view class="input">{{ currentStockStatusLabel }}</view>
+            </picker>
+          </view>
+        </view>
+
+        <view class="stock-form-grid three">
+          <view class="field">
+            <view class="label">规格型号</view>
+            <input v-model="stockInForm.spec_model" class="input" placeholder="如：H3C S5120V3" />
+          </view>
+          <view class="field">
+            <view class="label">厂家</view>
+            <input v-model="stockInForm.manufacturer" class="input" placeholder="如：H3C" />
+          </view>
+          <view class="field">
+            <view class="label">存放位置</view>
+            <input v-model="stockInForm.storage_location" class="input" placeholder="如：理工楼508" />
+          </view>
+        </view>
+
+        <view class="field">
+          <view class="label">入库备注（可选）</view>
+          <textarea v-model="stockInForm.description" class="input textarea" maxlength="200" placeholder="可填写采购批次、保修信息等" />
+        </view>
+
+        <view class="stock-modal__foot">
+          <view class="stock-btn stock-btn--primary" :class="{ disabled: stockInSubmitting }" @click="submitStockIn">确认入库</view>
+          <view class="stock-btn" @click="closeStockInModal">取消</view>
+        </view>
+      </view>
+    </view>
   </admin-layout>
 </template>
 
@@ -94,6 +149,8 @@ import { getProfile } from '../../common/session'
 import { canManageEquipment, routes } from '../../config/navigation'
 import { openPage } from '../../common/router'
 import AdminLayout from '../../components/admin-layout.vue'
+
+const META_FLAG = '__META__='
 
 export default {
   components: { AdminLayout },
@@ -109,13 +166,33 @@ export default {
         { label: '已通过', value: 'approved' },
         { label: '已驳回', value: 'rejected' }
       ],
-      selectedStatus: ''
+      selectedStatus: '',
+      showStockInModal: false,
+      stockInSubmitting: false,
+      currentRequest: {},
+      stockStatusOptions: [
+        { label: '在用', value: 'in_use' },
+        { label: '备用', value: 'spare' },
+        { label: '维修中', value: 'repair' }
+      ],
+      stockStatusIndex: 0,
+      stockInForm: {
+        asset_code: '',
+        spec_model: '',
+        manufacturer: '',
+        storage_location: '',
+        status: 'in_use',
+        description: ''
+      }
     }
   },
   computed: {
     currentStatusText() {
       const current = this.statusOptions.find((item) => item.value === this.selectedStatus)
       return current ? current.label : '全部状态'
+    },
+    currentStockStatusLabel() {
+      return this.stockStatusOptions[this.stockStatusIndex]?.label || '在用'
     },
     filteredList() {
       const text = this.keyword.trim().toLowerCase()
@@ -134,6 +211,12 @@ export default {
         { label: '已通过', value: String(approvedCount) },
         { label: '申报总额', value: this.moneyText(totalAmount) }
       ]
+    },
+    assetRows() {
+      return this.assetList.map((item) => ({
+        ...item,
+        meta: this.parseMeta(item?.description)
+      }))
     }
   },
   async onShow() {
@@ -169,11 +252,27 @@ export default {
       if (status === 'rejected') return 'status rejected'
       return 'status pending'
     },
+    parseMeta(text) {
+      const content = String(text || '')
+      const idx = content.lastIndexOf(META_FLAG)
+      if (idx < 0) return {}
+      try {
+        const row = JSON.parse(content.slice(idx + META_FLAG.length).trim())
+        return row && typeof row === 'object' ? row : {}
+      } catch (_error) {
+        return {}
+      }
+    },
     photoList(item) {
       return Array.isArray(item?.photos) ? item.photos.filter((row) => row && row.url) : []
     },
     changeStatus(event) {
       this.selectedStatus = this.statusOptions[event.detail.value].value
+    },
+    changeStockStatus(event) {
+      const idx = Number(event.detail.value || 0)
+      this.stockStatusIndex = idx
+      this.stockInForm.status = this.stockStatusOptions[idx]?.value || 'in_use'
     },
     async reloadAll() {
       const [requestList, assetList] = await Promise.all([
@@ -191,10 +290,58 @@ export default {
       uni.showToast({ title: status === 'approved' ? '已通过' : '已驳回', icon: 'success' })
       await this.reloadAll()
     },
-    async stockIn(item) {
-      await api.stockInAsset(item.id, {})
-      uni.showToast({ title: '资产已入库', icon: 'success' })
-      await this.reloadAll()
+    openStockInModal(item) {
+      this.currentRequest = item || {}
+      this.stockStatusIndex = 0
+      this.stockInForm = {
+        asset_code: '',
+        spec_model: '',
+        manufacturer: '',
+        storage_location: '',
+        status: 'in_use',
+        description: ''
+      }
+      this.showStockInModal = true
+    },
+    closeStockInModal() {
+      if (this.stockInSubmitting) return
+      this.showStockInModal = false
+    },
+    async submitStockIn() {
+      if (this.stockInSubmitting) return
+      const spec_model = String(this.stockInForm.spec_model || '').trim()
+      const manufacturer = String(this.stockInForm.manufacturer || '').trim()
+      const storage_location = String(this.stockInForm.storage_location || '').trim()
+
+      if (!spec_model) {
+        uni.showToast({ title: '请填写规格型号', icon: 'none' })
+        return
+      }
+      if (!manufacturer) {
+        uni.showToast({ title: '请填写厂家', icon: 'none' })
+        return
+      }
+      if (!storage_location) {
+        uni.showToast({ title: '请填写存放位置', icon: 'none' })
+        return
+      }
+
+      this.stockInSubmitting = true
+      try {
+        await api.stockInAsset(this.currentRequest.id, {
+          asset_code: String(this.stockInForm.asset_code || '').trim(),
+          status: this.stockInForm.status || 'in_use',
+          spec_model,
+          manufacturer,
+          storage_location,
+          description: String(this.stockInForm.description || '').trim()
+        })
+        uni.showToast({ title: '入库成功，请上传设备照片', icon: 'success' })
+        this.showStockInModal = false
+        await this.reloadAll()
+      } finally {
+        this.stockInSubmitting = false
+      }
     },
     previewPhotos(item) {
       const urls = this.photoList(item).map((row) => row.url)
@@ -259,31 +406,109 @@ page {
 }
 
 .toolbar {
-  margin-bottom: 24rpx;
+  margin-bottom: 28rpx;
   display: flex;
   align-items: center;
-  gap: 14rpx;
+  gap: 16rpx;
+  flex-wrap: nowrap;
+  border-radius: 26rpx;
+  background: #f0f4fa;
+  border: 1rpx solid #dce7f4;
+  box-shadow: 0 12rpx 32rpx rgba(16, 42, 73, 0.08);
+  transition: all 0.25s ease;
+  padding: 24rpx !important;
+}
+
+.toolbar:hover {
+  transform: translateY(-3rpx);
+  box-shadow: 0 18rpx 44rpx rgba(16, 42, 73, 0.1);
 }
 
 .toolbar-picker {
   min-width: 220rpx;
+  height: 68rpx;
+  padding: 0 24rpx;
+  border-radius: 24rpx;
+  border: 1rpx solid #e4ebf5;
+  background: #f4f7fc;
+  display: flex;
+  align-items: center;
+  color: #486280;
+  transition: all 0.2s ease;
 }
 
 .toolbar-search {
   flex: 1;
 }
 
+.admin-toolbar-lite__search {
+  flex: 1;
+  height: 68rpx;
+  padding: 0 24rpx;
+  border-radius: 24rpx;
+  background-color: #ffffff;
+  border: 1rpx solid #e4ebf5;
+  font-size: 24rpx;
+  color: #132d4d;
+  transition: all 0.2s ease;
+}
+
+.admin-toolbar-lite__search:focus {
+  border-color: #2c7da0;
+  background-color: #ffffff;
+  outline: none;
+  box-shadow: 0 0 0 4rpx rgba(44, 125, 160, 0.1);
+}
+
 .toolbar-btn {
-  width: 160rpx;
-  height: 64rpx;
-  border-radius: 18rpx;
-  background: #2c7da0;
-  color: #fff;
+  width: 190rpx;
+  flex-shrink: 0;
+  height: 68rpx;
+  padding: 0 16rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%);
+  border: 1rpx solid #c8e3f6;
+  color: #2b4864;
   font-size: 24rpx;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 8rpx 20rpx rgba(77, 123, 160, 0.18);
+  transition: all 0.2s ease;
+}
+
+.toolbar-btn:hover {
+  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%);
+  transform: translateY(-1rpx);
+  box-shadow: 0 12rpx 26rpx rgba(77, 123, 160, 0.24);
+}
+
+.toolbar .input {
+  height: 68rpx;
+  line-height: 68rpx;
+  border-radius: 24rpx;
+  font-size: 24rpx;
+  margin-top: 0;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+}
+
+.toolbar-picker {
+  display: flex;
+  align-items: center;
+}
+
+.toolbar-picker:hover {
+  background: #ffffff;
+}
+
+.toolbar .toolbar-search {
+  height: 68rpx;
+  line-height: 68rpx;
+  padding: 0 24rpx;
+  border-radius: 24rpx;
+  font-size: 24rpx;
 }
 
 .table-card {
@@ -298,7 +523,7 @@ page {
 }
 
 .asset-grid {
-  grid-template-columns: 1.4fr 1fr 0.8fr 0.8fr 0.8fr 1.6fr;
+  grid-template-columns: 1.6fr 1.1fr 0.9fr 1.2fr 0.9fr 1.2fr 0.8fr 1.6fr;
 }
 
 .table-header {
@@ -350,24 +575,25 @@ page {
 .pill {
   padding: 0 14rpx;
   height: 46rpx;
-  border-radius: 12rpx;
-  border: 1rpx solid #d9e4f2;
-  color: #476183;
+  border-radius: 18rpx;
+  border: 1rpx solid #c8e3f6;
+  color: #2b4864;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
+  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%);
 }
 
 .pill-danger {
-  border-color: #efcaca;
-  color: #c94747;
+  border-color: #f0c9c9;
+  color: #b33d3d;
+  background: #fff1f1;
 }
 
 .pill-primary {
-  border-color: #a9d3e5;
-  color: #0d749e;
-  background: #eef8fd;
+  border-color: #b8d9f2;
+  color: #2b4864;
+  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%);
 }
 
 .status {
@@ -421,6 +647,134 @@ page {
   border: 1rpx solid #d9e4f2;
 }
 
+.stock-modal-mask {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: rgba(14, 30, 52, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24rpx;
+  z-index: 999;
+}
+
+.stock-modal {
+  width: 96vw;
+  max-width: 980px;
+  max-height: 88vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 18rpx;
+  padding: 20rpx;
+  box-shadow: 0 18rpx 48rpx rgba(16, 35, 69, 0.28);
+}
+
+.stock-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10rpx;
+}
+
+.stock-modal__title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1b365d;
+}
+
+.stock-modal__close {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 50%;
+  background: #f2f5fa;
+  color: #4d6480;
+  font-size: 34rpx;
+  line-height: 52rpx;
+  text-align: center;
+}
+
+.stock-modal__hint {
+  font-size: 22rpx;
+  color: #60738e;
+  margin-bottom: 12rpx;
+}
+
+.stock-modal .input {
+  margin-top: 6rpx;
+  border-radius: 10rpx;
+  font-size: 22rpx;
+}
+
+.stock-modal input.input,
+.stock-modal .stock-form-grid .input {
+  height: 56rpx;
+  line-height: 56rpx;
+  padding: 0 14rpx;
+}
+
+.stock-form-grid {
+  display: grid;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.stock-form-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stock-form-grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  font-size: 22rpx;
+  color: #425a78;
+  margin-bottom: 6rpx;
+}
+
+.textarea {
+  min-height: 96rpx;
+  padding: 10rpx 14rpx;
+  line-height: 1.5;
+}
+
+.stock-modal__foot {
+  margin-top: 6rpx;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8rpx;
+}
+
+.stock-btn {
+  min-width: 110rpx;
+  height: 52rpx;
+  border-radius: 20rpx;
+  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%);
+  border: 1rpx solid #c8e3f6;
+  color: #2b4864;
+  font-size: 22rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stock-btn--primary {
+  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%);
+  color: #2b4864;
+}
+
+.stock-btn.disabled {
+  opacity: 0.65;
+}
+
 @media screen and (max-width: 1200px) {
   .admin-kpi-grid {
     grid-template-columns: 1fr;
@@ -448,5 +802,11 @@ page {
     grid-template-columns: 1fr;
     gap: 8rpx;
   }
+
+  .stock-form-grid.two,
+  .stock-form-grid.three {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
+

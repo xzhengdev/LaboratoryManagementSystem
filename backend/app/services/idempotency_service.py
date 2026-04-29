@@ -1,4 +1,9 @@
-﻿import hashlib
+﻿"""
+幂等性处理模块
+防止相同请求重复提交导致的数据重复问题
+"""
+
+import hashlib
 import json
 from datetime import datetime, timedelta
 
@@ -11,15 +16,18 @@ from app.utils.exceptions import AppError
 
 
 def normalize_idempotency_key(idempotency_key):
+    """规范化幂等键，去除首尾空格并截取前128字符"""
     return str(idempotency_key or "").strip()[:128]
 
 
 def build_payload_signature(payload):
+    """计算请求体的SHA256签名，用于校验请求内容是否一致"""
     canonical = json.dumps(payload or {}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _decode_response(record):
+    """解码存储的响应数据"""
     if not record.response_payload:
         return None
     try:
@@ -29,6 +37,7 @@ def _decode_response(record):
 
 
 def _consume_existing(record, request_hash):
+    """处理已存在的幂等记录"""
     if record.request_hash != request_hash:
         raise AppError("同一幂等键对应的请求参数不一致，请更换 Idempotency-Key", 409, 40921)
     if record.status == "succeeded":
@@ -46,6 +55,12 @@ def _consume_existing(record, request_hash):
 
 
 def claim_idempotency_record(current_user, endpoint, idempotency_key, request_hash):
+    """
+    申请幂等记录
+    返回: (record, cached_response)
+    - 如果已有成功记录，返回 (None, 缓存的响应)
+    - 如果新建记录，返回 (新记录, None)
+    """
     if not current_user or not endpoint or not idempotency_key:
         return None, None
 
@@ -59,6 +74,7 @@ def claim_idempotency_record(current_user, endpoint, idempotency_key, request_ha
         idempotency_key=idempotency_key,
     ).first()
 
+    # 清理已过期的记录
     if existing and existing.expires_at <= now:
         db.session.delete(existing)
         db.session.commit()
@@ -67,6 +83,7 @@ def claim_idempotency_record(current_user, endpoint, idempotency_key, request_ha
     if existing:
         return _consume_existing(existing, request_hash)
 
+    # 创建新记录
     record = IdempotencyRecord(
         user_id=current_user.id,
         endpoint=endpoint,
@@ -82,6 +99,7 @@ def claim_idempotency_record(current_user, endpoint, idempotency_key, request_ha
         return record, None
     except IntegrityError:
         db.session.rollback()
+        # 并发创建时，重新查询
         existing = IdempotencyRecord.query.filter_by(
             user_id=current_user.id,
             endpoint=endpoint,
@@ -93,6 +111,7 @@ def claim_idempotency_record(current_user, endpoint, idempotency_key, request_ha
 
 
 def mark_idempotency_success(record_id, response_data):
+    """标记幂等记录为成功"""
     if not record_id:
         return
     try:
@@ -109,6 +128,7 @@ def mark_idempotency_success(record_id, response_data):
 
 
 def mark_idempotency_failed(record_id, error_message, http_status=400):
+    """标记幂等记录为失败"""
     if not record_id:
         return
     try:

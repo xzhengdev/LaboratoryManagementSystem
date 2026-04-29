@@ -1,16 +1,4 @@
-<view class="page">
-  <view class="card budget-card">
-    <view class="title">预算概览</view>
-    <view class="budget-row">
-      <text>总额度：{{budget ? budget.total_amount : '0.00'}}</text>
-      <text>可用：{{budget ? budget.available_amount : '0.00'}}</text>
-    </view>
-    <view class="budget-row">
-      <text>锁定：{{budget ? budget.locked_amount : '0.00'}}</text>
-      <text>已用：{{budget ? budget.used_amount : '0.00'}}</text>
-    </view>
-  </view>
-
+﻿<view class="page">
   <view class="card">
     <view class="title">新建资产申报</view>
     <picker mode="selector" range="{{labs}}" range-key="name" value="{{labIndex}}" bindchange="onLabChange">

@@ -1,10 +1,9 @@
-const { api } = require('../../utils/api')
+﻿const { api } = require('../../utils/api')
 const { getProfile, isLoggedIn } = require('../../utils/session')
 
 Page({
   data: {
     profile: {},
-    budget: null,
     requests: [],
     labs: [],
     labIndex: 0,
@@ -33,7 +32,6 @@ Page({
     }
     this.setData({ profile })
     this.loadLabs()
-    this.loadBudget()
     this.loadRequests()
   },
 
@@ -50,15 +48,6 @@ Page({
         selectedLabName: '不指定实验室'
       })
     } catch (_) {}
-  },
-
-  async loadBudget() {
-    try {
-      const budget = await api.assetCurrentBudget()
-      this.setData({ budget: budget || null })
-    } catch (_) {
-      this.setData({ budget: null })
-    }
   },
 
   async loadRequests() {
@@ -129,7 +118,6 @@ Page({
         selectedLabName: '不指定实验室',
         amountText: '0.00'
       })
-      this.loadBudget()
       this.loadRequests()
     } catch (_) {
     } finally {

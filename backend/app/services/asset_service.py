@@ -1,4 +1,5 @@
-﻿from decimal import Decimal, InvalidOperation
+﻿import json
+from decimal import Decimal, InvalidOperation
 from datetime import datetime
 
 from app.models import (
@@ -22,6 +23,7 @@ from app.services.idempotency_service import (
 from app.utils.exceptions import AppError
 
 IDEMPOTENCY_ENDPOINT_CREATE_ASSET_REQUEST = "create_asset_request"
+META_FLAG = "__META__="
 
 
 def _to_decimal(value, field_name):
@@ -400,7 +402,28 @@ def stock_in_asset(current_user, request_item, payload):
         if not asset_code:
             asset_code = f"AS{item.campus_id:03d}{datetime.utcnow().strftime('%Y%m%d%H%M%S')}{item.id:04d}"
 
-        description = str(payload.get("description") or "").strip()
+        spec_model = str(payload.get("spec_model") or "").strip()
+        manufacturer = str(payload.get("manufacturer") or "").strip()
+        storage_location = str(payload.get("storage_location") or "").strip()
+        if not spec_model:
+            raise AppError("入库需填写规格型号")
+        if not manufacturer:
+            raise AppError("入库需填写厂家")
+        if not storage_location:
+            raise AppError("入库需填写存放位置")
+
+        description_plain = str(payload.get("description") or "").strip()
+        if META_FLAG in description_plain:
+            description_plain = description_plain.split(META_FLAG)[0].strip()
+        meta_text = json.dumps(
+            {
+                "spec_model": spec_model,
+                "manufacturer": manufacturer,
+                "storage_location": storage_location,
+            },
+            ensure_ascii=False,
+        )
+        description = f"{description_plain}\n{META_FLAG}{meta_text}" if description_plain else f"{META_FLAG}{meta_text}"
         try:
             asset_row = AssetItem(
                 asset_code=asset_code,
@@ -465,3 +488,4 @@ def list_assets(current_user, filters):
 
     with campus_db_session(current_user.campus_id) as session:
         return _list_assets_in_one_campus(session, filters)
+

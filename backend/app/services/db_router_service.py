@@ -1,4 +1,9 @@
-﻿import json
+﻿"""
+多校区数据库路由模块
+支持不同校区使用独立数据库，中心汇总库单独配置
+"""
+
+import json
 from contextlib import contextmanager
 from threading import RLock
 
@@ -8,16 +13,18 @@ from sqlalchemy.orm import sessionmaker
 
 from app.extensions import db
 
-_ENGINE_CACHE = {}
-_SESSION_FACTORY_CACHE = {}
-_CACHE_LOCK = RLock()
+_ENGINE_CACHE = {}           # 数据库引擎缓存
+_SESSION_FACTORY_CACHE = {}  # Session工厂缓存
+_CACHE_LOCK = RLock()        # 线程锁
 
 
 def _routing_enabled():
+    """检查是否开启分库路由功能"""
     return bool(current_app.config.get("ENABLE_CAMPUS_DB_ROUTING", False))
 
 
 def _parse_campus_db_uri_map():
+    """解析配置中的校区数据库映射，返回 {校区ID: 数据库URI}"""
     raw = current_app.config.get("CAMPUS_DB_URI_MAP")
     if isinstance(raw, dict):
         source = raw
@@ -44,10 +51,12 @@ def _parse_campus_db_uri_map():
 
 
 def get_routed_campus_ids():
+    """获取所有配置了独立数据库的校区ID列表"""
     return sorted(_parse_campus_db_uri_map().keys())
 
 
 def _get_engine(uri):
+    """根据URI获取数据库引擎（带缓存）"""
     if uri in _ENGINE_CACHE:
         return _ENGINE_CACHE[uri]
     with _CACHE_LOCK:
@@ -59,6 +68,7 @@ def _get_engine(uri):
 
 
 def _get_session_factory(uri):
+    """根据URI获取Session工厂（带缓存）"""
     if uri in _SESSION_FACTORY_CACHE:
         return _SESSION_FACTORY_CACHE[uri]
     with _CACHE_LOCK:
@@ -70,6 +80,7 @@ def _get_session_factory(uri):
 
 
 def _resolve_campus_uri(campus_id):
+    """根据校区ID解析对应的数据库URI"""
     if not _routing_enabled():
         return ""
     try:
@@ -82,9 +93,9 @@ def _resolve_campus_uri(campus_id):
 @contextmanager
 def campus_db_session(campus_id):
     """
-    根据 campus_id 选择数据库会话：
-    - 开启分库且配置了该校区 URI：返回独立 SQLAlchemy Session
-    - 否则：回退到 Flask 默认 db.session
+    获取指定校区的数据库会话
+    - 如果开启分库且配置了独立库：返回该校区专属 Session
+    - 否则：回退到默认 db.session
     """
     uri = _resolve_campus_uri(campus_id)
     if not uri:
@@ -101,9 +112,9 @@ def campus_db_session(campus_id):
 @contextmanager
 def summary_db_session():
     """
-    中心汇总库会话：
-    - 配置 SUMMARY_DB_URL 时写入汇总库
-    - 否则回退默认库
+    获取中心汇总库的数据库会话
+    - 如果配置了 SUMMARY_DB_URL：返回汇总库 Session
+    - 否则：回退到默认 db.session
     """
     uri = str(current_app.config.get("SUMMARY_DB_URL") or "").strip()
     if not uri:

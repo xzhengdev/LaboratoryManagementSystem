@@ -48,12 +48,21 @@ def _find_asset_item(current_user, asset_id):
 
 
 @asset_bp.get("/asset-budgets/current")
-@jwt_required()
+@role_required("system_admin")
 def get_current_budget_api():
     current_user = get_current_user()
     campus_id = request.args.get("campus_id")
     result = get_budget_for_user(current_user, campus_id=campus_id)
-    return success(result)
+    return success(
+        {
+            "id": result.get("id"),
+            "campus_id": result.get("campus_id"),
+            "campus_name": result.get("campus_name"),
+            "total_amount": result.get("total_amount"),
+            "remark": result.get("remark"),
+            "updated_at": result.get("updated_at"),
+        }
+    )
 
 
 @asset_bp.put("/asset-budgets/<int:campus_id>")

@@ -1,4 +1,4 @@
-.page {
+﻿.page {
   padding: 20rpx;
   background: #f5f7fb;
   min-height: 100vh;
@@ -12,23 +12,11 @@
   box-shadow: 0 8rpx 20rpx rgba(21, 42, 89, 0.06);
 }
 
-.budget-card {
-  background: linear-gradient(135deg, #eaf4ff 0%, #f2f8ff 100%);
-}
-
 .title {
   font-size: 30rpx;
   color: #16325c;
   font-weight: 600;
   margin-bottom: 14rpx;
-}
-
-.budget-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 24rpx;
-  color: #2f4f77;
-  margin-top: 8rpx;
 }
 
 .input {

@@ -75,7 +75,7 @@
           <text>资产申报</text>
           <text>资产数</text>
           <text>日报</text>
-          <text>预算可用</text>
+          <text>资产总额</text>
         </view>
         <view class="summary-row" v-for="item in summaryRows" :key="item.id">
           <text>{{ item.campus_name }}</text>
@@ -83,7 +83,7 @@
           <text>{{ item.asset_request_count || 0 }}</text>
           <text>{{ item.asset_item_count || 0 }}</text>
           <text>{{ item.daily_report_count || 0 }}</text>
-          <text>¥{{ moneyText(item.asset_budget_available_amount) }}</text>
+          <text>¥{{ moneyText(item.asset_budget_total_amount) }}</text>
         </view>
       </view>
     </view>
@@ -138,7 +138,8 @@ export default {
         { label: '校区数', value: this.overview.campus_count || 0 },
         { label: '实验室数', value: this.overview.lab_count || 0 },
         { label: '预约总数', value: this.overview.reservation_count || 0 },
-        { label: '待审批', value: this.overview.pending_count || 0 }
+        { label: '待审批', value: this.overview.pending_count || 0 },
+        { label: '总资产额度', value: `¥${this.moneyText(this.summaryLatest?.totals?.asset_budget_total_amount)}` }
       ]
     },
     campusChart() {

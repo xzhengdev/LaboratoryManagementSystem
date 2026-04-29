@@ -1,3 +1,8 @@
+"""
+站内通知服务模块
+支持多校区分库查询，提供通知的增删改查功能
+"""
+
 from datetime import datetime
 
 from flask import current_app
@@ -18,6 +23,7 @@ def create_notification(
     biz_type="general",
     biz_id=None,
 ):
+    """创建一条通知记录（需外部传入 session 自行提交）"""
     item = NotificationMessage(
         campus_id=int(campus_id),
         user_id=int(user_id),
@@ -33,6 +39,7 @@ def create_notification(
 
 
 def _campus_candidates_for_user(current_user):
+    """获取当前用户需要查询的校区列表"""
     if current_user.role == "system_admin":
         campus_ids = get_routed_campus_ids()
         return campus_ids or [0]
@@ -40,11 +47,13 @@ def _campus_candidates_for_user(current_user):
 
 
 def _is_table_missing_error(error):
+    """判断是否为表不存在的错误"""
     text = str(error or "").lower()
     return "doesn't exist" in text or "no such table" in text
 
 
 def list_notifications(current_user, filters):
+    """获取当前用户的通知列表，支持按未读过滤"""
     unread_only = str(filters.get("unread_only") or "").strip() in {"1", "true", "yes"}
 
     rows = []
@@ -67,6 +76,7 @@ def list_notifications(current_user, filters):
 
 
 def get_unread_count(current_user):
+    """获取当前用户的未读通知总数"""
     total = 0
     for campus_id in _campus_candidates_for_user(current_user):
         try:
@@ -85,6 +95,7 @@ def get_unread_count(current_user):
 
 
 def mark_notification_read(current_user, notification_id):
+    """将单条通知标记为已读"""
     for campus_id in _campus_candidates_for_user(current_user):
         with campus_db_session(campus_id) as session:
             item = session.query(NotificationMessage).get(int(notification_id))
@@ -101,6 +112,7 @@ def mark_notification_read(current_user, notification_id):
 
 
 def mark_all_notifications_read(current_user):
+    """将当前用户的所有通知标记为已读"""
     changed = 0
     for campus_id in _campus_candidates_for_user(current_user):
         with campus_db_session(campus_id) as session:

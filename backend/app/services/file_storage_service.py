@@ -1,3 +1,8 @@
+"""
+文件上传服务模块
+支持本地存储和 SeaweedFS 分布式存储，提供图片上传、权限校验等功能
+"""
+
 import hashlib
 import json
 import os
@@ -13,16 +18,19 @@ from app.models import FileObject, Laboratory
 from app.services.event_bus_service import publish_async_event
 from app.utils.exceptions import AppError
 
+# 支持的图片格式
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 IMAGE_MIME_PREFIX = "image/"
 
 
 def _safe_filename(filename):
+    """生成安全的文件名，防止路径遍历攻击"""
     name = secure_filename(filename or "")
     return name or f"upload-{uuid4().hex}.bin"
 
 
 def _validate_image(file_storage):
+    """校验文件是否为合法图片格式"""
     filename = _safe_filename(file_storage.filename)
     ext = os.path.splitext(filename)[1].lower()
     mime_type = file_storage.mimetype or "application/octet-stream"
@@ -32,6 +40,7 @@ def _validate_image(file_storage):
 
 
 def _save_local(file_bytes, filename, campus_id, biz_type):
+    """保存文件到本地存储"""
     upload_root = current_app.config["UPLOAD_ROOT"]
     day = datetime.utcnow().strftime("%Y%m%d")
     relative_dir = os.path.join("distributed-files", str(campus_id), biz_type, day)
@@ -52,6 +61,7 @@ def _save_local(file_bytes, filename, campus_id, biz_type):
 
 
 def _parse_campus_seaweedfs_map():
+    """解析校区 SeaweedFS 配置映射"""
     raw = str(current_app.config.get("SEAWEEDFS_CAMPUS_CONFIG_MAP", "")).strip()
     if not raw:
         return {}
@@ -95,6 +105,7 @@ def _parse_campus_seaweedfs_map():
 
 
 def _resolve_seaweedfs_target(campus_id):
+    """根据校区获取 SeaweedFS 上传目标配置"""
     campus_map = _parse_campus_seaweedfs_map()
     try:
         cid = int(campus_id)
@@ -116,6 +127,7 @@ def _resolve_seaweedfs_target(campus_id):
 
 
 def _save_seaweedfs(file_bytes, filename, campus_id):
+    """保存文件到 SeaweedFS 分布式存储"""
     upload_url, public_base_url, write_base_url, timeout_seconds = _resolve_seaweedfs_target(campus_id)
     if not upload_url:
         return None
@@ -215,6 +227,7 @@ def _save_seaweedfs(file_bytes, filename, campus_id):
 
 
 def user_can_access_file(current_user, file_object):
+    """检查用户是否有权限访问指定文件"""
     if current_user.role == "system_admin":
         return True
     if current_user.role == "lab_admin":
@@ -223,6 +236,11 @@ def user_can_access_file(current_user, file_object):
 
 
 def save_image_file(current_user, file_storage, campus_id, biz_type, biz_id=None, session=None):
+    """
+    保存图片文件核心方法
+    参数: 当前用户、文件流、校区ID、业务类型、业务ID、数据库会话
+    返回: 保存后的 FileObject 实例
+    """
     filename, mime_type = _validate_image(file_storage)
     file_bytes = file_storage.read()
     if not file_bytes:
@@ -233,6 +251,7 @@ def save_image_file(current_user, file_storage, campus_id, biz_type, biz_id=None
         raise AppError("上传文件过大，请控制在 10MB 以内", 413, 41300)
 
     digest = hashlib.sha256(file_bytes).hexdigest()
+    # 优先用 SeaweedFS，失败则回退到本地存储
     storage_result = _save_seaweedfs(file_bytes, filename, campus_id) or _save_local(
         file_bytes, filename, campus_id, biz_type
     )
@@ -254,6 +273,7 @@ def save_image_file(current_user, file_storage, campus_id, biz_type, biz_id=None
     )
     active_session.add(item)
     active_session.flush()
+    # 发布异步事件通知
     publish_async_event(
         "file.uploaded",
         {
@@ -269,6 +289,7 @@ def save_image_file(current_user, file_storage, campus_id, biz_type, biz_id=None
 
 
 def infer_lab_campus(lab_id, session=None):
+    """根据实验室ID推断所属校区"""
     active_session = session or db.session
     lab = active_session.query(Laboratory).get(int(lab_id))
     if not lab:
