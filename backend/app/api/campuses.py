@@ -3,41 +3,20 @@
 功能：校区的增删改查、封面上传等
 权限：普通用户可查看，系统管理员才能增删改
 """
-import os              # 操作系统接口，用于路径处理
-import imghdr          # 图片类型检测模块（通过文件头识别真实格式）
-from uuid import uuid4  # 生成唯一标识符，用于文件名
-from flask import Blueprint, current_app, request  # Flask核心：蓝图、应用上下文、请求对象
+from flask import Blueprint, request  # Flask核心：蓝图、请求对象
 from flask_jwt_extended import jwt_required        # JWT装饰器：要求请求携带有效令牌
-from werkzeug.utils import secure_filename          # 文件名安全化工具（移除危险字符）
 
 from app.extensions import db                       # 数据库实例
 from app.models import Campus                       # 校区数据模型
-from app.utils.decorators import role_required      # 角色权限装饰器（要求指定角色）
+from app.services.db_router_service import campus_db_session
+from app.services.file_storage_service import save_image_file
+from app.utils.decorators import get_current_user, role_required      # 角色权限装饰器（要求指定角色）
 from app.utils.exceptions import AppError           # 自定义异常类
 from app.utils.response import success              # 统一成功响应格式
 from app.utils.validators import require_fields     # 验证必填字段
 
 # ==================== 蓝图创建 ====================
 campus_bp = Blueprint('campuses', __name__)
-# ==================== 图片上传配置 ====================
-# 允许上传的图片扩展名集合
-ALLOWED_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp'}
-# MIME类型 → 文件扩展名映射
-MIMETYPE_EXT_MAP = {
-    'image/jpeg': 'jpg',
-    'image/jpg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp'
-}
-
-# imghdr 检测结果 → 文件扩展名映射（统一 jpeg 为 jpg）
-IMGHDR_EXT_MAP = {
-    'jpeg': 'jpg',
-    'png': 'png',
-    'webp': 'webp'
-}
-
-
 # ==================== 辅助函数 ====================
 def _normalize_cover_url(value):
     """
@@ -182,58 +161,29 @@ def upload_campus_cover():
             "path": "相对路径"
         }
     """
-    # ----- 1. 验证文件是否存在 -----
-    if 'file' not in request.files:
+    current_user = get_current_user()
+    file_storage = request.files.get('file')
+    if not file_storage:
         raise AppError('请上传校区封面文件', 400, 40022)
 
-    file = request.files['file']
-    if not file or not file.filename:
-        raise AppError('校区封面文件无效', 400, 40023)
+    campus_id_text = str(request.form.get('campus_id') or '').strip()
+    campus_id = int(campus_id_text) if campus_id_text else current_user.campus_id
+    if not campus_id:
+        raise AppError('请传入 campus_id，或先为当前账号绑定校区', 400, 40025)
 
-    # ----- 2. 安全化文件名并提取扩展名 -----
-    filename = secure_filename(file.filename)  # 移除危险字符
-    # 从文件名中提取扩展名（如 'cover.jpg' → 'jpg'）
-    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
-    # 获取MIME类型（如 'image/png'）
-    mime = (file.mimetype or '').lower()
+    with campus_db_session(campus_id) as session:
+        file_obj = save_image_file(
+            current_user=current_user,
+            file_storage=file_storage,
+            campus_id=campus_id,
+            biz_type='campus_cover',
+            biz_id=campus_id,
+            session=session,
+        )
+        response_data = file_obj.to_dict()
+        session.commit()
 
-    # ----- 3. 尝试多种方式确定文件类型 -----
-    # 方式1：如果扩展名为空，通过MIME类型映射
-    if not ext:
-        ext = MIMETYPE_EXT_MAP.get(mime, '')
-    
-    # 方式2：如果仍然没有，从MIME字符串中提取（如 'image/jpeg' → 'jpg'）
-    if not ext and mime.startswith('image/'):
-        sub = mime.split('/', 1)[1].split(';', 1)[0].strip()
-        if sub == 'jpeg':
-            sub = 'jpg'
-        ext = sub
-    
-    # 方式3：最后使用 imghdr 读取文件头识别真实类型（防止伪造扩展名）
-    if not ext:
-        detected = imghdr.what(file.stream)  # 读取文件头识别
-        if detected:
-            ext = IMGHDR_EXT_MAP.get(detected, detected)
-        file.stream.seek(0)  # 重置文件指针，以便后续保存
-
-    # ----- 4. 验证扩展名是否允许 -----
-    if ext not in ALLOWED_IMAGE_EXTENSIONS:
-        raise AppError('仅支持 jpg/jpeg/png/webp 格式', 400, 40024)
-
-    # ----- 5. 生成唯一文件名并保存 -----
-    save_name = f'{uuid4().hex}.{ext}'  # 如 'a1b2c3d4e5f6.jpg'
-    relative_path = os.path.join('campuses', save_name)  # 相对路径：campuses/xxx.jpg
-    upload_root = current_app.config['UPLOAD_ROOT']      # 上传根目录配置
-    absolute_path = os.path.join(upload_root, relative_path)  # 绝对路径
-    file.save(absolute_path)  # 保存文件到服务器
-
-    # ----- 6. 生成访问URL并返回 -----
-    # 将系统路径分隔符转换为URL使用的正斜杠
-    public_path = f"/uploads/{relative_path.replace(os.sep, '/')}"
-    # 生成完整URL（如 http://localhost:5000/uploads/campuses/xxx.jpg）
-    public_url = f"{request.host_url.rstrip('/')}{public_path}"
-    
-    return success({'url': public_url, 'path': public_path}, '校区封面上传成功')
+    return success(response_data, '校区封面上传成功')
 
 
 # ==================== 删除校区 ====================

@@ -336,7 +336,9 @@ export default {
           try {
             uni.showLoading({ title: '上传中', mask: true })
             loadingShown = true
-            const uploaded = await api.uploadCampusCover(list[0])
+            const uploaded = await api.uploadCampusCover(list[0], {
+              campus_id: this.editingId || ''
+            })
             this.form.cover_url = uploaded.url
             uni.showToast({ title: '封面已上传', icon: 'success' })
           } finally {

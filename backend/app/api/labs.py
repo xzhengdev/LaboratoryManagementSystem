@@ -22,6 +22,8 @@ from app.services.cache_service import (
     invalidate_statistics_cache,
 )
 from app.services.reservation_service import get_lab_schedule  # 排期服务
+from app.services.db_router_service import campus_db_session
+from app.services.file_storage_service import save_image_file
 from app.utils.decorators import get_current_user, role_required  # 用户获取、角色权限
 from app.utils.exceptions import AppError           # 自定义异常类
 from app.utils.response import success              # 统一成功响应格式
@@ -324,52 +326,34 @@ def upload_lab_photo():
     
     注意：上传成功后需调用更新接口将 URL 加入 photos 数组
     """
-    # ----- 1. 验证文件是否存在 -----
-    if "file" not in request.files:
+    current_user = get_current_user()
+    file_storage = request.files.get("file")
+    if not file_storage:
         raise AppError("请上传实验室封面文件", 400, 40071)
 
-    file = request.files["file"]
-    if not file or not file.filename:
-        raise AppError("实验室封面文件无效", 400, 40072)
+    campus_id_text = str(request.form.get("campus_id") or "").strip()
+    campus_id = int(campus_id_text) if campus_id_text else current_user.campus_id
+    if not campus_id:
+        raise AppError("请传入 campus_id，或先为当前账号绑定校区", 400, 40074)
+    if current_user.role == "lab_admin" and current_user.campus_id != campus_id:
+        raise AppError("只能上传本校区实验室图片", 403, 40312)
 
-    # ----- 2. 安全化文件名并提取扩展名 -----
-    filename = secure_filename(file.filename)
-    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-    mime = (file.mimetype or "").lower()
+    lab_id_text = str(request.form.get("lab_id") or "").strip()
+    lab_id = int(lab_id_text) if lab_id_text else None
 
-    # ----- 3. 尝试多种方式确定文件类型 -----
-    # 方式1：MIME类型映射
-    if not ext:
-        ext = MIMETYPE_EXT_MAP.get(mime, "")
-    
-    # 方式2：从MIME字符串提取
-    if not ext and mime.startswith("image/"):
-        sub = mime.split("/", 1)[1].split(";", 1)[0].strip()
-        if sub == "jpeg":
-            sub = "jpg"
-        ext = sub
-    
-    # 方式3：文件头识别（最可靠）
-    if not ext:
-        detected = imghdr.what(file.stream)
-        if detected:
-            ext = IMGHDR_EXT_MAP.get(detected, detected)
-        file.stream.seek(0)
-    
-    # ----- 4. 验证扩展名 -----
-    if ext not in ALLOWED_IMAGE_EXTENSIONS:
-        raise AppError("仅支持 jpg/jpeg/png/webp 格式", 400, 40073)
+    with campus_db_session(campus_id) as session:
+        file_obj = save_image_file(
+            current_user=current_user,
+            file_storage=file_storage,
+            campus_id=campus_id,
+            biz_type="lab_photo",
+            biz_id=lab_id,
+            session=session,
+        )
+        response_data = file_obj.to_dict()
+        session.commit()
 
-    # ----- 5. 保存文件 -----
-    save_name = f"{uuid4().hex}.{ext}"
-    relative_path = os.path.join("labs", save_name)  # labs/xxx.jpg
-    absolute_path = os.path.join(current_app.config["UPLOAD_ROOT"], relative_path)
-    file.save(absolute_path)
-
-    # ----- 6. 返回访问URL -----
-    public_path = f"/uploads/{relative_path.replace(os.sep, '/')}"
-    public_url = f"{request.host_url.rstrip('/')}{public_path}"
-    return success({"url": public_url, "path": public_path}, "实验室封面上传成功")
+    return success(response_data, "实验室封面上传成功")
 
 
 # ==================== 删除实验室 ====================

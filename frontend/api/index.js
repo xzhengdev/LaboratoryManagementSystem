@@ -88,12 +88,13 @@ export const api = {
         },
       });
     }),
-  uploadLabPhoto: (filePath) =>
+  uploadLabPhoto: (filePath, data = {}) =>
     new Promise((resolve, reject) => {
       uni.uploadFile({
         url: `${BASE_URL}/labs/upload-photo`,
         filePath,
         name: "file",
+        formData: data,
         header: {
           Authorization: getToken() ? `Bearer ${getToken()}` : "",
         },
@@ -134,12 +135,13 @@ export const api = {
         },
       });
     }),
-  uploadCampusCover: (filePath) =>
+  uploadCampusCover: (filePath, data = {}) =>
     new Promise((resolve, reject) => {
       uni.uploadFile({
         url: `${BASE_URL}/campuses/upload-cover`,
         filePath,
         name: "file",
+        formData: data,
         header: {
           Authorization: getToken() ? `Bearer ${getToken()}` : "",
         },

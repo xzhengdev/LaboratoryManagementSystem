@@ -496,7 +496,9 @@ export default {
           try {
             uni.showLoading({ title: '上传中', mask: true })
             loadingShown = true
-            const uploaded = await api.uploadLabPhoto(list[0])
+            const uploaded = await api.uploadLabPhoto(list[0], {
+              campus_id: this.form.campus_id
+            })
             this.form.photos = [uploaded.url]
             uni.showToast({ title: '封面已上传', icon: 'success' })
           } finally {
