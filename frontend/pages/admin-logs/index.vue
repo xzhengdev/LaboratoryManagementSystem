@@ -78,13 +78,23 @@ const ALL_VALUE = 'all'
 const LIMIT_OPTIONS = [50, 100, 200]
 const MODULE_TEXT_MAP = {
   reservation: '\u9884\u7ea6',
+  reservations: '\u9884\u7ea6',
   approval: '\u5ba1\u6279',
+  approvals: '\u5ba1\u6279',
   auth: '\u8ba4\u8bc1',
   user: '\u7528\u6237',
   users: '\u7528\u6237',
+  asset: '\u8d44\u4ea7',
+  assets: '\u8d44\u4ea7',
+  daily_report: '\u65e5\u62a5',
+  daily_reports: '\u65e5\u62a5',
+  lab_report: '\u65e5\u62a5',
+  lab_reports: '\u65e5\u62a5',
   lab: '\u5b9e\u9a8c\u5ba4',
   labs: '\u5b9e\u9a8c\u5ba4',
   equipment: '\u8bbe\u5907',
+  notification: '\u6d88\u606f',
+  notifications: '\u6d88\u606f',
   campus: '\u6821\u533a',
   campuses: '\u6821\u533a',
   statistics: '\u7edf\u8ba1',
@@ -92,9 +102,16 @@ const MODULE_TEXT_MAP = {
 }
 const ACTION_TEXT_MAP = {
   create: '\u521b\u5efa',
+  request_create: '\u53d1\u8d77\u7533\u8bf7',
+  request_review: '\u7533\u8bf7\u5ba1\u6838',
+  stock_in: '\u8d44\u4ea7\u5165\u5e93',
+  budget_update: '\u9884\u7b97\u66f4\u65b0',
+  read: '\u5df2\u8bfb',
+  read_all: '\u5168\u90e8\u5df2\u8bfb',
   cancel: '\u53d6\u6d88',
   update: '\u66f4\u65b0',
   delete: '\u5220\u9664',
+  sync: '\u540c\u6b65',
   approved: '\u901a\u8fc7',
   rejected: '\u9a73\u56de',
   login: '\u767b\u5f55',
@@ -336,7 +353,8 @@ export default {
       const raw = String(value || '').trim()
       if (!raw) return '--'
       const key = raw.toLowerCase()
-      return map[key] || raw
+      const normalized = key.replace(/-/g, '_')
+      return map[normalized] || map[key] || raw
     },
     roleLabel(role) {
       return getRoleText(role)

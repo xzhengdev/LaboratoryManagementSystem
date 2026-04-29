@@ -2,7 +2,9 @@ from datetime import datetime, time
 
 from sqlalchemy import or_
 
+from app.extensions import db
 from app.models import OperationLog, User
+from app.services.db_router_service import campus_db_session, get_routed_campus_ids
 from app.utils.exceptions import AppError
 
 
@@ -28,9 +30,8 @@ def _parse_limit(value):
     return min(limit, 300)
 
 
-def list_operation_logs(current_user, filters):
-    query = OperationLog.query.join(User, OperationLog.user_id == User.id)
-
+def _build_base_query(session, current_user, filters):
+    query = session.query(OperationLog).join(User, OperationLog.user_id == User.id)
     if current_user.role == "lab_admin":
         query = query.filter(User.campus_id == current_user.campus_id)
 
@@ -76,15 +77,10 @@ def list_operation_logs(current_user, filters):
         query = query.filter(
             OperationLog.created_at <= datetime.combine(end_date, time.max)
         )
+    return query
 
-    limit = _parse_limit(filters.get("limit"))
 
-    items = (
-        query.order_by(OperationLog.created_at.desc(), OperationLog.id.desc())
-        .limit(limit)
-        .all()
-    )
-
+def _format_items(items):
     return [
         item.to_dict(
             {
@@ -99,3 +95,43 @@ def list_operation_logs(current_user, filters):
         )
         for item in items
     ]
+
+
+def list_operation_logs(current_user, filters):
+    limit = _parse_limit(filters.get("limit"))
+
+    # 开启分库后日志落在各校区库，这里需要按校区聚合查询
+    campus_ids = get_routed_campus_ids()
+    if campus_ids:
+        target_ids = campus_ids
+        if current_user.role == "lab_admin":
+            target_ids = [current_user.campus_id]
+
+        merged = []
+        for campus_id in target_ids:
+            with campus_db_session(campus_id) as session:
+                query = _build_base_query(session, current_user, filters)
+                items = (
+                    query.order_by(OperationLog.created_at.desc(), OperationLog.id.desc())
+                    .limit(limit)
+                    .all()
+                )
+                merged.extend(_format_items(items))
+
+        merged.sort(
+            key=lambda row: (
+                str(row.get("created_at") or ""),
+                int(row.get("id") or 0),
+            ),
+            reverse=True,
+        )
+        return merged[:limit]
+
+    # 单库回退
+    query = _build_base_query(db.session, current_user, filters)
+    items = (
+        query.order_by(OperationLog.created_at.desc(), OperationLog.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return _format_items(items)

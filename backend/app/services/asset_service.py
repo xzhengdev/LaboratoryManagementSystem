@@ -7,10 +7,11 @@ from app.models import (
     AssetBudgetLedger,
     AssetItem,
     AssetPurchaseRequest,
+    GlobalAssetBudget,
     Laboratory,
     OperationLog,
 )
-from app.services.db_router_service import campus_db_session, get_routed_campus_ids
+from app.services.db_router_service import campus_db_session, get_routed_campus_ids, summary_db_session
 from app.services.distributed_lock_service import asset_budget_lock
 from app.services.event_bus_service import publish_async_event
 from app.services.idempotency_service import (
@@ -24,6 +25,7 @@ from app.utils.exceptions import AppError
 
 IDEMPOTENCY_ENDPOINT_CREATE_ASSET_REQUEST = "create_asset_request"
 META_FLAG = "__META__="
+GLOBAL_BUDGET_SCOPE_ID = 0
 
 
 def _to_decimal(value, field_name):
@@ -46,6 +48,26 @@ def _ensure_budget(session, campus_id):
         return budget
     budget = AssetBudget(
         campus_id=campus_id,
+        total_amount=Decimal("0.00"),
+        locked_amount=Decimal("0.00"),
+        used_amount=Decimal("0.00"),
+    )
+    session.add(budget)
+    session.flush()
+    return budget
+
+
+def _ensure_global_budget_table(session):
+    bind = session.get_bind()
+    GlobalAssetBudget.__table__.create(bind=bind, checkfirst=True)
+
+
+def _ensure_global_budget(session):
+    _ensure_global_budget_table(session)
+    budget = session.query(GlobalAssetBudget).first()
+    if budget:
+        return budget
+    budget = GlobalAssetBudget(
         total_amount=Decimal("0.00"),
         locked_amount=Decimal("0.00"),
         used_amount=Decimal("0.00"),
@@ -98,18 +120,18 @@ def _lab_belongs_to_campus(campus_id, lab_id):
 
 
 def _campus_id_for_user(current_user, campus_id=None):
-    if current_user.role == "system_admin" and campus_id:
-        return int(campus_id)
+    if current_user.role == "system_admin":
+        return GLOBAL_BUDGET_SCOPE_ID
     if not current_user.campus_id:
         raise AppError("当前用户未绑定校区", 400, 40081)
-    return current_user.campus_id
+    return GLOBAL_BUDGET_SCOPE_ID
 
 
 def get_budget_for_user(current_user, campus_id=None):
-    target_campus_id = _campus_id_for_user(current_user, campus_id=campus_id)
-    with campus_db_session(target_campus_id) as session:
+    _campus_id_for_user(current_user, campus_id=campus_id)
+    with summary_db_session() as session:
         try:
-            budget = _ensure_budget(session, target_campus_id)
+            budget = _ensure_global_budget(session)
             session.commit()
             return budget.to_dict()
         except Exception:
@@ -121,19 +143,17 @@ def update_budget_total(current_user, campus_id, total_amount, remark=""):
     if current_user.role != "system_admin":
         raise AppError("只有系统管理员可以修改预算额度", 403, 40341)
 
-    target_campus_id = int(campus_id)
     amount = _to_decimal(total_amount, "total_amount")
 
-    with campus_db_session(target_campus_id) as session:
+    with summary_db_session() as session:
         try:
-            with asset_budget_lock(target_campus_id):
-                budget = _ensure_budget(session, target_campus_id)
+            with asset_budget_lock(GLOBAL_BUDGET_SCOPE_ID):
+                budget = _ensure_global_budget(session)
                 used_and_locked = (budget.locked_amount or 0) + (budget.used_amount or 0)
                 if amount < used_and_locked:
                     raise AppError("总额度不能小于当前锁定额度与已使用额度之和", 400, 40082)
                 budget.total_amount = amount
                 budget.remark = str(remark or "")[:255]
-                _write_log(session, current_user.id, "budget_update", f"更新校区{target_campus_id}预算总额为{amount}")
                 session.commit()
                 return budget.to_dict()
         except Exception:
@@ -199,75 +219,68 @@ def create_asset_request(current_user, payload, idempotency_key=""):
         if cached is not None:
             return cached
 
-    with campus_db_session(campus_id) as session:
-        try:
-            with asset_budget_lock(campus_id):
-                budget = _ensure_budget(session, campus_id)
+    try:
+        with asset_budget_lock(GLOBAL_BUDGET_SCOPE_ID):
+            with summary_db_session() as budget_session:
+                budget = _ensure_global_budget(budget_session)
                 total = budget.total_amount or Decimal("0.00")
                 locked = budget.locked_amount or Decimal("0.00")
                 used = budget.used_amount or Decimal("0.00")
                 available = total - locked - used
                 if available < amount:
                     raise AppError("可用预算不足，无法锁定额度", 409, 40941)
-
-                before_locked = locked
-                before_used = used
                 budget.locked_amount = locked + amount
+                budget_session.commit()
 
-                request_item = AssetPurchaseRequest(
-                    request_no=_build_request_no(campus_id),
-                    campus_id=campus_id,
-                    lab_id=int(lab_id) if lab_id is not None else None,
-                    requester_id=current_user.id,
-                    asset_name=asset_name,
-                    category=category,
-                    quantity=quantity,
-                    unit_price=unit_price,
-                    amount=amount,
-                    reason=reason,
-                    status="pending",
-                )
-                session.add(request_item)
-                session.flush()
-                _write_budget_ledger(
-                    session=session,
-                    campus_id=campus_id,
-                    request_id=request_item.id,
-                    op_type="lock",
-                    amount=amount,
-                    before_locked=before_locked,
-                    after_locked=budget.locked_amount,
-                    before_used=before_used,
-                    after_used=before_used,
-                    operator_id=current_user.id,
-                    remark="资产申报锁定预算",
-                )
-                _write_log(session, current_user.id, "request_create", f"创建资产申报#{request_item.request_no}")
-                session.commit()
-                result = request_item.to_dict()
-                publish_async_event(
-                    "asset.request.created",
-                    {
-                        "request_id": request_item.id,
-                        "request_no": request_item.request_no,
-                        "campus_id": request_item.campus_id,
-                        "amount": float(request_item.amount),
-                        "status": request_item.status,
-                    },
-                )
-            if idempotency_record:
-                mark_idempotency_success(idempotency_record.id, result)
-            return result
-        except AppError as error:
-            session.rollback()
-            if idempotency_record:
-                mark_idempotency_failed(idempotency_record.id, error.message, error.code)
-            raise
-        except Exception:
-            session.rollback()
-            if idempotency_record:
-                mark_idempotency_failed(idempotency_record.id, "服务器内部错误", 500)
-            raise
+            try:
+                with campus_db_session(campus_id) as session:
+                    request_item = AssetPurchaseRequest(
+                        request_no=_build_request_no(campus_id),
+                        campus_id=campus_id,
+                        lab_id=int(lab_id) if lab_id is not None else None,
+                        requester_id=current_user.id,
+                        asset_name=asset_name,
+                        category=category,
+                        quantity=quantity,
+                        unit_price=unit_price,
+                        amount=amount,
+                        reason=reason,
+                        status="pending",
+                    )
+                    session.add(request_item)
+                    session.flush()
+                    _write_log(session, current_user.id, "request_create", f"创建资产申报#{request_item.request_no}")
+                    session.commit()
+                    result = request_item.to_dict()
+                    publish_async_event(
+                        "asset.request.created",
+                        {
+                            "request_id": request_item.id,
+                            "request_no": request_item.request_no,
+                            "campus_id": request_item.campus_id,
+                            "amount": float(request_item.amount),
+                            "status": request_item.status,
+                        },
+                    )
+            except Exception:
+                with summary_db_session() as rollback_session:
+                    rb = _ensure_global_budget(rollback_session)
+                    current_locked = rb.locked_amount or Decimal("0.00")
+                    rb.locked_amount = max(Decimal("0.00"), current_locked - amount)
+                    rollback_session.commit()
+                raise
+
+        if idempotency_record:
+            mark_idempotency_success(idempotency_record.id, result)
+        return result
+    except AppError as error:
+        if idempotency_record:
+            mark_idempotency_failed(idempotency_record.id, error.message, error.code)
+        raise
+    except Exception:
+        if idempotency_record:
+            mark_idempotency_failed(idempotency_record.id, "服务器内部错误", 500)
+        raise
 
 
 def _list_requests_in_one_campus(session, filters, current_user):
@@ -319,51 +332,39 @@ def review_asset_request(current_user, request_item, approval_status, remark="")
         raise AppError("只有管理员可以审批资产申报", 403, 40344)
 
     campus_id = request_item.campus_id
+    status = str(approval_status or "").strip().lower()
+    if status not in {"approved", "rejected"}:
+        raise AppError("approval_status 只能是 approved 或 rejected")
+
     with campus_db_session(campus_id) as session:
         item = _load_request_for_review(session, request_item.id)
         if current_user.role == "lab_admin" and current_user.campus_id != item.campus_id:
             raise AppError("只能审批本校区资产申报", 403, 40345)
         if item.status != "pending":
             raise AppError("当前申报不在待审批状态")
+        amount = item.amount
 
-        status = str(approval_status or "").strip().lower()
-        if status not in {"approved", "rejected"}:
-            raise AppError("approval_status 只能是 approved 或 rejected")
+    with asset_budget_lock(GLOBAL_BUDGET_SCOPE_ID):
+        with summary_db_session() as budget_session:
+            budget = _ensure_global_budget(budget_session)
+            before_locked = budget.locked_amount or Decimal("0.00")
+            before_used = budget.used_amount or Decimal("0.00")
+            if before_locked < amount:
+                raise AppError("预算锁定额度异常，请联系管理员", 409, 40942)
+            budget.locked_amount = before_locked - amount
+            if status == "approved":
+                budget.used_amount = before_used + amount
+            budget_session.commit()
 
         try:
-            with asset_budget_lock(item.campus_id):
-                budget = _ensure_budget(session, item.campus_id)
-                amount = item.amount
-                before_locked = budget.locked_amount or Decimal("0.00")
-                before_used = budget.used_amount or Decimal("0.00")
-
-                if before_locked < amount:
-                    raise AppError("预算锁定额度异常，请联系管理员", 409, 40942)
-
-                budget.locked_amount = before_locked - amount
-                if status == "approved":
-                    budget.used_amount = before_used + amount
-                else:
-                    budget.used_amount = before_used
-
+            with campus_db_session(campus_id) as session:
+                item = _load_request_for_review(session, request_item.id)
+                if item.status != "pending":
+                    raise AppError("当前申报不在待审批状态")
                 item.status = status
                 item.reviewer_id = current_user.id
                 item.review_remark = str(remark or "")[:255]
                 item.reviewed_at = datetime.utcnow()
-
-                _write_budget_ledger(
-                    session=session,
-                    campus_id=item.campus_id,
-                    request_id=item.id,
-                    op_type="consume" if status == "approved" else "release",
-                    amount=amount,
-                    before_locked=before_locked,
-                    after_locked=budget.locked_amount,
-                    before_used=before_used,
-                    after_used=budget.used_amount,
-                    operator_id=current_user.id,
-                    remark="审批通过转已用" if status == "approved" else "审批拒绝释放锁定",
-                )
                 _write_log(session, current_user.id, "request_review", f"审批资产申报#{item.request_no}: {status}")
                 session.commit()
                 result = item.to_dict()
@@ -378,7 +379,14 @@ def review_asset_request(current_user, request_item, approval_status, remark="")
                 )
                 return result
         except Exception:
-            session.rollback()
+            with summary_db_session() as rollback_session:
+                budget = _ensure_global_budget(rollback_session)
+                cur_locked = budget.locked_amount or Decimal("0.00")
+                cur_used = budget.used_amount or Decimal("0.00")
+                budget.locked_amount = cur_locked + amount
+                if status == "approved":
+                    budget.used_amount = max(Decimal("0.00"), cur_used - amount)
+                rollback_session.commit()
             raise
 
 

@@ -51,8 +51,7 @@ def _find_asset_item(current_user, asset_id):
 @role_required("system_admin")
 def get_current_budget_api():
     current_user = get_current_user()
-    campus_id = request.args.get("campus_id")
-    result = get_budget_for_user(current_user, campus_id=campus_id)
+    result = get_budget_for_user(current_user, campus_id=0)
     return success(
         {
             "id": result.get("id"),
@@ -77,6 +76,28 @@ def update_budget_total_api(campus_id):
         payload.get("remark", ""),
     )
     return success(result, "预算总额更新成功")
+
+
+@asset_bp.get("/asset-budgets/global")
+@role_required("system_admin")
+def get_global_budget_api():
+    current_user = get_current_user()
+    result = get_budget_for_user(current_user, campus_id=0)
+    return success(result)
+
+
+@asset_bp.put("/asset-budgets/global")
+@role_required("system_admin")
+def update_global_budget_api():
+    current_user = get_current_user()
+    payload = request.get_json(silent=True) or {}
+    result = update_budget_total(
+        current_user,
+        0,
+        payload.get("total_amount"),
+        payload.get("remark", ""),
+    )
+    return success(result, "全校共享预算更新成功")
 
 
 @asset_bp.post("/asset-requests")

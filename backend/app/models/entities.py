@@ -292,6 +292,32 @@ class AssetBudget(BaseModel):
         )
 
 
+class GlobalAssetBudget(BaseModel):
+    __tablename__ = "global_asset_budgets"
+
+    total_amount = db.Column(db.Numeric(14, 2), default=0, nullable=False)
+    locked_amount = db.Column(db.Numeric(14, 2), default=0, nullable=False)
+    used_amount = db.Column(db.Numeric(14, 2), default=0, nullable=False)
+    remark = db.Column(db.String(255))
+
+    def to_dict(self, extra=None):
+        total = float(self.total_amount or 0)
+        locked = float(self.locked_amount or 0)
+        used = float(self.used_amount or 0)
+        return super().to_dict(
+            {
+                "scope": "global",
+                "campus_id": 0,
+                "campus_name": "全校共享额度",
+                "total_amount": total,
+                "locked_amount": locked,
+                "used_amount": used,
+                "available_amount": total - locked - used,
+                **(extra or {}),
+            }
+        )
+
+
 class AssetPurchaseRequest(BaseModel):
     # 资产购置申报表：提交申报时锁定预算，审批后转为已用或释放锁定。
     __tablename__ = "asset_purchase_requests"

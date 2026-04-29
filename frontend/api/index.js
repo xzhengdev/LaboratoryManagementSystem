@@ -261,6 +261,10 @@ export const api = {
     request({ url: "/asset-budgets/current", data: params }),
   updateAssetBudget: (campusId, data) =>
     request({ url: `/asset-budgets/${campusId}`, method: "PUT", data }),
+  globalAssetBudget: () =>
+    request({ url: "/asset-budgets/global" }),
+  updateGlobalAssetBudget: (data) =>
+    request({ url: "/asset-budgets/global", method: "PUT", data }),
   createAssetRequest: (data, options = {}) =>
     request({
       url: "/asset-requests",

@@ -6,87 +6,135 @@
         <view class="admin-kpi-card__value">{{ item.value }}</view>
       </view>
     </view>
+    <view v-if="isSystemAdmin" class="card global-budget-card">
+      <view class="global-budget-card__head">
+        <view class="global-budget-card__title">全校共享预算</view>
+        <view class="global-budget-card__sub">三个校区共用一个总额度（锁定/已用统一计算）</view>
+      </view>
+      <view class="global-budget-grid">
+        <view class="global-budget-item">
+          <view class="global-budget-item__label">总额度</view>
+          <view class="global-budget-item__value">{{ moneyText(globalBudget.total_amount) }}</view>
+        </view>
+        <view class="global-budget-item">
+          <view class="global-budget-item__label">已锁定</view>
+          <view class="global-budget-item__value">{{ moneyText(globalBudget.locked_amount) }}</view>
+        </view>
+        <view class="global-budget-item">
+          <view class="global-budget-item__label">已使用</view>
+          <view class="global-budget-item__value">{{ moneyText(globalBudget.used_amount) }}</view>
+        </view>
+        <view class="global-budget-item">
+          <view class="global-budget-item__label">可用额度</view>
+          <view class="global-budget-item__value">{{ moneyText(globalBudget.available_amount) }}</view>
+        </view>
+      </view>
+      <view class="global-budget-form">
+        <input v-model="globalBudgetInput" class="input global-budget-input" type="digit" placeholder="输入新的全校总额度，如 600000.00" />
+        <view class="toolbar-btn" :class="{ disabled: globalBudgetSaving }" @click="saveGlobalBudget">
+          {{ globalBudgetSaving ? '保存中...' : '更新总额度' }}
+        </view>
+      </view>
+    </view>
 
     <view class="card toolbar">
-      <picker :range="statusOptions" range-key="label" @change="changeStatus">
+      <view class="asset-mode-switch">
+        <view class="asset-mode-pill" :class="{ active: panelMode === 'requests' }" @click="panelMode = 'requests'">
+          申报记录
+        </view>
+        <view class="asset-mode-pill" :class="{ active: panelMode === 'assets' }" @click="panelMode = 'assets'">
+          已入库资产
+        </view>
+      </view>
+      <picker v-if="panelMode === 'requests'" :range="statusOptions" range-key="label" @change="changeStatus">
         <view class="input toolbar-picker">{{ currentStatusText }}</view>
       </picker>
-      <input v-model="keyword" class="input toolbar-search admin-toolbar-lite__search" placeholder="搜索申报单号/设备名称/申请人" />
+      <input v-model="keyword" class="input toolbar-search admin-toolbar-lite__search" :placeholder="searchPlaceholder" />
       <view class="toolbar-btn" @click="reloadAll">刷新</view>
     </view>
 
-    <view class="card table-card">
-      <view class="table-header req-grid">
-        <text>申报单号</text>
-        <text>设备信息</text>
-        <text>申请人</text>
-        <text>金额</text>
-        <text>状态</text>
-        <text>操作</text>
-      </view>
+    <view v-if="panelMode === 'requests'" class="card table-card">
+        <view class="table-header req-grid">
+          <text>申报单号</text>
+          <text>设备信息</text>
+          <text>申请人</text>
+          <text>金额</text>
+          <text>状态</text>
+          <text>操作</text>
+        </view>
 
-      <view v-if="!filteredList.length" class="empty-text">暂无资产申报记录</view>
+        <view v-if="!filteredList.length" class="empty-text">暂无资产申报记录</view>
 
-      <view v-for="item in filteredList" :key="item.id" class="table-row req-grid">
-        <view>
-          <view class="mono">{{ item.request_no }}</view>
-          <view class="row-sub">{{ timeText(item.created_at) }}</view>
+        <view v-for="item in filteredList" :key="item.id" class="table-row req-grid">
+          <view>
+            <view class="mono">{{ item.request_no }}</view>
+            <view class="row-sub">{{ timeText(item.created_at) }}</view>
+          </view>
+          <view>
+            <view class="strong">{{ item.asset_name }}</view>
+            <view class="row-sub">{{ item.category }} · 数量{{ item.quantity }}</view>
+          </view>
+          <view>
+            <view>{{ item.requester_name || '--' }}</view>
+            <view class="row-sub">{{ item.campus_name || '--' }}</view>
+          </view>
+          <text>{{ moneyText(item.amount) }}</text>
+          <text :class="statusClass(item.status)">{{ statusText(item.status) }}</text>
+          <view class="actions">
+            <view v-if="item.status === 'pending'" class="pill" @click="approve(item, 'approved')">通过</view>
+            <view v-if="item.status === 'pending'" class="pill pill-danger" @click="approve(item, 'rejected')">驳回</view>
+            <view v-if="item.status === 'approved' && !isRequestStocked(item)" class="pill pill-primary" @click="openStockInModal(item)">入库登记</view>
+            <view v-if="item.status === 'approved' && isRequestStocked(item)" class="pill">已入库</view>
+          </view>
         </view>
-        <view>
-          <view class="strong">{{ item.asset_name }}</view>
-          <view class="row-sub">{{ item.category }} · 数量{{ item.quantity }}</view>
-        </view>
-        <view>
-          <view>{{ item.requester_name || '--' }}</view>
-          <view class="row-sub">{{ item.campus_name || '--' }}</view>
-        </view>
-        <text>{{ moneyText(item.amount) }}</text>
-        <text :class="statusClass(item.status)">{{ statusText(item.status) }}</text>
-        <view class="actions">
-          <view v-if="item.status === 'pending'" class="pill" @click="approve(item, 'approved')">通过</view>
-          <view v-if="item.status === 'pending'" class="pill pill-danger" @click="approve(item, 'rejected')">驳回</view>
-          <view v-if="item.status === 'approved'" class="pill pill-primary" @click="openStockInModal(item)">入库登记</view>
-        </view>
-      </view>
     </view>
 
-    <view class="card table-card">
-      <view class="table-header asset-grid">
-        <text>资产编码</text>
-        <text>设备名称</text>
-        <text>类别</text>
-        <text>规格型号</text>
-        <text>厂家</text>
-        <text>存放位置</text>
-        <text>金额</text>
-        <text>图片</text>
-      </view>
+    <view v-if="panelMode === 'assets'" class="card table-card">
+        <view class="table-header asset-grid">
+          <text>资产编码</text>
+          <text>设备名称</text>
+          <text>类别</text>
+          <text>规格型号</text>
+          <text>厂家</text>
+          <text>存放位置</text>
+          <text>金额</text>
+          <text>图片</text>
+        </view>
 
-      <view v-if="!assetRows.length" class="empty-text">暂无已入库资产</view>
+        <view v-if="!filteredAssetRows.length" class="empty-text">暂无已入库资产</view>
 
-      <view v-for="item in assetRows" :key="item.id" class="table-row asset-grid">
-        <text class="mono">{{ item.asset_code }}</text>
-        <text>{{ item.asset_name }}</text>
-        <text>{{ item.category }}</text>
-        <text>{{ item.meta.spec_model || '--' }}</text>
-        <text>{{ item.meta.manufacturer || '--' }}</text>
-        <text>{{ item.meta.storage_location || '--' }}</text>
-        <text>{{ moneyText(item.price) }}</text>
-        <view class="asset-photo-cell">
-          <view class="asset-photo-top">
-            <text class="photo-count">共 {{ photoList(item).length }} 张</text>
-            <view class="pill pill-primary" @click="uploadAssetPhoto(item)">上传图片</view>
-          </view>
-          <view v-if="photoList(item).length" class="asset-photo-preview">
-            <image
-              class="asset-photo-thumb"
-              :src="photoList(item)[0].url"
-              mode="aspectFill"
-              @click="previewPhotos(item)"
-            />
+        <view v-for="item in filteredAssetRows" :key="item.id" class="table-row asset-grid">
+          <text class="mono">{{ item.asset_code }}</text>
+          <text>{{ item.asset_name }}</text>
+          <text>{{ item.category }}</text>
+          <text>{{ item.meta.spec_model || '--' }}</text>
+          <text>{{ item.meta.manufacturer || '--' }}</text>
+          <text>{{ item.meta.storage_location || '--' }}</text>
+          <text>{{ moneyText(item.price) }}</text>
+          <view class="asset-photo-cell">
+            <view class="asset-photo-top">
+              <text class="photo-count">共 {{ photoList(item).length }} 张</text>
+              <text
+                v-if="photoList(item).length > 3"
+                class="asset-photo-more"
+                @click="previewPhotos(item, 0)"
+              >
+                查看全部
+              </text>
+            </view>
+            <view v-if="photoList(item).length" class="asset-photo-preview">
+              <image
+                v-for="(photo, idx) in photoList(item).slice(0, 3)"
+                :key="photo.id || idx"
+                class="asset-photo-thumb"
+                :src="photo.url"
+                mode="aspectFill"
+                @click="previewPhotos(item, idx)"
+              />
+            </view>
+            <view v-else class="row-sub">暂无图片</view>
           </view>
         </view>
-      </view>
     </view>
 
     <view v-if="showStockInModal" class="stock-modal-mask" @click="closeStockInModal">
@@ -133,8 +181,28 @@
           <textarea v-model="stockInForm.description" class="input textarea" maxlength="200" placeholder="可填写采购批次、保修信息等" />
         </view>
 
+        <view class="field">
+          <view class="label">设备照片</view>
+          <view class="stock-photo-wrap">
+            <view class="pill pill-primary" @click="uploadStockInPhoto">上传设备照片</view>
+            <text class="stock-photo-count">待上传 {{ stockInPendingPhotoPaths.length }} 张</text>
+          </view>
+          <view v-if="stockInPendingPhotoPaths.length" class="stock-photo-list">
+            <image
+              v-for="(path, idx) in stockInPendingPhotoPaths"
+              :key="path || idx"
+              class="stock-photo-thumb"
+              :src="path"
+              mode="aspectFill"
+              @click="previewStockInPhotos(idx)"
+            />
+          </view>
+        </view>
+
         <view class="stock-modal__foot">
-          <view class="stock-btn stock-btn--primary" :class="{ disabled: stockInSubmitting }" @click="submitStockIn">确认入库</view>
+          <view class="stock-btn stock-btn--primary" :class="{ disabled: stockInSubmitting }" @click="submitStockIn">
+            确认入库
+          </view>
           <view class="stock-btn" @click="closeStockInModal">取消</view>
         </view>
       </view>
@@ -159,7 +227,16 @@ export default {
       profile: {},
       requestList: [],
       assetList: [],
+      globalBudget: {
+        total_amount: 0,
+        locked_amount: 0,
+        used_amount: 0,
+        available_amount: 0
+      },
+      globalBudgetInput: '',
+      globalBudgetSaving: false,
       keyword: '',
+      panelMode: 'requests',
       statusOptions: [
         { label: '全部状态', value: '' },
         { label: '待审批', value: 'pending' },
@@ -170,6 +247,7 @@ export default {
       showStockInModal: false,
       stockInSubmitting: false,
       currentRequest: {},
+      stockInPendingPhotoPaths: [],
       stockStatusOptions: [
         { label: '在用', value: 'in_use' },
         { label: '备用', value: 'spare' },
@@ -187,6 +265,9 @@ export default {
     }
   },
   computed: {
+    isSystemAdmin() {
+      return String(this.profile?.role || '') === 'system_admin'
+    },
     currentStatusText() {
       const current = this.statusOptions.find((item) => item.value === this.selectedStatus)
       return current ? current.label : '全部状态'
@@ -194,9 +275,14 @@ export default {
     currentStockStatusLabel() {
       return this.stockStatusOptions[this.stockStatusIndex]?.label || '在用'
     },
+    searchPlaceholder() {
+      if (this.panelMode === 'assets') return '搜索资产编码/名称/类别/规格/厂家/存放位置'
+      return '搜索申报单号/设备名称/申请人'
+    },
     filteredList() {
       const text = this.keyword.trim().toLowerCase()
       return this.requestList.filter((item) => {
+        if (this.isRequestStocked(item)) return false
         const hitKeyword = !text || `${item.request_no}${item.asset_name}${item.requester_name || ''}`.toLowerCase().includes(text)
         const hitStatus = !this.selectedStatus || item.status === this.selectedStatus
         return hitKeyword && hitStatus
@@ -204,7 +290,7 @@ export default {
     },
     summaryCards() {
       const pendingCount = this.requestList.filter((item) => item.status === 'pending').length
-      const approvedCount = this.requestList.filter((item) => item.status === 'approved').length
+      const approvedCount = this.requestList.filter((item) => item.status === 'approved' && !this.isRequestStocked(item)).length
       const totalAmount = this.requestList.reduce((sum, item) => sum + Number(item.amount || 0), 0)
       return [
         { label: '待审批', value: String(pendingCount) },
@@ -217,6 +303,32 @@ export default {
         ...item,
         meta: this.parseMeta(item?.description)
       }))
+    },
+    stockedRequestIdSet() {
+      const set = new Set()
+      this.assetList.forEach((item) => {
+        const requestId = item?.request_id
+        if (requestId !== undefined && requestId !== null && requestId !== '') {
+          set.add(String(requestId))
+        }
+      })
+      return set
+    },
+    filteredAssetRows() {
+      const text = this.keyword.trim().toLowerCase()
+      if (!text) return this.assetRows
+      return this.assetRows.filter((item) => {
+        const meta = item?.meta || {}
+        const fields = [
+          item?.asset_code,
+          item?.asset_name,
+          item?.category,
+          meta?.spec_model,
+          meta?.manufacturer,
+          meta?.storage_location
+        ]
+        return fields.some((field) => String(field || '').toLowerCase().includes(text))
+      })
     }
   },
   async onShow() {
@@ -274,6 +386,11 @@ export default {
       this.stockStatusIndex = idx
       this.stockInForm.status = this.stockStatusOptions[idx]?.value || 'in_use'
     },
+    isRequestStocked(item) {
+      const requestId = item?.id
+      if (requestId === undefined || requestId === null || requestId === '') return false
+      return this.stockedRequestIdSet.has(String(requestId))
+    },
     async reloadAll() {
       const [requestList, assetList] = await Promise.all([
         api.assetRequests(),
@@ -281,6 +398,38 @@ export default {
       ])
       this.requestList = Array.isArray(requestList) ? requestList : []
       this.assetList = Array.isArray(assetList) ? assetList : []
+      if (this.isSystemAdmin) {
+        await this.loadGlobalBudget()
+      }
+    },
+    async loadGlobalBudget() {
+      const row = await api.globalAssetBudget()
+      this.globalBudget = {
+        total_amount: Number(row?.total_amount || 0),
+        locked_amount: Number(row?.locked_amount || 0),
+        used_amount: Number(row?.used_amount || 0),
+        available_amount: Number(row?.available_amount || 0)
+      }
+      this.globalBudgetInput = String(this.globalBudget.total_amount || '')
+    },
+    async saveGlobalBudget() {
+      if (this.globalBudgetSaving) return
+      const amount = Number(this.globalBudgetInput || 0)
+      if (!Number.isFinite(amount) || amount <= 0) {
+        uni.showToast({ title: '请输入有效总额度', icon: 'none' })
+        return
+      }
+      this.globalBudgetSaving = true
+      try {
+        await api.updateGlobalAssetBudget({
+          total_amount: amount,
+          remark: '全校共享预算总额'
+        })
+        uni.showToast({ title: '总额度已更新', icon: 'success' })
+        await this.loadGlobalBudget()
+      } finally {
+        this.globalBudgetSaving = false
+      }
     },
     async approve(item, status) {
       await api.reviewAssetRequest(item.id, {
@@ -292,6 +441,7 @@ export default {
     },
     openStockInModal(item) {
       this.currentRequest = item || {}
+      this.stockInPendingPhotoPaths = []
       this.stockStatusIndex = 0
       this.stockInForm = {
         asset_code: '',
@@ -328,7 +478,7 @@ export default {
 
       this.stockInSubmitting = true
       try {
-        await api.stockInAsset(this.currentRequest.id, {
+        const createdAsset = await api.stockInAsset(this.currentRequest.id, {
           asset_code: String(this.stockInForm.asset_code || '').trim(),
           status: this.stockInForm.status || 'in_use',
           spec_model,
@@ -336,29 +486,67 @@ export default {
           storage_location,
           description: String(this.stockInForm.description || '').trim()
         })
-        uni.showToast({ title: '入库成功，请上传设备照片', icon: 'success' })
+
         this.showStockInModal = false
+        this.panelMode = 'assets'
+        this.keyword = ''
+        const optimisticAsset = createdAsset
+          ? {
+              ...createdAsset,
+              photos: Array.isArray(createdAsset.photos) ? createdAsset.photos : []
+            }
+          : null
+        if (optimisticAsset) {
+          this.assetList = [optimisticAsset, ...this.assetList]
+        }
+
+        let uploadSuccess = 0
+        let uploadFailed = 0
+        const filePaths = Array.isArray(this.stockInPendingPhotoPaths) ? this.stockInPendingPhotoPaths : []
+        if (createdAsset?.id && filePaths.length) {
+          for (const filePath of filePaths) {
+            try {
+              await api.uploadAssetPhoto(createdAsset.id, filePath)
+              uploadSuccess += 1
+            } catch (_error) {
+              uploadFailed += 1
+            }
+          }
+        }
+
+        if (uploadFailed > 0) {
+          uni.showToast({ title: `入库成功，图片成功${uploadSuccess}张，失败${uploadFailed}张`, icon: 'none' })
+        } else if (uploadSuccess > 0) {
+          uni.showToast({ title: `入库成功，已上传${uploadSuccess}张图片`, icon: 'success' })
+        } else {
+          uni.showToast({ title: '入库成功', icon: 'success' })
+        }
         await this.reloadAll()
       } finally {
         this.stockInSubmitting = false
       }
     },
-    previewPhotos(item) {
+    previewPhotos(item, index = 0) {
       const urls = this.photoList(item).map((row) => row.url)
       if (!urls.length) return
-      uni.previewImage({ urls, current: urls[0] })
+      uni.previewImage({ urls, current: urls[index] || urls[0] })
     },
-    uploadAssetPhoto(item) {
+    previewStockInPhotos(index = 0) {
+      const urls = this.stockInPendingPhotoPaths.filter(Boolean)
+      if (!urls.length) return
+      uni.previewImage({ urls, current: urls[index] || urls[0] })
+    },
+    uploadStockInPhoto() {
       uni.chooseImage({
-        count: 1,
+        count: 6,
         sizeType: ['compressed'],
         sourceType: ['album', 'camera'],
         success: async (res) => {
-          const filePath = res?.tempFilePaths?.[0]
-          if (!filePath) return
-          await api.uploadAssetPhoto(item.id, filePath)
-          uni.showToast({ title: '上传成功', icon: 'success' })
-          await this.reloadAll()
+          const selected = Array.isArray(res?.tempFilePaths) ? res.tempFilePaths : []
+          if (!selected.length) return
+          const merged = [...this.stockInPendingPhotoPaths, ...selected]
+          const dedup = [...new Set(merged)].slice(0, 9)
+          this.stockInPendingPhotoPaths = dedup
         },
         fail: () => {
           uni.showToast({ title: '未选择图片', icon: 'none' })
@@ -403,6 +591,70 @@ page {
   font-size: 40rpx;
   font-weight: 800;
   color: #132d4d;
+}
+
+.global-budget-card {
+  margin-bottom: 24rpx;
+  border-radius: 22rpx;
+  border: 1rpx solid #dbe4f1;
+  background: #fff;
+}
+
+.global-budget-card__head {
+  margin-bottom: 14rpx;
+}
+
+.global-budget-card__title {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #133254;
+}
+
+.global-budget-card__sub {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: #6e829d;
+}
+
+.global-budget-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12rpx;
+}
+
+.global-budget-item {
+  border: 1rpx solid #e4ecf6;
+  border-radius: 16rpx;
+  background: #f7faff;
+  padding: 14rpx 16rpx;
+}
+
+.global-budget-item__label {
+  font-size: 20rpx;
+  color: #667d99;
+}
+
+.global-budget-item__value {
+  margin-top: 6rpx;
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #183a60;
+}
+
+.global-budget-form {
+  margin-top: 14rpx;
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+}
+
+.global-budget-input {
+  flex: 1;
+  height: 68rpx;
+  border-radius: 24rpx;
+  background: #fff;
+  border: 1rpx solid #e4ebf5;
+  padding: 0 24rpx;
 }
 
 .toolbar {
@@ -484,6 +736,11 @@ page {
   box-shadow: 0 12rpx 26rpx rgba(77, 123, 160, 0.24);
 }
 
+.toolbar-btn.disabled {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
 .toolbar .input {
   height: 68rpx;
   line-height: 68rpx;
@@ -510,12 +767,40 @@ page {
   border-radius: 24rpx;
   font-size: 24rpx;
 }
+.asset-mode-switch {
+  height: 68rpx;
+  padding: 0 8rpx;
+  border-radius: 24rpx;
+  border: 1rpx solid #e4ebf5;
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.asset-mode-pill {
+  min-width: 150rpx;
+  height: 52rpx;
+  padding: 0 16rpx;
+  border-radius: 14rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #5a6e88;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.asset-mode-pill.active {
+  background: #e9f1fb;
+  color: #1f4872;
+}
 
 .table-card {
   border: 1rpx solid #dbe4f1;
   background: #fff;
   border-radius: 22rpx;
-  margin-bottom: 24rpx;
+  margin-bottom: 0;
 }
 
 .req-grid {
@@ -622,6 +907,7 @@ page {
   display: flex;
   flex-direction: column;
   gap: 8rpx;
+  padding-left: 20rpx;
 }
 
 .asset-photo-top {
@@ -638,6 +924,9 @@ page {
 
 .asset-photo-preview {
   display: flex;
+  align-items: center;
+  gap: 8rpx;
+  flex-wrap: wrap;
 }
 
 .asset-photo-thumb {
@@ -645,6 +934,11 @@ page {
   height: 72rpx;
   border-radius: 10rpx;
   border: 1rpx solid #d9e4f2;
+}
+
+.asset-photo-more {
+  color: #2c7da0;
+  font-size: 20rpx;
 }
 
 .stock-modal-mask {
@@ -746,6 +1040,33 @@ page {
   line-height: 1.5;
 }
 
+.stock-photo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex-wrap: wrap;
+}
+
+.stock-photo-count {
+  color: #60738e;
+  font-size: 20rpx;
+}
+
+.stock-photo-list {
+  margin-top: 10rpx;
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  flex-wrap: wrap;
+}
+
+.stock-photo-thumb {
+  width: 84rpx;
+  height: 84rpx;
+  border-radius: 10rpx;
+  border: 1rpx solid #d9e4f2;
+}
+
 .stock-modal__foot {
   margin-top: 6rpx;
   display: flex;
@@ -779,15 +1100,29 @@ page {
   .admin-kpi-grid {
     grid-template-columns: 1fr;
   }
+
+  .global-budget-grid {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media screen and (max-width: 768px) {
+  .global-budget-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .global-budget-grid {
+    grid-template-columns: 1fr;
+  }
+
   .toolbar {
     flex-direction: column;
     align-items: stretch;
   }
 
   .toolbar-picker,
+  .asset-mode-switch,
   .toolbar-search,
   .toolbar-btn {
     width: 100%;

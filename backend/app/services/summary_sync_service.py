@@ -4,10 +4,10 @@ from decimal import Decimal
 from sqlalchemy import case, func
 
 from app.models import (
-    AssetBudget,
     AssetItem,
     AssetPurchaseRequest,
     CampusSummarySnapshot,
+    GlobalAssetBudget,
     LabDailyReport,
     Reservation,
 )
@@ -84,24 +84,19 @@ def _collect_one_campus_snapshot(campus_id):
         )
 
         asset_item_count = int(session.query(AssetItem.id).count() or 0)
-        budget = session.query(AssetBudget).filter_by(campus_id=int(campus_id)).first()
-
-        total_amount = _safe_decimal(budget.total_amount if budget else 0)
-        locked_amount = _safe_decimal(budget.locked_amount if budget else 0)
-        used_amount = _safe_decimal(budget.used_amount if budget else 0)
-        available_amount = total_amount - locked_amount - used_amount
+        total_amount = Decimal("0.00")
+        locked_amount = Decimal("0.00")
+        used_amount = Decimal("0.00")
+        available_amount = Decimal("0.00")
 
         campus_name = f"校区{campus_id}"
-        if budget and budget.campus and budget.campus.campus_name:
-            campus_name = str(budget.campus.campus_name)
+        first_reservation = session.query(Reservation).first()
+        if first_reservation and first_reservation.campus and first_reservation.campus.campus_name:
+            campus_name = str(first_reservation.campus.campus_name)
         else:
-            first_reservation = session.query(Reservation).first()
-            if first_reservation and first_reservation.campus and first_reservation.campus.campus_name:
-                campus_name = str(first_reservation.campus.campus_name)
-            else:
-                first_report = session.query(LabDailyReport).first()
-                if first_report and first_report.campus and first_report.campus.campus_name:
-                    campus_name = str(first_report.campus.campus_name)
+            first_report = session.query(LabDailyReport).first()
+            if first_report and first_report.campus and first_report.campus.campus_name:
+                campus_name = str(first_report.campus.campus_name)
 
         return {
             "campus_id": int(campus_id),
@@ -123,6 +118,29 @@ def _collect_one_campus_snapshot(campus_id):
             "daily_report_pending_count": int(daily_report_stats.pending or 0),
             "daily_report_approved_count": int(daily_report_stats.approved or 0),
             "daily_report_rejected_count": int(daily_report_stats.rejected or 0),
+        }
+
+
+def _global_budget_totals():
+    with summary_db_session() as session:
+        bind = session.get_bind()
+        GlobalAssetBudget.__table__.create(bind=bind, checkfirst=True)
+        row = session.query(GlobalAssetBudget).first()
+        if not row:
+            return {
+                "asset_budget_total_amount": 0.0,
+                "asset_budget_locked_amount": 0.0,
+                "asset_budget_used_amount": 0.0,
+                "asset_budget_available_amount": 0.0,
+            }
+        total = float(row.total_amount or 0)
+        locked = float(row.locked_amount or 0)
+        used = float(row.used_amount or 0)
+        return {
+            "asset_budget_total_amount": total,
+            "asset_budget_locked_amount": locked,
+            "asset_budget_used_amount": used,
+            "asset_budget_available_amount": total - locked - used,
         }
 
 
@@ -164,10 +182,8 @@ def sync_campus_summary_snapshots(snapshot_date=None, target_campus_ids=None):
         totals["asset_request_count"] += int(row["asset_request_count"])
         totals["asset_item_count"] += int(row["asset_item_count"])
         totals["daily_report_count"] += int(row["daily_report_count"])
-        totals["asset_budget_total_amount"] += float(row["asset_budget_total_amount"] or 0)
-        totals["asset_budget_locked_amount"] += float(row["asset_budget_locked_amount"] or 0)
-        totals["asset_budget_used_amount"] += float(row["asset_budget_used_amount"] or 0)
-        totals["asset_budget_available_amount"] += float(row["asset_budget_available_amount"] or 0)
+
+    totals.update(_global_budget_totals())
 
     return {"snapshot_date": target_date.isoformat(), "rows": rows, "totals": totals}
 
@@ -191,11 +207,12 @@ def get_latest_campus_summary_rows(campus_id=None):
         "asset_request_count": sum(int(item.get("asset_request_count") or 0) for item in rows),
         "asset_item_count": sum(int(item.get("asset_item_count") or 0) for item in rows),
         "daily_report_count": sum(int(item.get("daily_report_count") or 0) for item in rows),
-        "asset_budget_total_amount": sum(float(item.get("asset_budget_total_amount") or 0) for item in rows),
-        "asset_budget_locked_amount": sum(float(item.get("asset_budget_locked_amount") or 0) for item in rows),
-        "asset_budget_used_amount": sum(float(item.get("asset_budget_used_amount") or 0) for item in rows),
-        "asset_budget_available_amount": sum(float(item.get("asset_budget_available_amount") or 0) for item in rows),
+        "asset_budget_total_amount": 0.0,
+        "asset_budget_locked_amount": 0.0,
+        "asset_budget_used_amount": 0.0,
+        "asset_budget_available_amount": 0.0,
     }
+    totals.update(_global_budget_totals())
     return {"snapshot_date": latest_date.isoformat(), "rows": rows, "totals": totals}
 
 
