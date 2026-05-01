@@ -78,7 +78,7 @@ def _find_asset_item(current_user, asset_id, campus_id_hint=None):
 
 
 @asset_bp.get("/asset-budgets/current")
-@role_required("system_admin")
+@role_required("teacher", "lab_admin", "system_admin")
 def get_current_budget_api():
     current_user = get_current_user()
     result = get_budget_for_user(current_user, campus_id=0)

@@ -179,8 +179,12 @@
   - 业务异常 `AppError`
 
 ### 3.7 数据初始化与迁移
-- [scripts/seed.py](./scripts/seed.py)
-  - 一键生成演示数据（校区、实验室、设备、角色账号、示例预约）
+- [scripts/bootstrap_shards.py](./scripts/bootstrap_shards.py)
+  - 分库引导脚本: 建表+初始数据
+- [scripts/seed_shards.py](./scripts/seed_shards.py)
+  - 一键生成分库演示数据（校区、实验室、设备、角色账号、示例预约）
+- [scripts/seed_multi_campus_users.py](./scripts/seed_multi_campus_users.py)
+  - 多校区用户批量种子数据
 
 - [migrations/README.md](./migrations/README.md)
   - Flask-Migrate 使用说明
@@ -298,11 +302,9 @@ python run.py
 
 ### 9.2 初始化演示数据
 ```bash
-flask --app run.py seed-data
+python scripts/bootstrap_shards.py
+python scripts/seed_shards.py
 ```
-或
-```bash
-python scripts/seed.py
 ```
 
 ### 9.3 迁移流程

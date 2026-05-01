@@ -1,7 +1,7 @@
 ﻿import json
 from app import create_app
 from app.extensions import db
-from app.models import AssetBudget, Campus, Laboratory, User
+from app.models import Campus, Laboratory, User
 from app.services.db_router_service import campus_db_session
 
 app=create_app()
@@ -21,6 +21,5 @@ with app.app_context():
     with campus_db_session(cid) as session:
         print('entered session')
         c=session.query(Campus).count(); print('count campus',c)
-        b=session.query(AssetBudget).count(); print('count budget',b)
         session.commit(); print('commit ok')
 print('done')

@@ -265,33 +265,6 @@ class FileObject(BaseModel):
             }
         )
 
-
-class AssetBudget(BaseModel):
-    # 校区资产预算表：保存总额度、锁定额度和已使用额度。
-    __tablename__ = "asset_budgets"
-    __table_args__ = (
-        db.UniqueConstraint("campus_id", name="uq_asset_budget_campus"),
-    )
-
-    campus_id = db.Column(db.Integer, db.ForeignKey("campuses.id"), nullable=False)
-    total_amount = db.Column(db.Numeric(12, 2), default=0, nullable=False)
-    locked_amount = db.Column(db.Numeric(12, 2), default=0, nullable=False)
-    used_amount = db.Column(db.Numeric(12, 2), default=0, nullable=False)
-    remark = db.Column(db.String(255))
-
-    campus = db.relationship("Campus")
-
-    def to_dict(self, extra=None):
-        available = float((self.total_amount or 0) - (self.locked_amount or 0) - (self.used_amount or 0))
-        return super().to_dict(
-            {
-                "campus_name": self.campus.campus_name if self.campus else None,
-                "available_amount": available,
-                **(extra or {}),
-            }
-        )
-
-
 class GlobalAssetBudget(BaseModel):
     __tablename__ = "global_asset_budgets"
 

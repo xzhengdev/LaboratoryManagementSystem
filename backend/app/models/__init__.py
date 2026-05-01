@@ -1,6 +1,5 @@
 from .entities import (
     Approval,
-    AssetBudget,
     AssetBudgetLedger,
     AssetItem,
     AssetPurchaseRequest,
@@ -18,10 +17,8 @@ from .entities import (
     User,
 )
 
-# 统一导出模型，方便其他模块直接 from app.models import User 这种写法。
 __all__ = [
     "Approval",
-    "AssetBudget",
     "AssetBudgetLedger",
     "AssetItem",
     "AssetPurchaseRequest",

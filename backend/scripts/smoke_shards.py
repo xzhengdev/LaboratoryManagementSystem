@@ -57,7 +57,7 @@ def main():
         labs_resp = client.get(f"/api/labs?campus_id={campus_id}", headers=teacher_headers)
         labs = assert_ok(labs_resp, "查询实验室")
         if not labs:
-            raise RuntimeError("当前校区无实验室，请先执行 seed.py + seed_shards.py")
+            raise RuntimeError("当前校区无实验室，请先执行 bootstrap_shards.py + seed_shards.py")
         lab_id = labs[0]["id"]
 
         budget_resp = client.get("/api/asset-budgets/current", headers=teacher_headers)

@@ -3,7 +3,6 @@ from decimal import Decimal, InvalidOperation
 from datetime import datetime
 
 from app.models import (
-    AssetBudget,
     AssetBudgetLedger,
     AssetItem,
     AssetPurchaseRequest,
@@ -40,21 +39,6 @@ def _to_decimal(value, field_name):
 
 def _build_request_no(campus_id):
     return f"AR{int(campus_id):03d}{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')[:20]}"
-
-
-def _ensure_budget(session, campus_id):
-    budget = session.query(AssetBudget).filter_by(campus_id=campus_id).first()
-    if budget:
-        return budget
-    budget = AssetBudget(
-        campus_id=campus_id,
-        total_amount=Decimal("0.00"),
-        locked_amount=Decimal("0.00"),
-        used_amount=Decimal("0.00"),
-    )
-    session.add(budget)
-    session.flush()
-    return budget
 
 
 def _ensure_global_budget_table(session):
