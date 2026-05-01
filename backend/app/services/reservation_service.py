@@ -232,6 +232,7 @@ def create_reservation(current_user, payload, idempotency_key=None):
     if current_user.role in {"student", "teacher"} and current_user.campus_id != campus_id:
         raise AppError("只能提交本校区预约", 403, 40359)
 
+    lab_id = int(payload["lab_id"])
     reservation_date = parse_date(payload["reservation_date"], "reservation_date")
     start_time = parse_time(payload["start_time"], "start_time")
     end_time = parse_time(payload["end_time"], "end_time")
@@ -274,7 +275,7 @@ def create_reservation(current_user, payload, idempotency_key=None):
             {
                 "user_id": current_user.id,
                 "campus_id": campus_id,
-                "lab_id": int(payload["lab_id"]),
+                "lab_id": lab_id,
                 "reservation_date": reservation_date.isoformat(),
                 "start_time": start_time.strftime("%H:%M:%S"),
                 "end_time": end_time.strftime("%H:%M:%S"),
@@ -288,16 +289,19 @@ def create_reservation(current_user, payload, idempotency_key=None):
         if cached_result is not None:
             return cached_result
 
-    with campus_db_session(campus_id) as session:
-        try:
-            lab = _get_lab_by_campus(session, campus_id, payload["lab_id"])
+    # 先获取分布式锁，再打开数据库会话。
+    # 否则在 MySQL 默认隔离级别下，等待锁期间已建立的事务快照可能看不到前一个请求刚提交的预约，
+    # 从而导致不同幂等键的并发请求误判“无冲突”。
+    with reservation_slot_lock(lab_id, reservation_date):
+        with campus_db_session(campus_id) as session:
+            try:
+                lab = _get_lab_by_campus(session, campus_id, lab_id)
 
-            if start_time < lab.open_time or end_time > lab.close_time:
-                raise AppError("预约时间必须在实验室开放时间范围内")
-            if participant_count > lab.capacity:
-                raise AppError("参与人数超过实验室容量上限")
+                if start_time < lab.open_time or end_time > lab.close_time:
+                    raise AppError("预约时间必须在实验室开放时间范围内")
+                if participant_count > lab.capacity:
+                    raise AppError("参与人数超过实验室容量上限")
 
-            with reservation_slot_lock(lab.id, reservation_date):
                 overlapping = _find_overlapping_reservation(
                     session, lab.id, reservation_date, start_time, end_time
                 )
@@ -355,22 +359,21 @@ def create_reservation(current_user, payload, idempotency_key=None):
                         "status": reservation.status,
                     },
                 )
-
-            invalidate_lab_schedule_cache(lab.id, reservation_date, campus_id=lab.campus_id)
-            invalidate_statistics_cache()
-            if idempotency_record:
-                _mark_idempotency_success(idempotency_record.id, result)
-            return result
-        except AppError as error:
-            session.rollback()
-            if idempotency_record:
-                _mark_idempotency_failed(idempotency_record.id, error.message, error.code)
-            raise
-        except Exception:
-            session.rollback()
-            if idempotency_record:
-                _mark_idempotency_failed(idempotency_record.id, "服务器内部错误", 500)
-            raise
+                invalidate_lab_schedule_cache(lab.id, reservation_date, campus_id=lab.campus_id)
+                invalidate_statistics_cache()
+                if idempotency_record:
+                    _mark_idempotency_success(idempotency_record.id, result)
+                return result
+            except AppError as error:
+                session.rollback()
+                if idempotency_record:
+                    _mark_idempotency_failed(idempotency_record.id, error.message, error.code)
+                raise
+            except Exception:
+                session.rollback()
+                if idempotency_record:
+                    _mark_idempotency_failed(idempotency_record.id, "服务器内部错误", 500)
+                raise
 
 
 def get_reservation_detail(current_user, reservation_id):
@@ -519,79 +522,78 @@ def approve_reservation_by_id(current_user, reservation_id, approval_status, rem
     if current_user.role not in {"lab_admin", "system_admin"}:
         raise AppError("只有管理员可以审批预约", 403, 40305)
 
-    _, campus_id = _resolve_reservation(current_user, reservation_id)
-    with campus_db_session(campus_id) as session:
-        reservation = _get_reservation_from_campus(session, reservation_id)
+    snapshot, campus_id = _resolve_reservation(current_user, reservation_id)
+    lab_id = int(snapshot["lab_id"])
+    reservation_date = parse_date(snapshot["reservation_date"], "reservation_date")
 
-        if current_user.role == "lab_admin" and current_user.campus_id != reservation.campus_id:
-            raise AppError("只能审批本校区预约", 403, 40306)
+    if approval_status not in {"approved", "rejected"}:
+        raise AppError("审批状态只能是 approved 或 rejected")
 
-        if reservation.status != "pending":
-            raise AppError("当前预约不在待审批状态")
+    lock_context = (
+        reservation_slot_lock(lab_id, reservation_date)
+        if approval_status == "approved"
+        else nullcontext()
+    )
 
-        if approval_status not in {"approved", "rejected"}:
-            raise AppError("审批状态只能是 approved 或 rejected")
+    with lock_context:
+        with campus_db_session(campus_id) as session:
+            reservation = _get_reservation_from_campus(session, reservation_id)
 
-        lock_context = (
-            reservation_slot_lock(reservation.lab_id, reservation.reservation_date)
-            if approval_status == "approved"
-            else nullcontext()
-        )
+            if current_user.role == "lab_admin" and current_user.campus_id != reservation.campus_id:
+                raise AppError("只能审批本校区预约", 403, 40306)
 
-        try:
-            with lock_context:
-                if approval_status == "approved":
-                    overlapping = _find_overlapping_reservation(
-                        session,
-                        reservation.lab_id,
-                        reservation.reservation_date,
-                        reservation.start_time,
-                        reservation.end_time,
-                        exclude_id=reservation.id,
-                    )
-                    if overlapping:
-                        raise AppError("审批失败，该时间段已有其他有效预约")
+            if reservation.status != "pending":
+                raise AppError("当前预约不在待审批状态")
 
-                reservation.status = approval_status
-
-                approval = Approval(
-                    reservation_id=reservation.id,
-                    approver_id=current_user.id,
-                    approval_status=approval_status,
-                    remark=remark or "",
-                    approval_time=datetime.utcnow(),
-                )
-                session.add(approval)
-
-                _write_log(
+            if approval_status == "approved":
+                overlapping = _find_overlapping_reservation(
                     session,
-                    current_user.id,
-                    "approval",
-                    approval_status,
-                    f"审批预约 #{reservation.id}，结果 {approval_status}",
+                    reservation.lab_id,
+                    reservation.reservation_date,
+                    reservation.start_time,
+                    reservation.end_time,
+                    exclude_id=reservation.id,
                 )
-                session.commit()
-                result = reservation.to_dict({"approval": approval.to_dict()})
+                if overlapping:
+                    raise AppError("审批失败，该时间段已有其他有效预约")
 
-            invalidate_lab_schedule_cache(
-                reservation.lab_id,
-                reservation.reservation_date,
-                campus_id=reservation.campus_id,
+            reservation.status = approval_status
+
+            approval = Approval(
+                reservation_id=reservation.id,
+                approver_id=current_user.id,
+                approval_status=approval_status,
+                remark=remark or "",
+                approval_time=datetime.utcnow(),
             )
-            invalidate_statistics_cache()
-            publish_async_event(
-                f"reservation.{approval_status}",
-                {
-                    "reservation_id": reservation.id,
-                    "user_id": current_user.id,
-                    "campus_id": reservation.campus_id,
-                    "lab_id": reservation.lab_id,
-                    "reservation_date": reservation.reservation_date.isoformat(),
-                    "status": reservation.status,
-                    "approval_id": approval.id,
-                },
+            session.add(approval)
+
+            _write_log(
+                session,
+                current_user.id,
+                "approval",
+                approval_status,
+                f"审批预约 #{reservation.id}，结果 {approval_status}",
             )
-            return result
-        except Exception:
-            session.rollback()
-            raise
+            session.commit()
+            result = reservation.to_dict({"approval": approval.to_dict()})
+
+        invalidate_lab_schedule_cache(
+            reservation.lab_id,
+            reservation.reservation_date,
+            campus_id=reservation.campus_id,
+        )
+        invalidate_statistics_cache()
+        publish_async_event(
+            f"reservation.{approval_status}",
+            {
+                "reservation_id": reservation.id,
+                "user_id": current_user.id,
+                "campus_id": reservation.campus_id,
+                "lab_id": reservation.lab_id,
+                "reservation_date": reservation.reservation_date.isoformat(),
+                "status": reservation.status,
+                "approval_id": approval.id,
+            },
+        )
+        return result

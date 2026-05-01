@@ -1,0 +1,231 @@
+{
+  "metadata": {
+    "generated_at": "2026-04-30 18:37:21",
+    "base_url": "http://127.0.0.1:5000",
+    "script": "C:\\Users\\Ete'rna'l\\Desktop\\毕设\\lab\\backend\\scripts\\full_project_test.py"
+  },
+  "scope": [
+    "基础运行与环境测试",
+    "核心功能测试",
+    "权限与边界测试",
+    "分布式能力测试",
+    "高并发与稳定性测试",
+    "运维与可观测性测试"
+  ],
+  "tests": [
+    {
+      "category": "基础运行与环境测试",
+      "name": "健康检查",
+      "status": "passed",
+      "detail": "后端服务可访问",
+      "metrics": {
+        "status": "ok"
+      },
+      "raw": null,
+      "timestamp": "2026-04-30 18:37:21"
+    },
+    {
+      "category": "基础运行与环境测试",
+      "name": "分库结构检查",
+      "status": "passed",
+      "detail": "校区分库和中心汇总库结构完整",
+      "metrics": {
+        "campus-5": {
+          "tables": 15,
+          "missing": 0
+        },
+        "campus-6": {
+          "tables": 15,
+          "missing": 0
+        },
+        "campus-7": {
+          "tables": 15,
+          "missing": 0
+        },
+        "summary": {
+          "tables": 17,
+          "missing": 0
+        }
+      },
+      "raw": null,
+      "timestamp": "2026-04-30 18:37:23"
+    },
+    {
+      "category": "基础运行与环境测试",
+      "name": "运行时开关检查",
+      "status": "passed",
+      "detail": "分布式与高并发开关均已开启",
+      "metrics": {
+        "ENABLE_CAMPUS_DB_ROUTING": "ON",
+        "ENABLE_DISTRIBUTED_LOCK": "ON",
+        "ENABLE_IDEMPOTENCY": "ON",
+        "ENABLE_RATE_LIMIT": "ON",
+        "ENABLE_ASYNC_EVENTS": "ON",
+        "REDIS_URL": "SET",
+        "REDIS_CONNECTED": "ON",
+        "SEAWEEDFS_CAMPUS_CONFIG_MAP": "SET",
+        "SUMMARY_DB_URL": "SET"
+      },
+      "raw": null,
+      "timestamp": "2026-04-30 18:37:26"
+    },
+    {
+      "category": "基础运行与环境测试",
+      "name": "SeaweedFS 路由检查",
+      "status": "passed",
+      "detail": "三个校区图片上传与访问链路均可用",
+      "metrics": {
+        "5": {
+          "upload_url": "http://127.0.0.1:19335",
+          "file_id": "7,2c5b27ae77",
+          "access_url": "http://127.0.0.1:18085/7,2c5b27ae77"
+        },
+        "6": {
+          "upload_url": "http://127.0.0.1:19336",
+          "file_id": "7,08b28933a3",
+          "access_url": "http://127.0.0.1:18086/7,08b28933a3"
+        },
+        "7": {
+          "upload_url": "http://127.0.0.1:19337",
+          "file_id": "5,060d1baa69",
+          "access_url": "http://127.0.0.1:18087/5,060d1baa69"
+        }
+      },
+      "raw": null,
+      "timestamp": "2026-04-30 18:37:28"
+    },
+    {
+      "category": "核心功能测试",
+      "name": "多角色登录测试",
+      "status": "passed",
+      "detail": "学生、教师、实验室管理员、系统管理员均可正常登录",
+      "metrics": {},
+      "raw": null,
+      "timestamp": "2026-04-30 18:37:29"
+    },
+    {
+      "category": "核心功能测试",
+      "name": "预约创建与审批流程",
+      "status": "passed",
+      "detail": "学生提交预约后，实验室管理员可在待审批列表中审批，学生侧状态同步更新",
+      "metrics": {
+        "reservation_id": 10,
+        "lab_id": 17,
+        "campus_id": 5
+      },
+      "raw": null,
+      "timestamp": "2026-04-30 18:37:30"
+    },
+    {
+      "category": "核心功能测试",
+      "name": "资产申报、审批、入库与图片上传流程",
+      "status": "passed",
+      "detail": "教师端资产申报后，可完成审批、入库与设备照片上传",
+      "metrics": {
+        "request_id": 17,
+        "asset_id": 12,
+        "photo_file_id": 52,
+        "campus_id": 5
+      },
+      "raw": null,
+      "timestamp": "2026-04-30 18:37:30"
+    },
+    {
+      "category": "核心功能测试",
+      "name": "日报上传、提交、审核与消息提醒流程",
+      "status": "passed",
+      "detail": "学生日报提交后，管理员可审核，审核结果会反馈到学生消息中心",
+      "metrics": {
+        "report_id": 21,
+        "photo_file_id": 53,
+        "unread_before": 1,
+        "unread_after": 2
+      },
+      "raw": null,
+      "timestamp": "2026-04-30 18:37:30"
+    },
+    {
+      "category": "权限与边界测试",
+      "name": "教师访问系统管理员预算接口拦截",
+      "status": "passed",
+      "detail": "教师无权访问全局预算接口",
+      "metrics": {},
+      "raw": null,
+      "timestamp": "2026-04-30 18:37:30"
+    },
+    {
+      "category": "权限与边界测试",
+      "name": "实验室管理员跨校区资产访问拦截",
+      "status": "passed",
+      "detail": "实验室管理员只能访问本校区资产",
+      "metrics": {},
+      "raw": null,
+      "timestamp": "2026-04-30 18:37:30"
+    },
+    {
+      "category": "权限与边界测试",
+      "name": "学生越权审核日报拦截",
+      "status": "passed",
+      "detail": "普通学生不能执行日报审核操作",
+      "metrics": {},
+      "raw": null,
+      "timestamp": "2026-04-30 18:37:30"
+    },
+    {
+      "category": "分布式能力测试",
+      "name": "跨校区分库写入与中心汇总同步",
+      "status": "passed",
+      "detail": "丰台校区资产流程和海南校区日报流程均可独立写入，并能同步到中心汇总总表",
+      "metrics": {
+        "campus6_request_id": 3,
+        "campus6_asset_id": 3,
+        "campus7_report_id": 2,
+        "summary_snapshot_date": "2026-04-30",
+        "summary_campus_count": null
+      },
+      "raw": null,
+      "timestamp": "2026-04-30 18:37:31"
+    },
+    {
+      "category": "运维与可观测性测试",
+      "name": "统计接口与日志审计查询",
+      "status": "passed",
+      "detail": "管理员可查询概览统计、日报统计、中心汇总快照和操作日志",
+      "metrics": {
+        "overview": {
+          "approved_count": 5,
+          "campus_count": 1,
+          "lab_count": 8,
+          "pending_count": 5,
+          "reservation_count": 10
+        },
+        "campus_stat_count": 1,
+        "daily_report_overview": {
+          "daily_report_approved_count": 7,
+          "daily_report_count": 21,
+          "daily_report_pending_count": 13,
+          "daily_report_rejected_count": 1
+        },
+        "summary_rows": 3,
+        "operation_log_count": 63
+      },
+      "raw": null,
+      "timestamp": "2026-04-30 18:37:31"
+    },
+    {
+      "category": "高并发与稳定性测试",
+      "name": "高并发与稳定性总测试",
+      "status": "failed",
+      "detail": "同幂等键预约去重结果异常: {'params': {'concurrency': 20, 'total': 20, 'idempotency_mode': 'same', 'target_slot': '2026-05-06 09:00-10:00', 'lab_id': 20, 'campus_id': 6}, 'timing': {'elapsed_seconds': 0.222, 'throughput_rps': 90.15, 'latency_ms': {'p50': 129.79, 'p95': 175.57, 'p99': 175.57, 'max': 180.42}}, 'http_status_distribution': {'400': 1, '409': 9, '429': 10}, 'business_code_distribution': {'40000': 1, '40924': 9, '42911': 10}, 'reservation_write_result': {'returned_records': 0, 'unique_reservation_ids': 0, 'duplicate_id_count': 0}}",
+      "metrics": {},
+      "raw": null,
+      "timestamp": "2026-04-30 18:37:32"
+    }
+  ],
+  "summary": {
+    "total": 14,
+    "passed": 13,
+    "failed": 1,
+    "skipped": 0
+  }
+}
