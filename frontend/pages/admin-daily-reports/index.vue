@@ -9,7 +9,21 @@
         class="input toolbar-search admin-toolbar-lite__search"
         placeholder="搜索实验室/提交人/内容"
       />
-      <view class="toolbar-btn" @click="reload">刷新</view>
+    </view>
+    <view class="card ai-toolbar">
+      <input
+        v-model="nlQuery"
+        class="input ai-toolbar__input"
+        placeholder="自然语言查询：例如 查今天待审核的巡查结果"
+      />
+      <view class="ai-toolbar__btn" :class="{ disabled: nlLoading }" @click="runNlQuery">
+        {{ nlLoading ? '查询中...' : 'AI查询' }}
+      </view>
+      <view class="ai-toolbar__btn ai-toolbar__btn--light" @click="clearNlQuery">清空</view>
+    </view>
+    <view class="report-total">
+      总条数：{{ reportList.length }} 条
+      <text class="report-total__sub">当前显示：{{ filteredList.length }} 条</text>
     </view>
 
     <view class="card table-card">
@@ -25,7 +39,7 @@
 
       <view v-if="!filteredList.length" class="empty-text">暂无日报记录</view>
 
-      <view v-for="item in filteredList" :key="item.id" class="table-row report-grid">
+      <view v-for="item in pagedList" :key="rowKey(item)" class="table-row report-grid">
         <view>
           <view>{{ item.report_date || '--' }}</view>
           <view class="row-sub">{{ timeText(item.created_at) }}</view>
@@ -44,6 +58,7 @@
               :key="photo.id || idx"
               class="photo-thumb"
               :src="photo.url"
+              lazy-load
               mode="aspectFill"
               @click="previewPhotos(item, idx)"
             />
@@ -52,6 +67,17 @@
         <text :class="statusClass(item.status)">{{ statusText(item.status) }}</text>
         <view class="actions">
           <view class="pill" @click="openDrawer(item)">详情</view>
+        </view>
+      </view>
+
+      <view v-if="filteredList.length" class="pager">
+        <view class="pager-left">
+          <text>第 {{ pageNo }} / {{ totalPages }} 页</text>
+          <text class="pager-muted">每页 10 条</text>
+        </view>
+        <view class="pager-right">
+          <view class="pill" :class="{ 'pill-disabled': pageNo <= 1 }" @click="goPrevPage">上一页</view>
+          <view class="pill" :class="{ 'pill-disabled': pageNo >= totalPages }" @click="goNextPage">下一页</view>
         </view>
       </view>
     </view>
@@ -77,6 +103,7 @@
               :key="photo.id || idx"
               class="drawer-photo"
               :src="photo.url"
+              lazy-load
               mode="aspectFill"
               @click="previewPhotos(activeItem, idx)"
             />
@@ -130,9 +157,14 @@ export default {
         { label: '已驳回', value: 'rejected' }
       ],
       selectedStatus: '',
+      pageNo: 1,
+      pageSize: 10,
       drawerVisible: false,
       activeItem: {},
-      reviewRemark: ''
+      reviewRemark: '',
+      nlQuery: '',
+      nlLoading: false,
+      nlReply: ''
     }
   },
   computed: {
@@ -147,6 +179,24 @@ export default {
         const hitStatus = !this.selectedStatus || item.status === this.selectedStatus
         return hitKeyword && hitStatus
       })
+    },
+    totalPages() {
+      return Math.max(1, Math.ceil(this.filteredList.length / this.pageSize))
+    },
+    pagedList() {
+      const start = (this.pageNo - 1) * this.pageSize
+      return this.filteredList.slice(start, start + this.pageSize)
+    }
+  },
+  watch: {
+    keyword() {
+      this.pageNo = 1
+    },
+    selectedStatus() {
+      this.pageNo = 1
+    },
+    reportList() {
+      this.ensurePageInRange()
     }
   },
   async onShow() {
@@ -160,6 +210,23 @@ export default {
     await this.reload()
   },
   methods: {
+    ensurePageInRange() {
+      if (this.pageNo < 1) this.pageNo = 1
+      if (this.pageNo > this.totalPages) this.pageNo = this.totalPages
+    },
+    goPrevPage() {
+      if (this.pageNo <= 1) return
+      this.pageNo -= 1
+    },
+    goNextPage() {
+      if (this.pageNo >= this.totalPages) return
+      this.pageNo += 1
+    },
+    rowKey(item) {
+      const campusId = item?.campus_id ?? 'x'
+      const id = item?.id ?? 'x'
+      return `${campusId}-${id}`
+    },
     photoList(item) {
       return Array.isArray(item?.photos) ? item.photos.filter((row) => row && row.url) : []
     },
@@ -185,6 +252,37 @@ export default {
     },
     async reload() {
       this.reportList = await api.dailyReports()
+      this.nlReply = ''
+    },
+    async runNlQuery() {
+      const message = String(this.nlQuery || '').trim()
+      if (!message || this.nlLoading) return
+      this.nlLoading = true
+      try {
+        const result = await api.adminQuery({
+          domain: 'daily_reports',
+          message
+        })
+        if (Array.isArray(result?.items)) {
+          this.reportList = result.items
+        }
+        if (result?.filters && typeof result.filters === 'object') {
+          this.selectedStatus = String(result.filters.status || '')
+          this.keyword = String(result.filters.keyword || '')
+        }
+        this.nlReply = String(result?.reply || '查询完成')
+      } catch (error) {
+        uni.showToast({ title: error?.message || 'AI查询失败', icon: 'none' })
+      } finally {
+        this.nlLoading = false
+      }
+    },
+    async clearNlQuery() {
+      this.nlQuery = ''
+      this.nlReply = ''
+      this.keyword = ''
+      this.selectedStatus = ''
+      await this.reload()
     },
     previewPhotos(item, index = 0) {
       const urls = this.photoList(item).map((row) => row.url)
@@ -221,7 +319,8 @@ page {
   background: #f5f7fa;
 }
 
-.toolbar {
+.toolbar,
+.ai-toolbar {
   margin-bottom: 28rpx;
   display: flex;
   align-items: center;
@@ -233,6 +332,59 @@ page {
   box-shadow: 0 12rpx 32rpx rgba(16, 42, 73, 0.08);
   transition: all 0.25s ease;
   padding: 24rpx !important;
+}
+
+
+.ai-toolbar__input {
+  flex: 1;
+  height: 64rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid #d8e4dc;
+  background: #ffffff;
+  padding: 0 20rpx;
+}
+
+.ai-toolbar__btn {
+  width: 120rpx;
+  flex-shrink: 0;
+  height: 68rpx;
+  padding: 0 16rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%);
+  border: 1rpx solid #c8e3f6;
+  color: #2b4864;
+  font-size: 24rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8rpx 20rpx rgba(77, 123, 160, 0.18);
+  transition: all 0.2s ease;
+}
+
+.ai-toolbar__btn:hover {
+  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%);
+  transform: translateY(-1rpx);
+  box-shadow: 0 12rpx 26rpx rgba(77, 123, 160, 0.24);
+}
+
+
+.ai-toolbar__btn.disabled {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.report-total {
+  margin: 6rpx 20rpx;
+  color: #2f4f70;
+  font-size: 23rpx;
+  font-weight: 700;
+}
+
+.report-total__sub {
+  margin-left: 16rpx;
+  color: #6f8399;
+  font-weight: 500;
 }
 
 .toolbar:hover {
@@ -274,30 +426,6 @@ page {
   background-color: #ffffff;
   outline: none;
   box-shadow: 0 0 0 4rpx rgba(44, 125, 160, 0.1);
-}
-
-.toolbar-btn {
-  width: 190rpx;
-  flex-shrink: 0;
-  height: 68rpx;
-  padding: 0 16rpx;
-  border-radius: 24rpx;
-  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%);
-  border: 1rpx solid #c8e3f6;
-  color: #2b4864;
-  font-size: 24rpx;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8rpx 20rpx rgba(77, 123, 160, 0.18);
-  transition: all 0.2s ease;
-}
-
-.toolbar-btn:hover {
-  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%);
-  transform: translateY(-1rpx);
-  box-shadow: 0 12rpx 26rpx rgba(77, 123, 160, 0.24);
 }
 
 .toolbar .input {
@@ -424,6 +552,37 @@ page {
   font-size: 22rpx;
 }
 
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 18rpx 16rpx;
+  border-top: 1rpx solid #e6edf7;
+}
+
+.pager-left {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  color: #2f4f70;
+  font-size: 22rpx;
+}
+
+.pager-muted {
+  color: #6f8399;
+}
+
+.pager-right {
+  display: flex;
+  gap: 8rpx;
+}
+
+.pill-disabled {
+  opacity: 0.48;
+  pointer-events: none;
+}
+
 .drawer-mask {
   position: fixed;
   inset: 0;
@@ -536,10 +695,19 @@ page {
   }
 
   .toolbar-picker,
-  .toolbar-search,
-  .toolbar-btn {
+  .toolbar-search{
     width: 100%;
     min-width: 0;
+  }
+
+  .ai-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ai-toolbar__input,
+  .ai-toolbar__btn {
+    width: 100%;
   }
 
   .table-header {
@@ -548,6 +716,11 @@ page {
 
   .table-row {
     grid-template-columns: 1fr;
+  }
+
+  .pager {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>

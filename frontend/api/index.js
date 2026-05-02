@@ -388,5 +388,7 @@ export const api = {
     }),
   agentChat: (message) =>
     request({ url: "/agent/chat", method: "POST", data: { message } }),
+  adminQuery: (data) =>
+    request({ url: "/agent/admin-query", method: "POST", data }),
 };
 

@@ -52,6 +52,18 @@
       <input v-model="keyword" class="input toolbar-search admin-toolbar-lite__search" :placeholder="searchPlaceholder" />
       <view class="toolbar-btn" @click="reloadAll">刷新</view>
     </view>
+    <view class="card ai-toolbar">
+      <input
+        v-model="nlQuery"
+        class="input ai-toolbar__input"
+        placeholder="自然语言查询：例如 查已入库的交换机资产"
+      />
+      <view class="ai-toolbar__btn" :class="{ disabled: nlLoading }" @click="runNlQuery">
+        {{ nlLoading ? '查询中...' : 'AI查询' }}
+      </view>
+      <view class="ai-toolbar__btn ai-toolbar__btn--light" @click="clearNlQuery">清空</view>
+    </view>
+    <view v-if="nlReply" class="ai-reply">{{ nlReply }}</view>
 
     <view v-if="panelMode === 'requests'" class="card table-card">
         <view class="table-header req-grid">
@@ -253,6 +265,9 @@ export default {
         { label: '备用', value: 'spare' },
         { label: '维修中', value: 'repair' }
       ],
+      nlQuery: '',
+      nlLoading: false,
+      nlReply: '',
       stockStatusIndex: 0,
       stockInForm: {
         asset_code: '',
@@ -413,9 +428,52 @@ export default {
       ])
       this.requestList = Array.isArray(requestList) ? requestList : []
       this.assetList = Array.isArray(assetList) ? assetList : []
+      this.nlReply = ''
       if (this.isSystemAdmin) {
         await this.loadGlobalBudget()
       }
+    },
+    async runNlQuery() {
+      const message = String(this.nlQuery || '').trim()
+      if (!message || this.nlLoading) return
+      this.nlLoading = true
+      try {
+        const result = await api.adminQuery({
+          domain: 'assets',
+          message,
+          context: { mode: this.panelMode }
+        })
+        const filters = result?.filters && typeof result.filters === 'object' ? result.filters : {}
+        const panelMode = String(filters.panel_mode || this.panelMode || '').toLowerCase()
+        if (panelMode === 'assets' || panelMode === 'requests') {
+          this.panelMode = panelMode
+        }
+        if (Array.isArray(result?.items)) {
+          if (this.panelMode === 'assets') {
+            this.assetList = result.items
+          } else {
+            this.requestList = result.items
+          }
+        }
+        this.keyword = String(filters.keyword || '')
+        if (this.panelMode === 'requests') {
+          this.selectedStatus = String(filters.status || '')
+        } else {
+          this.selectedStatus = ''
+        }
+        this.nlReply = String(result?.reply || '查询完成')
+      } catch (error) {
+        uni.showToast({ title: error?.message || 'AI查询失败', icon: 'none' })
+      } finally {
+        this.nlLoading = false
+      }
+    },
+    async clearNlQuery() {
+      this.nlQuery = ''
+      this.nlReply = ''
+      this.keyword = ''
+      this.selectedStatus = ''
+      await this.reloadAll()
     },
     async loadGlobalBudget() {
       const row = await api.globalAssetBudget()
@@ -686,6 +744,59 @@ page {
   box-shadow: 0 12rpx 32rpx rgba(16, 42, 73, 0.08);
   transition: all 0.25s ease;
   padding: 24rpx !important;
+}
+
+.ai-toolbar {
+  margin-bottom: 20rpx;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 20rpx !important;
+  border-radius: 22rpx;
+  background: #f6faf6;
+  border: 1rpx solid #d7e7da;
+}
+
+.ai-toolbar__input {
+  flex: 1;
+  height: 64rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid #d8e4dc;
+  background: #ffffff;
+  padding: 0 20rpx;
+}
+
+.ai-toolbar__btn {
+  min-width: 140rpx;
+  height: 64rpx;
+  border-radius: 20rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #1f6f54;
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.ai-toolbar__btn--light {
+  background: #eef4f0;
+  color: #2b4d3f;
+}
+
+.ai-toolbar__btn.disabled {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.ai-reply {
+  margin: -6rpx 0 18rpx;
+  padding: 12rpx 16rpx;
+  border-radius: 14rpx;
+  background: #f1f8f2;
+  color: #2a5a47;
+  font-size: 22rpx;
+  border: 1rpx solid #d6e9db;
 }
 
 .toolbar:hover {
@@ -1144,6 +1255,16 @@ page {
   .toolbar-btn {
     width: 100%;
     min-width: 0;
+  }
+
+  .ai-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ai-toolbar__input,
+  .ai-toolbar__btn {
+    width: 100%;
   }
 
   .table-header {

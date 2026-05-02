@@ -1,8 +1,10 @@
-﻿from datetime import datetime
+from datetime import datetime
+
 from flask import current_app
 
-from app.models import FileObject, LabDailyReport, Laboratory, OperationLog
-from app.services.db_router_service import campus_db_session, get_routed_campus_ids
+from app.extensions import db
+from app.models import FileObject, LabDailyReport, Laboratory, OperationLog, User
+from app.services.db_router_service import campus_db_session, get_routed_campus_ids, summary_db_session
 from app.services.event_bus_service import publish_async_event
 from app.services.notification_service import create_notification
 from app.utils.exceptions import AppError
@@ -11,6 +13,32 @@ from app.utils.validators import parse_date
 
 def _write_log(session, user_id, action, detail):
     session.add(OperationLog(user_id=user_id, module="daily_report", action=action, detail=detail))
+
+
+def _load_user_name_map(user_ids):
+    ids = sorted({int(uid) for uid in (user_ids or []) if uid})
+    if not ids:
+        return {}
+
+    def _query_names(session):
+        rows = session.query(User).filter(User.id.in_(ids)).all()
+        return {
+            int(row.id): (str(row.real_name or "").strip() or str(row.username or "").strip() or f"用户#{row.id}")
+            for row in rows
+        }
+
+    try:
+        with summary_db_session() as session:
+            name_map = _query_names(session)
+            if name_map:
+                return name_map
+    except Exception:
+        pass
+
+    try:
+        return _query_names(db.session)
+    except Exception:
+        return {}
 
 
 def _bind_photo_file_ids(session, current_user, campus_id, report_id, file_ids):
@@ -55,14 +83,12 @@ def _resolve_campus_for_report(current_user, lab_id):
             raise AppError("当前用户未绑定校区", 400, 40092)
         campus_ids = [current_user.campus_id]
 
-    # 在分库场景下，按候选校区尝试查找该实验室。
     for campus_id in campus_ids:
         with campus_db_session(campus_id) as session:
             lab = session.query(Laboratory).get(int(lab_id))
             if lab:
                 return campus_id, lab
 
-    # 回退默认库一次，避免未开启分库时因 campus_ids 为空导致误判。
     with campus_db_session(0) as session:
         lab = session.query(Laboratory).get(int(lab_id))
         if lab:
@@ -133,7 +159,20 @@ def _list_reports_in_one_campus(session, current_user, filters):
     if filters.get("report_date"):
         query = query.filter_by(report_date=parse_date(filters.get("report_date"), "report_date"))
 
-    return [item.to_dict() for item in query.all()]
+    rows = [item.to_dict() for item in query.all()]
+    user_ids = []
+    for row in rows:
+        if row.get("reporter_id"):
+            user_ids.append(row.get("reporter_id"))
+        if row.get("reviewer_id"):
+            user_ids.append(row.get("reviewer_id"))
+    user_name_map = _load_user_name_map(user_ids)
+    for row in rows:
+        reporter_id = row.get("reporter_id")
+        reviewer_id = row.get("reviewer_id")
+        row["reporter_name"] = user_name_map.get(int(reporter_id), "") if reporter_id else ""
+        row["reviewer_name"] = user_name_map.get(int(reviewer_id), "") if reviewer_id else ""
+    return rows
 
 
 def list_daily_reports(current_user, filters):
@@ -201,7 +240,6 @@ def review_daily_report(current_user, report_item, review_status, review_remark=
                     biz_id=item.id,
                 )
             except Exception as notify_error:
-                # ??????????????????????
                 current_app.logger.warning("create daily report notification failed: %s", notify_error)
             _write_log(session, current_user.id, "review", f"审核日报#{item.id}: {status}")
             session.commit()
