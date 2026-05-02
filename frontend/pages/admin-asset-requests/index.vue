@@ -56,14 +56,17 @@
       <input
         v-model="nlQuery"
         class="input ai-toolbar__input"
-        placeholder="自然语言查询：例如 查已入库的交换机资产"
+        :placeholder="nlPlaceholder"
       />
       <view class="ai-toolbar__btn" :class="{ disabled: nlLoading }" @click="runNlQuery">
         {{ nlLoading ? '查询中...' : 'AI查询' }}
       </view>
       <view class="ai-toolbar__btn ai-toolbar__btn--light" @click="clearNlQuery">清空</view>
     </view>
-    <view v-if="nlReply" class="ai-reply">{{ nlReply }}</view>
+    <view class="report-total">
+      总条数：{{ panelTotalCount }} 条
+      <text class="report-total__sub">当前显示：{{ panelShownCount }} 条</text>
+    </view>
 
     <view v-if="panelMode === 'requests'" class="card table-card">
         <view class="table-header req-grid">
@@ -77,7 +80,7 @@
 
         <view v-if="!filteredList.length" class="empty-text">暂无资产申报记录</view>
 
-        <view v-for="item in filteredList" :key="rowKey(item)" class="table-row req-grid">
+        <view v-for="item in pagedRequestList" :key="rowKey(item)" class="table-row req-grid">
           <view>
             <view class="mono">{{ item.request_no }}</view>
             <view class="row-sub">{{ timeText(item.created_at) }}</view>
@@ -93,10 +96,22 @@
           <text>{{ moneyText(item.amount) }}</text>
           <text :class="statusClass(item.status)">{{ statusText(item.status) }}</text>
           <view class="actions">
+            <view class="pill" @click="openRequestDetail(item)">详情</view>
             <view v-if="item.status === 'pending'" class="pill" @click="approve(item, 'approved')">通过</view>
             <view v-if="item.status === 'pending'" class="pill pill-danger" @click="approve(item, 'rejected')">驳回</view>
             <view v-if="item.status === 'approved' && !isRequestStocked(item)" class="pill pill-primary" @click="openStockInModal(item)">入库登记</view>
             <view v-if="item.status === 'approved' && isRequestStocked(item)" class="pill">已入库</view>
+          </view>
+        </view>
+
+        <view v-if="filteredList.length" class="pager">
+          <view class="pager-left">
+            <text>第 {{ pageNo }} / {{ totalPages }} 页</text>
+            <text class="pager-muted">每页 10 条</text>
+          </view>
+          <view class="pager-right">
+            <view class="pill" :class="{ 'pill-disabled': pageNo <= 1 }" @click="goPrevPage">上一页</view>
+            <view class="pill" :class="{ 'pill-disabled': pageNo >= totalPages }" @click="goNextPage">下一页</view>
           </view>
         </view>
     </view>
@@ -115,7 +130,7 @@
 
         <view v-if="!filteredAssetRows.length" class="empty-text">暂无已入库资产</view>
 
-        <view v-for="item in filteredAssetRows" :key="rowKey(item)" class="table-row asset-grid">
+        <view v-for="item in pagedAssetRows" :key="rowKey(item)" class="table-row asset-grid">
           <text class="mono">{{ item.asset_code }}</text>
           <text>{{ item.asset_name }}</text>
           <text>{{ item.category }}</text>
@@ -147,6 +162,44 @@
             <view v-else class="row-sub">暂无图片</view>
           </view>
         </view>
+
+        <view v-if="filteredAssetRows.length" class="pager">
+          <view class="pager-left">
+            <text>第 {{ pageNo }} / {{ totalPages }} 页</text>
+            <text class="pager-muted">每页 10 条</text>
+          </view>
+          <view class="pager-right">
+            <view class="pill" :class="{ 'pill-disabled': pageNo <= 1 }" @click="goPrevPage">上一页</view>
+            <view class="pill" :class="{ 'pill-disabled': pageNo >= totalPages }" @click="goNextPage">下一页</view>
+          </view>
+        </view>
+    </view>
+
+    <view v-if="requestDetailVisible" class="stock-modal-mask" @click="closeRequestDetail">
+      <view class="stock-modal request-detail-modal" @click.stop>
+        <view class="stock-modal__head">
+          <view class="stock-modal__title">申报详情</view>
+          <view class="stock-modal__close" @click="closeRequestDetail">×</view>
+        </view>
+        <view class="request-detail-grid">
+          <view class="request-detail-item"><text class="label">申报单号</text><text>{{ activeRequest.request_no || '--' }}</text></view>
+          <view class="request-detail-item"><text class="label">设备名称</text><text>{{ activeRequest.asset_name || '--' }}</text></view>
+          <view class="request-detail-item"><text class="label">设备类别</text><text>{{ activeRequest.category || '--' }}</text></view>
+          <view class="request-detail-item"><text class="label">数量</text><text>{{ activeRequest.quantity || '--' }}</text></view>
+          <view class="request-detail-item"><text class="label">单价</text><text>{{ moneyText(activeRequest.unit_price) }}</text></view>
+          <view class="request-detail-item"><text class="label">总金额</text><text>{{ moneyText(activeRequest.amount) }}</text></view>
+          <view class="request-detail-item"><text class="label">申请人</text><text>{{ activeRequest.requester_name || '--' }}</text></view>
+          <view class="request-detail-item"><text class="label">校区/实验室</text><text>{{ activeRequest.campus_name || '--' }} / {{ activeRequest.lab_name || '--' }}</text></view>
+          <view class="request-detail-item"><text class="label">状态</text><text :class="statusClass(activeRequest.status)">{{ statusText(activeRequest.status) }}</text></view>
+          <view class="request-detail-item"><text class="label">提交时间</text><text>{{ timeText(activeRequest.created_at) }}</text></view>
+          <view class="request-detail-item"><text class="label">审批意见</text><text>{{ activeRequest.review_remark || '--' }}</text></view>
+          <view class="request-detail-item"><text class="label">审批时间</text><text>{{ timeText(activeRequest.reviewed_at) }}</text></view>
+        </view>
+        <view class="field">
+          <view class="label">申报说明</view>
+          <view class="request-detail-reason">{{ activeRequest.reason || '无申报说明' }}</view>
+        </view>
+      </view>
     </view>
 
     <view v-if="showStockInModal" class="stock-modal-mask" @click="closeStockInModal">
@@ -256,6 +309,10 @@ export default {
         { label: '已驳回', value: 'rejected' }
       ],
       selectedStatus: '',
+      pageNo: 1,
+      pageSize: 10,
+      requestDetailVisible: false,
+      activeRequest: {},
       showStockInModal: false,
       stockInSubmitting: false,
       currentRequest: {},
@@ -267,7 +324,6 @@ export default {
       ],
       nlQuery: '',
       nlLoading: false,
-      nlReply: '',
       stockStatusIndex: 0,
       stockInForm: {
         asset_code: '',
@@ -293,6 +349,10 @@ export default {
     searchPlaceholder() {
       if (this.panelMode === 'assets') return '搜索资产编码/名称/类别/规格/厂家/存放位置'
       return '搜索申报单号/设备名称/申请人'
+    },
+    nlPlaceholder() {
+      if (this.panelMode === 'assets') return '自然语言查询：例如 查维修中的交换机资产'
+      return '自然语言查询：例如 查本周被驳回的申报'
     },
     filteredList() {
       const text = this.keyword.trim().toLowerCase()
@@ -348,6 +408,40 @@ export default {
         ]
         return fields.some((field) => String(field || '').toLowerCase().includes(text))
       })
+    },
+    panelTotalCount() {
+      return this.panelMode === 'assets' ? this.filteredAssetRows.length : this.filteredList.length
+    },
+    panelShownCount() {
+      return this.panelMode === 'assets' ? this.pagedAssetRows.length : this.pagedRequestList.length
+    },
+    totalPages() {
+      return Math.max(1, Math.ceil(this.panelTotalCount / this.pageSize))
+    },
+    pagedRequestList() {
+      const start = (this.pageNo - 1) * this.pageSize
+      return this.filteredList.slice(start, start + this.pageSize)
+    },
+    pagedAssetRows() {
+      const start = (this.pageNo - 1) * this.pageSize
+      return this.filteredAssetRows.slice(start, start + this.pageSize)
+    }
+  },
+  watch: {
+    keyword() {
+      this.pageNo = 1
+    },
+    selectedStatus() {
+      this.pageNo = 1
+    },
+    panelMode() {
+      this.pageNo = 1
+    },
+    requestList() {
+      this.ensurePageInRange()
+    },
+    assetList() {
+      this.ensurePageInRange()
     }
   },
   async onShow() {
@@ -361,6 +455,18 @@ export default {
     await this.reloadAll()
   },
   methods: {
+    ensurePageInRange() {
+      if (this.pageNo < 1) this.pageNo = 1
+      if (this.pageNo > this.totalPages) this.pageNo = this.totalPages
+    },
+    goPrevPage() {
+      if (this.pageNo <= 1) return
+      this.pageNo -= 1
+    },
+    goNextPage() {
+      if (this.pageNo >= this.totalPages) return
+      this.pageNo += 1
+    },
     moneyText(value) {
       const num = Number(value || 0)
       if (!Number.isFinite(num)) return '¥0.00'
@@ -428,7 +534,7 @@ export default {
       ])
       this.requestList = Array.isArray(requestList) ? requestList : []
       this.assetList = Array.isArray(assetList) ? assetList : []
-      this.nlReply = ''
+      this.pageNo = 1
       if (this.isSystemAdmin) {
         await this.loadGlobalBudget()
       }
@@ -461,7 +567,7 @@ export default {
         } else {
           this.selectedStatus = ''
         }
-        this.nlReply = String(result?.reply || '查询完成')
+        this.pageNo = 1
         uni.showToast({ title: '查询成功', icon: 'success' })
       } catch (error) {
         uni.showToast({ title: error?.message || 'AI查询失败', icon: 'none' })
@@ -471,9 +577,9 @@ export default {
     },
     async clearNlQuery() {
       this.nlQuery = ''
-      this.nlReply = ''
       this.keyword = ''
       this.selectedStatus = ''
+      this.pageNo = 1
       await this.reloadAll()
     },
     async loadGlobalBudget() {
@@ -527,6 +633,13 @@ export default {
         description: ''
       }
       this.showStockInModal = true
+    },
+    openRequestDetail(item) {
+      this.activeRequest = item || {}
+      this.requestDetailVisible = true
+    },
+    closeRequestDetail() {
+      this.requestDetailVisible = false
     },
     closeStockInModal() {
       if (this.stockInSubmitting) return
@@ -748,14 +861,17 @@ page {
 }
 
 .ai-toolbar {
-  margin-bottom: 20rpx;
+  margin-bottom: 28rpx;
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  padding: 20rpx !important;
-  border-radius: 22rpx;
-  background: #f6faf6;
-  border: 1rpx solid #d7e7da;
+  gap: 16rpx;
+  flex-wrap: nowrap;
+  border-radius: 26rpx;
+  background: #f0f4fa;
+  border: 1rpx solid #dce7f4;
+  box-shadow: 0 12rpx 32rpx rgba(16, 42, 73, 0.08);
+  transition: all 0.25s ease;
+  padding: 24rpx !important;
 }
 
 .ai-toolbar__input {
@@ -768,21 +884,33 @@ page {
 }
 
 .ai-toolbar__btn {
-  min-width: 140rpx;
-  height: 64rpx;
-  border-radius: 20rpx;
-  display: inline-flex;
+  width: 120rpx;
+  flex-shrink: 0;
+  height: 68rpx;
+  padding: 0 16rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%);
+  border: 1rpx solid #c8e3f6;
+  color: #2b4864;
+  font-size: 24rpx;
+  font-weight: 700;
+  display: flex;
   align-items: center;
   justify-content: center;
-  background: #1f6f54;
-  color: #fff;
-  font-size: 22rpx;
-  font-weight: 700;
+  box-shadow: 0 8rpx 20rpx rgba(77, 123, 160, 0.18);
+  transition: all 0.2s ease;
+}
+
+.ai-toolbar__btn:hover {
+  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%);
+  transform: translateY(-1rpx);
+  box-shadow: 0 12rpx 26rpx rgba(77, 123, 160, 0.24);
 }
 
 .ai-toolbar__btn--light {
-  background: #eef4f0;
-  color: #2b4d3f;
+  background: linear-gradient(180deg, #ffffff 0%, #dcf1ff 100%);
+  border: 1rpx solid #c8e3f6;
+  color: #2b4864;
 }
 
 .ai-toolbar__btn.disabled {
@@ -790,14 +918,17 @@ page {
   pointer-events: none;
 }
 
-.ai-reply {
-  margin: -6rpx 0 18rpx;
-  padding: 12rpx 16rpx;
-  border-radius: 14rpx;
-  background: #f1f8f2;
-  color: #2a5a47;
-  font-size: 22rpx;
-  border: 1rpx solid #d6e9db;
+.report-total {
+  margin: 6rpx 20rpx;
+  color: #2f4f70;
+  font-size: 23rpx;
+  font-weight: 700;
+}
+
+.report-total__sub {
+  margin-left: 16rpx;
+  color: #6f8399;
+  font-weight: 500;
 }
 
 .toolbar:hover {
@@ -1032,6 +1163,38 @@ page {
   font-size: 22rpx;
 }
 
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+  padding: 16rpx;
+  border-top: 1rpx solid #edf2f7;
+}
+
+.pager-left {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  color: #486280;
+  font-size: 22rpx;
+}
+
+.pager-muted {
+  color: #7b8fa6;
+  font-size: 20rpx;
+}
+
+.pager-right {
+  display: flex;
+  gap: 8rpx;
+}
+
+.pill-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 .asset-photo-cell {
   display: flex;
   flex-direction: column;
@@ -1123,6 +1286,40 @@ page {
   font-size: 22rpx;
   color: #60738e;
   margin-bottom: 12rpx;
+}
+
+.request-detail-modal {
+  max-width: 920px;
+}
+
+.request-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10rpx 16rpx;
+  margin-bottom: 10rpx;
+}
+
+.request-detail-item {
+  border: 1rpx solid #e4ebf5;
+  border-radius: 12rpx;
+  background: #f8fbff;
+  padding: 10rpx 12rpx;
+  color: #173350;
+  font-size: 21rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.request-detail-reason {
+  border: 1rpx solid #e4ebf5;
+  border-radius: 12rpx;
+  background: #f8fbff;
+  padding: 12rpx;
+  color: #173350;
+  font-size: 22rpx;
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 .stock-modal .input {
@@ -1277,8 +1474,21 @@ page {
     gap: 8rpx;
   }
 
+  .pager {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pager-right {
+    justify-content: space-between;
+  }
+
   .stock-form-grid.two,
   .stock-form-grid.three {
+    grid-template-columns: 1fr;
+  }
+
+  .request-detail-grid {
     grid-template-columns: 1fr;
   }
 }

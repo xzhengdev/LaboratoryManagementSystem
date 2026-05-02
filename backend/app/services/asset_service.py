@@ -9,6 +9,7 @@ from app.models import (
     GlobalAssetBudget,
     Laboratory,
     OperationLog,
+    User,
 )
 from app.services.db_router_service import campus_db_session, get_routed_campus_ids, summary_db_session
 from app.services.distributed_lock_service import asset_budget_lock
@@ -92,6 +93,32 @@ def _write_budget_ledger(
 
 def _write_log(session, user_id, action, detail):
     session.add(OperationLog(user_id=user_id, module="asset", action=action, detail=detail))
+
+
+def _load_user_name_map(user_ids):
+    ids = sorted({int(uid) for uid in (user_ids or []) if uid})
+    if not ids:
+        return {}
+
+    def _query_names(session):
+        rows = session.query(User).filter(User.id.in_(ids)).all()
+        return {
+            int(row.id): (str(row.real_name or "").strip() or str(row.username or "").strip() or f"用户#{row.id}")
+            for row in rows
+        }
+
+    try:
+        with summary_db_session() as session:
+            name_map = _query_names(session)
+            if name_map:
+                return name_map
+    except Exception:
+        pass
+
+    try:
+        return _query_names(db.session)
+    except Exception:
+        return {}
 
 
 def _lab_belongs_to_campus(campus_id, lab_id):
@@ -275,7 +302,20 @@ def _list_requests_in_one_campus(session, filters, current_user):
         query = query.filter_by(status=str(filters["status"]).strip())
     if filters.get("requester_id") and current_user.role in {"lab_admin", "system_admin"}:
         query = query.filter_by(requester_id=int(filters["requester_id"]))
-    return [item.to_dict() for item in query.all()]
+    rows = [item.to_dict() for item in query.all()]
+    user_ids = []
+    for row in rows:
+        if row.get("requester_id"):
+            user_ids.append(row.get("requester_id"))
+        if row.get("reviewer_id"):
+            user_ids.append(row.get("reviewer_id"))
+    user_name_map = _load_user_name_map(user_ids)
+    for row in rows:
+        requester_id = row.get("requester_id")
+        reviewer_id = row.get("reviewer_id")
+        row["requester_name"] = user_name_map.get(int(requester_id), "") if requester_id else ""
+        row["reviewer_name"] = user_name_map.get(int(reviewer_id), "") if reviewer_id else ""
+    return rows
 
 
 def list_asset_requests(current_user, filters):
@@ -480,4 +520,3 @@ def list_assets(current_user, filters):
 
     with campus_db_session(current_user.campus_id) as session:
         return _list_assets_in_one_campus(session, filters)
-
