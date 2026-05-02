@@ -41,6 +41,7 @@ def _query_daily_reports(current_user, plan: Dict[str, Any]) -> Dict[str, Any]:
     time_scope = str(filters.get("time_scope") or "").strip().lower()
     campus_id = _safe_int(filters.get("campus_id"))
     campus_name = str(filters.get("campus_name") or "").strip()
+    lab_name = str(filters.get("lab_name") or "").strip()
     limit = _normalize_limit(filters.get("limit"))
 
     if status:
@@ -68,6 +69,7 @@ def _query_daily_reports(current_user, plan: Dict[str, Any]) -> Dict[str, Any]:
             "report_date": report_date or "",
             "time_scope": time_scope,
             "campus_name": campus_name,
+            "lab_name": lab_name,
             "keyword": str(filters.get("keyword") or "").strip(),
             "campus_id": campus_id or "",
         },
@@ -192,7 +194,7 @@ def _plan_with_llm(domain: str, message: str, context: Dict[str, Any]) -> Dict[s
         "requests filters: status, category, campus_id, keyword, limit. "
         "assets filters: asset_status, category, campus_id, keyword, limit. "
         "status in [pending, approved, rejected]. asset_status in [in_use, spare, repair]. "
-        "time_scope in [this_week, last_week]. report_date in YYYY-MM-DD."
+        "time_scope in [this_week, last_week, recent_3_days]. report_date in YYYY-MM-DD."
     )
     user_prompt = json.dumps(
         {"domain": domain, "context": context or {}, "message": str(message or "").strip()},
@@ -264,6 +266,7 @@ def _fallback_plan(domain: str, message: str, context: Dict[str, Any]) -> Dict[s
         report_date = _detect_date(text)
         time_scope = _detect_time_scope(text)
         campus_name = _detect_campus_keyword(text)
+        lab_name = _detect_lab_keyword(text)
         if status:
             filters["status"] = status
         if report_date:
@@ -272,6 +275,8 @@ def _fallback_plan(domain: str, message: str, context: Dict[str, Any]) -> Dict[s
             filters["time_scope"] = time_scope
         if campus_name:
             filters["campus_name"] = campus_name
+        if lab_name:
+            filters["lab_name"] = lab_name
     elif mode == "requests":
         status = _normalize_request_status(_detect_status_token(text))
         if status:
@@ -347,6 +352,8 @@ def _detect_time_scope(text: str) -> str:
         return "this_week"
     if any(token in src for token in ["\u4e0a\u5468", "\u4e0a\u661f\u671f", "last week"]):
         return "last_week"
+    if any(token in src for token in ["\u6700\u8fd1\u4e09\u5929", "\u8fd1\u4e09\u5929", "\u6700\u8fd13\u5929", "\u8fd13\u5929", "last 3 days", "recent 3 days"]):
+        return "recent_3_days"
     return ""
 
 
@@ -364,6 +371,24 @@ def _detect_campus_keyword(text: str) -> str:
     if m:
         return m.group(1)
     return ""
+
+
+def _detect_lab_keyword(text: str) -> str:
+    src = str(text or "").strip()
+    if not src:
+        return ""
+    m = re.search(r"([^\s\uff0c,\u3002\uff1b;]{1,24}?\u5b9e\u9a8c\u5ba4)", src)
+    if not m:
+        return ""
+    token = m.group(1).strip()
+    token = re.sub(
+        r"^(?:\u67e5\u8be2|\u67e5\u770b|\u67e5|\u770b\u770b|\u770b\u4e00\u4e0b|\u770b\u4e0b|\u770b|\u5e2e\u6211\u67e5|\u5e2e\u5fd9\u67e5|\u8bf7\u67e5)+",
+        "",
+        token,
+    ).strip()
+    if token in {"\u5b9e\u9a8c\u5ba4", "\u65e5\u62a5\u5b9e\u9a8c\u5ba4"}:
+        return ""
+    return token[:24]
 
 
 def _safe_iso_date(year: int, month: int, day: int) -> str:
@@ -432,13 +457,28 @@ def _extract_quoted_keyword(text: str) -> str:
 def _extract_keyword_from_sentence(text: str, lowered: str) -> str:
     if not _contains_any(text, ["\u641c\u7d22", "\u67e5\u627e", "\u5305\u542b", "\u5173\u952e\u5b57", "\u5173\u952e\u8bcd", "\u540d\u5b57", "\u540d\u79f0"]):
         return ""
-    cleaned = re.sub(r"[\uff0c\u3002\uff1b;,.!?！？]", " ", text or "").strip()
+
+    m_contains = re.search(
+        r'(?:\u5305\u542b|\u542b\u6709|\u542b)\s*["\'\u201c\u201d]?([^"\'\u201c\u201d\uff0c,\u3002\uff1b;]+)',
+        text or "",
+    )
+    if m_contains:
+        candidate = m_contains.group(1).strip()
+        candidate = re.sub(r"(\u7684)?(\u65e5\u62a5|\u8bb0\u5f55|\u5185\u5bb9)$", "", candidate).strip()
+        if candidate:
+            return candidate[:40]
+
+    cleaned = re.sub(r"[\uff0c\u3002\uff1b;,.!?]", " ", text or "").strip()
     for noisy in [
         "\u641c\u7d22",
         "\u67e5\u627e",
         "\u5305\u542b",
+        "\u542b\u6709",
         "\u5173\u952e\u5b57",
         "\u5173\u952e\u8bcd",
+        "\u5185\u5bb9\u91cc",
+        "\u5185\u5bb9\u4e2d",
+        "\u5185\u5bb9",
         "\u540d\u5b57",
         "\u540d\u79f0",
         "\u7684",
@@ -455,35 +495,35 @@ def _extract_keyword_from_sentence(text: str, lowered: str) -> str:
         return ""
     return cleaned
 
-
 def _sanitize_daily_merged_filters(filters: Dict[str, Any], message: str) -> Dict[str, Any]:
     sanitized = dict(filters or {})
     keyword = str(sanitized.get("keyword") or "").strip()
     if keyword:
-        if not _contains_any(message, ["搜索", "查找", "包含", "关键词", "关键字", "名字", "名称"]):
+        if not _contains_any(message, ["\u641c\u7d22", "\u67e5\u627e", "\u5305\u542b", "\u5173\u952e\u8bcd", "\u5173\u952e\u5b57", "\u540d\u5b57", "\u540d\u79f0"]):
             sanitized.pop("keyword", None)
         elif keyword in {
-            "今天",
-            "昨天",
-            "前天",
-            "本周",
-            "这周",
-            "本星期",
-            "这星期",
-            "上周",
-            "待审核",
-            "已通过",
-            "已驳回",
-            "驳回",
-            "通过",
-            "日报",
-            "记录",
+            "\u4eca\u5929",
+            "\u6628\u5929",
+            "\u524d\u5929",
+            "\u672c\u5468",
+            "\u8fd9\u5468",
+            "\u672c\u661f\u671f",
+            "\u8fd9\u661f\u671f",
+            "\u4e0a\u5468",
+            "\u6700\u8fd1\u4e09\u5929",
+            "\u8fd1\u4e09\u5929",
+            "\u5f85\u5ba1\u6838",
+            "\u5df2\u901a\u8fc7",
+            "\u5df2\u9a73\u56de",
+            "\u9a73\u56de",
+            "\u901a\u8fc7",
+            "\u65e5\u62a5",
+            "\u8bb0\u5f55",
         }:
             sanitized.pop("keyword", None)
         elif len(keyword) <= 1:
             sanitized.pop("keyword", None)
     return sanitized
-
 
 def _contains_any(text: str, tokens: List[str]) -> bool:
     src = str(text or "")
@@ -508,6 +548,8 @@ def _resolve_daily_date_range(filters: Dict[str, Any]) -> Tuple[Optional[date], 
     if scope == "last_week":
         last_start = week_start - timedelta(days=7)
         return last_start, last_start + timedelta(days=6)
+    if scope == "recent_3_days":
+        return today - timedelta(days=2), today
     return None, None
 
 
@@ -525,6 +567,7 @@ def _is_row_in_date_range(row: Dict[str, Any], start_date: date, end_date: date)
 def _filter_daily_rows(rows: List[Dict[str, Any]], filters: Dict[str, Any]) -> List[Dict[str, Any]]:
     keyword = str(filters.get("keyword") or "").strip().lower()
     lab_name = str(filters.get("lab_name") or "").strip().lower()
+    lab_core = _normalize_lab_core_keyword(lab_name)
     reporter_name = str(filters.get("reporter_name") or "").strip().lower()
     campus_name = str(filters.get("campus_name") or "").strip().lower()
     if not keyword and not lab_name and not reporter_name and not campus_name:
@@ -534,7 +577,7 @@ def _filter_daily_rows(rows: List[Dict[str, Any]], filters: Dict[str, Any]) -> L
         lab_text = str(row.get("lab_name") or "").lower()
         reporter_text = str(row.get("reporter_name") or "").lower()
         campus_text = str(row.get("campus_name") or "").lower()
-        if lab_name and lab_name not in lab_text:
+        if lab_name and (lab_name not in lab_text and (not lab_core or lab_core not in lab_text)):
             return False
         if reporter_name and reporter_name not in reporter_text:
             return False
@@ -551,6 +594,18 @@ def _filter_daily_rows(rows: List[Dict[str, Any]], filters: Dict[str, Any]) -> L
         return keyword in merged
 
     return [row for row in rows if _hit(row)]
+
+
+def _normalize_lab_core_keyword(lab_name: str) -> str:
+    token = str(lab_name or "").strip().lower()
+    if not token:
+        return ""
+    if token.endswith("\u5b9e\u9a8c\u5ba4"):
+        token = token[: -len("\u5b9e\u9a8c\u5ba4")]
+    token = token.strip()
+    if len(token) <= 1:
+        return ""
+    return token
 
 
 def _filter_request_rows(rows: List[Dict[str, Any]], filters: Dict[str, Any], category: str) -> List[Dict[str, Any]]:
