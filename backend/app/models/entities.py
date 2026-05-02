@@ -19,7 +19,6 @@ class Campus(BaseModel):
     status = db.Column(db.String(20), default="active", nullable=False)
 
     laboratories = db.relationship("Laboratory", backref="campus", lazy=True)
-    users = db.relationship("User", backref="campus", lazy=True)
 
 
 class User(BaseModel):
@@ -36,8 +35,7 @@ class User(BaseModel):
     campus_id = db.Column(db.Integer, db.ForeignKey("campuses.id"))
     status = db.Column(db.String(20), default="active", nullable=False)
 
-    reservations = db.relationship("Reservation", backref="user", lazy=True)
-    approvals = db.relationship("Approval", backref="approver", lazy=True)
+    campus = db.relationship("Campus")
 
     def set_password(self, password):
         # 保存密码时只保存哈希，不保存明文。
@@ -121,7 +119,7 @@ class Reservation(BaseModel):
         db.Index("idx_reservation_user_created_at", "user_id", "created_at"),
     )
 
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    user_id = db.Column(db.Integer, nullable=False)
     campus_id = db.Column(db.Integer, db.ForeignKey("campuses.id"), nullable=False)
     lab_id = db.Column(db.Integer, db.ForeignKey("laboratories.id"), nullable=False)
     reservation_date = db.Column(db.Date, nullable=False)
@@ -139,7 +137,6 @@ class Reservation(BaseModel):
         # 序列化时补充用户名、校区名、实验室名，便于前端直接渲染。
         return super().to_dict(
             {
-                "user_name": self.user.real_name if self.user else None,
                 "campus_name": self.campus.campus_name if self.campus else None,
                 "lab_name": self.lab.lab_name if self.lab else None,
                 **(extra or {}),
@@ -160,18 +157,17 @@ class IdempotencyRecord(BaseModel):
         db.Index("idx_idempotency_expires_at", "expires_at"),
     )
 
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    user_id = db.Column(db.Integer, nullable=False)
     endpoint = db.Column(db.String(64), nullable=False)
     idempotency_key = db.Column(db.String(128), nullable=False)
     request_hash = db.Column(db.String(64), nullable=False)
     status = db.Column(db.String(20), default="processing", nullable=False)
     response_payload = db.Column(db.Text)
-    reservation_id = db.Column(db.Integer, db.ForeignKey("reservations.id"))
+    reservation_id = db.Column(db.Integer)
     http_status = db.Column(db.Integer, default=200, nullable=False)
     error_message = db.Column(db.String(255))
     expires_at = db.Column(db.DateTime, nullable=False)
 
-    user = db.relationship("User")
 
 
 class Approval(db.Model):
@@ -182,7 +178,7 @@ class Approval(db.Model):
     reservation_id = db.Column(
         db.Integer, db.ForeignKey("reservations.id"), nullable=False
     )
-    approver_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    approver_id = db.Column(db.Integer, nullable=False)
     approval_status = db.Column(db.String(20), nullable=False)
     remark = db.Column(db.String(255))
     approval_time = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -209,13 +205,11 @@ class OperationLog(db.Model):
     __tablename__ = "operation_logs"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    user_id = db.Column(db.Integer, nullable=False)
     module = db.Column(db.String(50), nullable=False)
     action = db.Column(db.String(50), nullable=False)
     detail = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-
-    user = db.relationship("User")
 
     def to_dict(self, extra=None):
         # 日志字段较少，手动序列化即可。
@@ -250,17 +244,15 @@ class FileObject(BaseModel):
     mime_type = db.Column(db.String(100))
     size = db.Column(db.Integer, default=0, nullable=False)
     sha256 = db.Column(db.String(64), nullable=False)
-    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_by = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(20), default="active", nullable=False)
 
     campus = db.relationship("Campus")
-    uploader = db.relationship("User")
 
     def to_dict(self, extra=None):
         return super().to_dict(
             {
                 "campus_name": self.campus.campus_name if self.campus else None,
-                "uploader_name": self.uploader.real_name if self.uploader else None,
                 **(extra or {}),
             }
         )
@@ -302,7 +294,7 @@ class AssetPurchaseRequest(BaseModel):
     request_no = db.Column(db.String(40), nullable=False)
     campus_id = db.Column(db.Integer, db.ForeignKey("campuses.id"), nullable=False)
     lab_id = db.Column(db.Integer, db.ForeignKey("laboratories.id"))
-    requester_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    requester_id = db.Column(db.Integer, nullable=False)
     asset_name = db.Column(db.String(100), nullable=False)
     category = db.Column(db.String(50), nullable=False)
     quantity = db.Column(db.Integer, default=1, nullable=False)
@@ -310,22 +302,18 @@ class AssetPurchaseRequest(BaseModel):
     amount = db.Column(db.Numeric(12, 2), nullable=False)
     reason = db.Column(db.Text)
     status = db.Column(db.String(20), default="pending", nullable=False)
-    reviewer_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    reviewer_id = db.Column(db.Integer)
     review_remark = db.Column(db.String(255))
     reviewed_at = db.Column(db.DateTime)
 
     campus = db.relationship("Campus")
     lab = db.relationship("Laboratory")
-    requester = db.relationship("User", foreign_keys=[requester_id])
-    reviewer = db.relationship("User", foreign_keys=[reviewer_id])
 
     def to_dict(self, extra=None):
         return super().to_dict(
             {
                 "campus_name": self.campus.campus_name if self.campus else None,
                 "lab_name": self.lab.lab_name if self.lab else None,
-                "requester_name": self.requester.real_name if self.requester else None,
-                "reviewer_name": self.reviewer.real_name if self.reviewer else None,
                 **(extra or {}),
             }
         )
@@ -346,18 +334,16 @@ class AssetBudgetLedger(BaseModel):
     after_locked = db.Column(db.Numeric(12, 2), nullable=False)
     before_used = db.Column(db.Numeric(12, 2), nullable=False)
     after_used = db.Column(db.Numeric(12, 2), nullable=False)
-    operator_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    operator_id = db.Column(db.Integer, nullable=False)
     remark = db.Column(db.String(255))
 
     campus = db.relationship("Campus")
     request = db.relationship("AssetPurchaseRequest")
-    operator = db.relationship("User")
 
     def to_dict(self, extra=None):
         return super().to_dict(
             {
                 "campus_name": self.campus.campus_name if self.campus else None,
-                "operator_name": self.operator.real_name if self.operator else None,
                 **(extra or {}),
             }
         )
@@ -414,7 +400,7 @@ class NotificationMessage(BaseModel):
     )
 
     campus_id = db.Column(db.Integer, db.ForeignKey("campuses.id"), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    user_id = db.Column(db.Integer, nullable=False)
     title = db.Column(db.String(100), nullable=False)
     content = db.Column(db.String(500), nullable=False)
     level = db.Column(db.String(20), default="info", nullable=False)
@@ -424,13 +410,11 @@ class NotificationMessage(BaseModel):
     read_at = db.Column(db.DateTime)
 
     campus = db.relationship("Campus")
-    user = db.relationship("User")
 
     def to_dict(self, extra=None):
         return super().to_dict(
             {
                 "campus_name": self.campus.campus_name if self.campus else None,
-                "user_name": self.user.real_name if self.user else None,
                 **(extra or {}),
             }
         )
@@ -446,18 +430,16 @@ class LabDailyReport(BaseModel):
 
     campus_id = db.Column(db.Integer, db.ForeignKey("campuses.id"), nullable=False)
     lab_id = db.Column(db.Integer, db.ForeignKey("laboratories.id"), nullable=False)
-    reporter_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    reporter_id = db.Column(db.Integer, nullable=False)
     report_date = db.Column(db.Date, nullable=False)
     content = db.Column(db.Text)
     status = db.Column(db.String(20), default="pending", nullable=False)
-    reviewer_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    reviewer_id = db.Column(db.Integer)
     review_remark = db.Column(db.String(255))
     reviewed_at = db.Column(db.DateTime)
 
     campus = db.relationship("Campus")
     lab = db.relationship("Laboratory")
-    reporter = db.relationship("User", foreign_keys=[reporter_id])
-    reviewer = db.relationship("User", foreign_keys=[reviewer_id])
 
     def to_dict(self, extra=None):
         active_session = object_session(self)
@@ -473,8 +455,6 @@ class LabDailyReport(BaseModel):
             {
                 "campus_name": self.campus.campus_name if self.campus else None,
                 "lab_name": self.lab.lab_name if self.lab else None,
-                "reporter_name": self.reporter.real_name if self.reporter else None,
-                "reviewer_name": self.reviewer.real_name if self.reviewer else None,
                 "photos": [item.to_dict() for item in photos],
                 **(extra or {}),
             }

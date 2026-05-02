@@ -14,16 +14,13 @@ from app import create_app
 from app.extensions import db
 from app.models import *  # noqa: F401,F403
 
-# 校区库: 14 张业务表 (不含已废弃的 asset_budgets)
 CAMPUS_TABLE_NAMES = [
     "campuses",
-    "users",
     "laboratories",
     "equipment",
     "reservations",
     "approvals",
     "operation_logs",
-    "idempotency_records",
     "file_objects",
     "asset_purchase_requests",
     "asset_budget_ledgers",
@@ -32,25 +29,13 @@ CAMPUS_TABLE_NAMES = [
     "lab_daily_reports",
 ]
 
-# 中心汇总库: 14 张业务表 + 2 张汇总专属表 (共 16 张)
-# 汇总库保存全量数据用于认证、用户管理和跨校区聚合查询
+# 中心汇总库仅保留认证/用户/全局预算/幂等/快照 5 张表
 SUMMARY_TABLE_NAMES = [
-    "campuses",
     "users",
-    "laboratories",
-    "equipment",
-    "reservations",
-    "approvals",
-    "operation_logs",
-    "idempotency_records",
-    "file_objects",
-    "asset_purchase_requests",
-    "asset_budget_ledgers",
-    "asset_items",
-    "notification_messages",
-    "lab_daily_reports",
+    "campuses",
     "campus_summary_snapshots",
     "global_asset_budgets",
+    "idempotency_records",
 ]
 
 
@@ -96,7 +81,7 @@ def main():
 
         print(f"[INFO] Found {len(campus_map)} campus DB configs")
         for campus_id in sorted(campus_map.keys()):
-            print(f"[INFO] Init campus {campus_id} schema ({len(CAMPUS_TABLE_NAMES)} tables)...")
+            print(f"[INFO] Init campus {campus_id} schema ({len(CAMPUS_TABLE_NAMES)} 张表)...")
             ensure_schema(campus_map[campus_id], CAMPUS_TABLE_NAMES)
             print(f"[OK] Campus {campus_id} done")
 

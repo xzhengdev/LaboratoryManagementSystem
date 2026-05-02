@@ -200,6 +200,7 @@ def get_lab_schedule(lab, target_date):
         return cached
 
     with campus_db_session(lab.campus_id) as session:
+        lab = session.get(Laboratory, lab.id)
         reservations = (
             session.query(Reservation)
             .filter_by(lab_id=lab.id, reservation_date=target_date)

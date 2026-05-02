@@ -126,3 +126,33 @@ def summary_db_session():
         yield session
     finally:
         session.close()
+
+
+def find_across_campuses(model_class, item_id, campus_ids=None):
+    """在所有校区库中按 ID 查找记录，返回 (item, campus_id) 或 (None, None)。"""
+    if campus_ids is None:
+        campus_ids = get_routed_campus_ids()
+    if not campus_ids:
+        with campus_db_session(0) as session:
+            item = session.get(model_class, int(item_id))
+            return (item, 0) if item else (None, None)
+    for cid in campus_ids:
+        with campus_db_session(cid) as session:
+            item = session.get(model_class, int(item_id))
+            if item is not None:
+                return item, cid
+    return None, None
+
+
+def aggregate_across_campuses(model_class, filters_fn, campus_ids=None):
+    """聚合所有校区库的查询结果，返回合并后的列表。"""
+    if campus_ids is None:
+        campus_ids = get_routed_campus_ids()
+    if not campus_ids:
+        with campus_db_session(0) as session:
+            return filters_fn(session)
+    rows = []
+    for cid in campus_ids:
+        with campus_db_session(cid) as session:
+            rows.extend(filters_fn(session))
+    return rows

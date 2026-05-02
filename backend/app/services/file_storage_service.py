@@ -258,6 +258,26 @@ def save_image_file(current_user, file_storage, campus_id, biz_type, biz_id=None
 
     active_session = session or db.session
 
+    # 头像、校区封面等一对一场景：复用以 biz_type + biz_id 唯一标识的旧记录
+    SINGLE_IMAGE_BIZ_TYPES = {"avatar", "campus_cover", "lab_photo", "asset_photo"}
+    if biz_id is not None and biz_type in SINGLE_IMAGE_BIZ_TYPES:
+        existing = (
+            active_session.query(FileObject)
+            .filter_by(biz_type=biz_type, biz_id=biz_id, status="active")
+            .first()
+        )
+        if existing:
+            existing.file_id = storage_result["file_id"]
+            existing.url = storage_result["url"]
+            existing.original_name = filename
+            existing.storage_backend = storage_result["storage_backend"]
+            existing.mime_type = mime_type
+            existing.size = len(file_bytes)
+            existing.sha256 = digest
+            existing.created_by = current_user.id
+            active_session.flush()
+            return existing
+
     item = FileObject(
         campus_id=int(campus_id),
         biz_type=biz_type,

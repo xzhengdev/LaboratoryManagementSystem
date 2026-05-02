@@ -35,7 +35,7 @@ def main():
 
         teacher_login_resp = client.post(
             "/api/auth/login",
-            json={"username": "teacher1", "password": "123456"},
+            json={"username": "20210001", "password": "123456"},
         )
         teacher_login_data = assert_ok(teacher_login_resp, "教师登录")
         teacher_token = teacher_login_data["token"]
@@ -45,13 +45,13 @@ def main():
 
         student_login_resp = client.post(
             "/api/auth/login",
-            json={"username": "student1", "password": "123456"},
+            json={"username": "22140166", "password": "123456"},
         )
         student_login_data = assert_ok(student_login_resp, "学生登录")
         student_token = student_login_data["token"]
         student_profile = student_login_data["user"]
         if student_profile.get("campus_id") != campus_id:
-            raise RuntimeError("冒烟测试要求 student1 与 teacher1 在同一校区")
+            raise RuntimeError("冒烟测试要求 22140166 与 20210001 在同一校区")
         student_headers = {"Authorization": f"Bearer {student_token}"}
 
         labs_resp = client.get(f"/api/labs?campus_id={campus_id}", headers=teacher_headers)

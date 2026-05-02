@@ -183,6 +183,12 @@ def upload_campus_cover():
         response_data = file_obj.to_dict()
         session.commit()
 
+    # 同步更新汇总库中校区的 cover_url
+    campus = Campus.query.get(campus_id)
+    if campus:
+        campus.cover_url = response_data["url"]
+        db.session.commit()
+
     return success(response_data, '校区封面上传成功')
 
 

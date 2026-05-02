@@ -11,16 +11,13 @@ if BACKEND_ROOT not in sys.path:
 
 from app import create_app
 
-# 校区库应有表：用户/实验室/预约/资产/日报/文件/幂等/审批/日志/通知/预算流水
 CAMPUS_TABLES = [
     "campuses",
-    "users",
     "laboratories",
     "equipment",
     "reservations",
     "approvals",
     "operation_logs",
-    "idempotency_records",
     "file_objects",
     "asset_purchase_requests",
     "asset_budget_ledgers",
@@ -29,24 +26,12 @@ CAMPUS_TABLES = [
     "lab_daily_reports",
 ]
 
-# 中心汇总库应有表：14 张业务表 + 2 张汇总专属表 (共 16 张，不含 asset_budgets)
 SUMMARY_TABLES = [
-    "campuses",
     "users",
-    "laboratories",
-    "equipment",
-    "reservations",
-    "approvals",
-    "operation_logs",
-    "idempotency_records",
-    "file_objects",
-    "asset_purchase_requests",
-    "asset_budget_ledgers",
-    "asset_items",
-    "notification_messages",
-    "lab_daily_reports",
+    "campuses",
     "campus_summary_snapshots",
     "global_asset_budgets",
+    "idempotency_records",
 ]
 
 
@@ -110,19 +95,17 @@ def main():
 
         passed = True
 
-        # 校区库校验
         print("=" * 50)
-        print("[检查] 校区数据库 (应含 14 张业务表)")
+        print("[检查] 校区数据库 (应含 12 张业务表)")
         print("=" * 50)
         for campus_id in sorted(campus_map.keys()):
             ok = check_one_db(f"校区-{campus_id}", campus_map[campus_id], CAMPUS_TABLES)
             passed = passed and ok
 
-        # 中心汇总库校验
         if summary_uri:
             print()
             print("=" * 50)
-            print("[检查] 中心汇总库 (应含 16 张表: 14 业务 + 2 汇总)")
+            print("[检查] 中心汇总库 (应含 5 张表: 认证/用户/全局预算/快照/幂等)")
             print("=" * 50)
             ok = check_one_db("中心汇总库", summary_uri, SUMMARY_TABLES)
             passed = passed and ok

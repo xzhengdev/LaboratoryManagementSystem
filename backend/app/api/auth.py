@@ -5,7 +5,6 @@
 from flask import Blueprint, request  # Flask核心：蓝图、请求对象
 from flask_jwt_extended import jwt_required        # JWT装饰器：要求请求携带有效令牌
 from app.extensions import db                       # 数据库实例
-from app.models import User
 from app.services.auth_service import login         # 认证服务：处理登录逻辑
 from app.services.db_router_service import campus_db_session
 from app.services.file_storage_service import save_image_file
@@ -142,9 +141,6 @@ def upload_avatar_api():
         )
         response_data = file_obj.to_dict()
         file_url = file_obj.url
-        shard_user = session.query(User).get(int(current_user.id))
-        if shard_user:
-            shard_user.avatar_url = file_url
         session.commit()
 
     user = get_current_user()

@@ -3,7 +3,7 @@ from datetime import datetime, time
 from sqlalchemy import or_
 
 from app.extensions import db
-from app.models import OperationLog, User
+from app.models import OperationLog
 from app.services.db_router_service import campus_db_session, get_routed_campus_ids
 from app.utils.exceptions import AppError
 
@@ -31,9 +31,7 @@ def _parse_limit(value):
 
 
 def _build_base_query(session, current_user, filters):
-    query = session.query(OperationLog).join(User, OperationLog.user_id == User.id)
-    if current_user.role == "lab_admin":
-        query = query.filter(User.campus_id == current_user.campus_id)
+    query = session.query(OperationLog)
 
     module = str(filters.get("module") or "").strip()
     if module:
@@ -58,8 +56,6 @@ def _build_base_query(session, current_user, filters):
                 OperationLog.module.ilike(like_text),
                 OperationLog.action.ilike(like_text),
                 OperationLog.detail.ilike(like_text),
-                User.username.ilike(like_text),
-                User.real_name.ilike(like_text),
             )
         )
 
@@ -80,27 +76,9 @@ def _build_base_query(session, current_user, filters):
     return query
 
 
-def _format_items(items):
-    return [
-        item.to_dict(
-            {
-                "username": item.user.username if item.user else None,
-                "real_name": item.user.real_name if item.user else None,
-                "role": item.user.role if item.user else None,
-                "campus_id": item.user.campus_id if item.user else None,
-                "campus_name": item.user.campus.campus_name
-                if item.user and item.user.campus
-                else None,
-            }
-        )
-        for item in items
-    ]
-
-
 def list_operation_logs(current_user, filters):
     limit = _parse_limit(filters.get("limit"))
 
-    # 开启分库后日志落在各校区库，这里需要按校区聚合查询
     campus_ids = get_routed_campus_ids()
     if campus_ids:
         target_ids = campus_ids
@@ -116,7 +94,7 @@ def list_operation_logs(current_user, filters):
                     .limit(limit)
                     .all()
                 )
-                merged.extend(_format_items(items))
+                merged.extend([item.to_dict() for item in items])
 
         merged.sort(
             key=lambda row: (
@@ -127,11 +105,10 @@ def list_operation_logs(current_user, filters):
         )
         return merged[:limit]
 
-    # 单库回退
     query = _build_base_query(db.session, current_user, filters)
     items = (
         query.order_by(OperationLog.created_at.desc(), OperationLog.id.desc())
         .limit(limit)
         .all()
     )
-    return _format_items(items)
+    return [item.to_dict() for item in items]
