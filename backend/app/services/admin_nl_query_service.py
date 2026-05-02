@@ -1,7 +1,7 @@
 import json
 import re
 from datetime import date, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
@@ -15,10 +15,15 @@ MAX_LIMIT = 500
 META_FLAG = "__META__="
 
 
-def query_admin_data(current_user, domain: str, message: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def query_admin_data(
+    current_user,
+    domain: str,
+    message: str,
+    context: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     normalized_domain = str(domain or "").strip().lower()
     if normalized_domain not in {"daily_reports", "assets"}:
-        raise AppError("domain 仅支持 daily_reports 或 assets", 400, 40098)
+        raise AppError("domain only supports daily_reports or assets", 400, 40098)
 
     ctx = context or {}
     plan = _plan_query(normalized_domain, message, ctx)
@@ -30,9 +35,12 @@ def query_admin_data(current_user, domain: str, message: str, context: Optional[
 def _query_daily_reports(current_user, plan: Dict[str, Any]) -> Dict[str, Any]:
     filters = plan.get("filters") or {}
     service_filters: Dict[str, Any] = {}
+
     status = _normalize_request_status(filters.get("status"))
     report_date = _normalize_date(filters.get("report_date"))
+    time_scope = str(filters.get("time_scope") or "").strip().lower()
     campus_id = _safe_int(filters.get("campus_id"))
+    campus_name = str(filters.get("campus_name") or "").strip()
     limit = _normalize_limit(filters.get("limit"))
 
     if status:
@@ -43,15 +51,23 @@ def _query_daily_reports(current_user, plan: Dict[str, Any]) -> Dict[str, Any]:
         service_filters["campus_id"] = campus_id
 
     rows = list_daily_reports(current_user, service_filters)
+    start_date, end_date = _resolve_daily_date_range(filters)
+    if start_date and end_date:
+        rows = [row for row in rows if _is_row_in_date_range(row, start_date, end_date)]
+        service_filters["report_date_start"] = start_date.isoformat()
+        service_filters["report_date_end"] = end_date.isoformat()
+
     rows = _filter_daily_rows(rows, filters)
     total = len(rows)
     rows = rows[:limit]
 
     return {
-        "reply": _build_reply(plan.get("reply"), total, "巡查结果"),
+        "reply": _build_reply(plan.get("reply"), total, "日报"),
         "filters": {
             "status": status or "",
             "report_date": report_date or "",
+            "time_scope": time_scope,
+            "campus_name": campus_name,
             "keyword": str(filters.get("keyword") or "").strip(),
             "campus_id": campus_id or "",
         },
@@ -108,7 +124,7 @@ def _query_assets(current_user, plan: Dict[str, Any], context: Dict[str, Any]) -
 
     status = _normalize_request_status(filters.get("status"))
     category = str(filters.get("category") or "").strip()
-    service_filters = {}
+    service_filters: Dict[str, Any] = {}
     if status:
         service_filters["status"] = status
     if campus_id and campus_id > 0:
@@ -146,10 +162,17 @@ def _plan_query(domain: str, message: str, context: Dict[str, Any]) -> Dict[str,
         planned = _plan_with_llm(domain, message, context)
         if not isinstance(planned, dict):
             return fallback
+
         fallback_filters = _compact_filters(fallback.get("filters") or {})
         planned_filters = _compact_filters(planned.get("filters") or {})
         merged_filters = dict(fallback_filters)
-        merged_filters.update(planned_filters)
+        # fallback fields are deterministic; llm only fills missing fields
+        for key, value in planned_filters.items():
+            if key not in merged_filters or _is_blank_filter_value(merged_filters.get(key)):
+                merged_filters[key] = value
+        if domain == "daily_reports":
+            merged_filters = _sanitize_daily_merged_filters(merged_filters, message)
+
         return {
             "mode": planned.get("mode") or fallback.get("mode", ""),
             "filters": merged_filters,
@@ -161,14 +184,15 @@ def _plan_query(domain: str, message: str, context: Dict[str, Any]) -> Dict[str,
 
 def _plan_with_llm(domain: str, message: str, context: Dict[str, Any]) -> Dict[str, Any]:
     system_prompt = (
-        "你是管理后台查询解析器。只输出 JSON，不要输出解释。\n"
-        "JSON 结构: {\"mode\":\"\", \"filters\":{}, \"reply\":\"\"}\n"
-        "domain=daily_reports 时 mode 为空字符串；filters 可用键: status, report_date, campus_id, lab_name, reporter_name, keyword, limit。\n"
-        "domain=assets 时 mode 只能是 requests 或 assets；\n"
-        "requests 模式 filters 可用键: status, category, campus_id, keyword, limit；\n"
-        "assets 模式 filters 可用键: asset_status, category, campus_id, keyword, limit。\n"
-        "status 仅允许 pending/approved/rejected；asset_status 仅允许 in_use/spare/repair。\n"
-        "report_date 必须是 YYYY-MM-DD。"
+        "You are an admin-query parser. Output JSON only, no prose. "
+        "Schema: {\"mode\":\"\", \"filters\":{}, \"reply\":\"\"}. "
+        "For domain=daily_reports: mode empty; filters keys: "
+        "status, report_date, time_scope, campus_id, campus_name, lab_name, reporter_name, keyword, limit. "
+        "For domain=assets: mode in [requests, assets]. "
+        "requests filters: status, category, campus_id, keyword, limit. "
+        "assets filters: asset_status, category, campus_id, keyword, limit. "
+        "status in [pending, approved, rejected]. asset_status in [in_use, spare, repair]. "
+        "time_scope in [this_week, last_week]. report_date in YYYY-MM-DD."
     )
     user_prompt = json.dumps(
         {"domain": domain, "context": context or {}, "message": str(message or "").strip()},
@@ -226,9 +250,9 @@ def _fallback_plan(domain: str, message: str, context: Dict[str, Any]) -> Dict[s
     mode = ""
 
     if domain == "assets":
-        if _contains_any(text, ["入库", "台账", "资产编码", "厂家", "规格"]):
+        if _contains_any(text, ["\u5165\u5e93", "\u53f0\u8d26", "\u8d44\u4ea7\u7f16\u7801", "\u5382\u5bb6", "\u89c4\u683c"]):
             mode = "assets"
-        elif _contains_any(text, ["申报", "审批", "申请单", "申请记录"]):
+        elif _contains_any(text, ["\u7533\u62a5", "\u5ba1\u6279", "\u7533\u8bf7\u5355", "\u7533\u8bf7\u8bb0\u5f55"]):
             mode = "requests"
         else:
             mode = str(context.get("mode") or "requests").strip().lower()
@@ -238,22 +262,28 @@ def _fallback_plan(domain: str, message: str, context: Dict[str, Any]) -> Dict[s
     if domain == "daily_reports":
         status = _normalize_request_status(_detect_status_token(text))
         report_date = _detect_date(text)
+        time_scope = _detect_time_scope(text)
+        campus_name = _detect_campus_keyword(text)
         if status:
             filters["status"] = status
         if report_date:
             filters["report_date"] = report_date
+        if time_scope:
+            filters["time_scope"] = time_scope
+        if campus_name:
+            filters["campus_name"] = campus_name
     elif mode == "requests":
         status = _normalize_request_status(_detect_status_token(text))
         if status:
             filters["status"] = status
-        category = _extract_after_keyword(text, ["分类", "类别"])
+        category = _extract_after_keyword(text, ["\u5206\u7c7b", "\u7c7b\u522b"])
         if category:
             filters["category"] = category
     else:
         status = _normalize_asset_status(_detect_asset_status_token(text))
         if status:
             filters["asset_status"] = status
-        category = _extract_after_keyword(text, ["分类", "类别"])
+        category = _extract_after_keyword(text, ["\u5206\u7c7b", "\u7c7b\u522b"])
         if category:
             filters["category"] = category
 
@@ -265,45 +295,74 @@ def _fallback_plan(domain: str, message: str, context: Dict[str, Any]) -> Dict[s
 
 
 def _detect_status_token(text: str) -> str:
-    if _contains_any(text, ["待审核", "待审批", "pending"]):
+    src = str(text or "").lower()
+    if any(token in src for token in ["\u5f85\u5ba1\u6838", "\u5f85\u5ba1\u6279", "pending"]):
         return "pending"
-    if _contains_any(text, ["已通过", "通过", "approved"]):
+    if any(token in src for token in ["\u5df2\u901a\u8fc7", "\u901a\u8fc7", "approved"]):
         return "approved"
-    if _contains_any(text, ["已驳回", "驳回", "rejected"]):
+    if any(token in src for token in ["\u5df2\u9a73\u56de", "\u9a73\u56de", "\u99c1\u56de", "rejected"]):
         return "rejected"
     return ""
 
 
 def _detect_asset_status_token(text: str) -> str:
-    if _contains_any(text, ["在用", "使用中", "in_use"]):
+    src = str(text or "").lower()
+    if any(token in src for token in ["\u5728\u7528", "\u4f7f\u7528\u4e2d", "in_use"]):
         return "in_use"
-    if _contains_any(text, ["备用", "spare"]):
+    if any(token in src for token in ["\u5907\u7528", "spare"]):
         return "spare"
-    if _contains_any(text, ["维修", "维修中", "repair"]):
+    if any(token in src for token in ["\u7ef4\u4fee", "\u7ef4\u4fee\u4e2d", "repair"]):
         return "repair"
     return ""
 
 
 def _detect_date(text: str) -> str:
     today = date.today()
-    m_cn = re.search(r"(\d{1,2})\u6708(\d{1,2})\u65e5", text or "")
+    src = text or ""
+
+    m_cn = re.search(r"(\d{1,2})\u6708(\d{1,2})\u65e5", src)
     if m_cn:
         return _safe_iso_date(today.year, int(m_cn.group(1)), int(m_cn.group(2)))
 
-    m_ymd = re.search(r"(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})", text or "")
+    m_ymd = re.search(r"(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})", src)
     if m_ymd:
         return _safe_iso_date(int(m_ymd.group(1)), int(m_ymd.group(2)), int(m_ymd.group(3)))
 
-    m_md = re.search(r"(?<!\d)(\d{1,2})[-/.](\d{1,2})(?!\d)", text or "")
+    m_md = re.search(r"(?<!\d)(\d{1,2})[-/.](\d{1,2})(?!\d)", src)
     if m_md:
         return _safe_iso_date(today.year, int(m_md.group(1)), int(m_md.group(2)))
 
-    if "今天" in (text or ""):
+    if "\u4eca\u5929" in src:
         return today.isoformat()
-    if "昨天" in (text or ""):
+    if "\u6628\u5929" in src:
         return (today - timedelta(days=1)).isoformat()
-    if "前天" in (text or ""):
+    if "\u524d\u5929" in src:
         return (today - timedelta(days=2)).isoformat()
+    return ""
+
+
+def _detect_time_scope(text: str) -> str:
+    src = str(text or "").lower()
+    if any(token in src for token in ["\u672c\u5468", "\u8fd9\u5468", "\u672c\u661f\u671f", "\u8fd9\u661f\u671f", "this week"]):
+        return "this_week"
+    if any(token in src for token in ["\u4e0a\u5468", "\u4e0a\u661f\u671f", "last week"]):
+        return "last_week"
+    return ""
+
+
+def _detect_campus_keyword(text: str) -> str:
+    src = str(text or "").strip()
+    if not src:
+        return ""
+    if any(token in src for token in ["\u6d77\u6dc0", "\u6d77\u6dc0\u6821\u533a"]):
+        return "\u6d77\u6dc0"
+    if any(token in src for token in ["\u4e30\u53f0", "\u4e30\u53f0\u6821\u533a"]):
+        return "\u4e30\u53f0"
+    if any(token in src for token in ["\u6d77\u5357", "\u6d77\u5357\u6821\u533a"]):
+        return "\u6d77\u5357"
+    m = re.search(r"([^\s\uff0c,\u3002\uff1b;]{1,12}\u6821\u533a)", src)
+    if m:
+        return m.group(1)
     return ""
 
 
@@ -321,15 +380,12 @@ def _normalize_date(value: Any) -> str:
     m = re.fullmatch(r"(20\d{2})-(\d{1,2})-(\d{1,2})", token)
     if m:
         return _safe_iso_date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-
     m2 = re.fullmatch(r"(20\d{2})[/.年](\d{1,2})[-/.月](\d{1,2})日?", token)
     if m2:
         return _safe_iso_date(int(m2.group(1)), int(m2.group(2)), int(m2.group(3)))
-
     m3 = re.fullmatch(r"(\d{1,2})\u6708(\d{1,2})\u65e5", token)
     if m3:
         return _safe_iso_date(date.today().year, int(m3.group(1)), int(m3.group(2)))
-
     m4 = re.fullmatch(r"(\d{1,2})[-/.](\d{1,2})", token)
     if m4:
         return _safe_iso_date(date.today().year, int(m4.group(1)), int(m4.group(2)))
@@ -338,16 +394,12 @@ def _normalize_date(value: Any) -> str:
 
 def _normalize_request_status(value: Any) -> str:
     token = str(value or "").strip().lower()
-    if token in {"pending", "approved", "rejected"}:
-        return token
-    return ""
+    return token if token in {"pending", "approved", "rejected"} else ""
 
 
 def _normalize_asset_status(value: Any) -> str:
     token = str(value or "").strip().lower()
-    if token in {"in_use", "spare", "repair"}:
-        return token
-    return ""
+    return token if token in {"in_use", "spare", "repair"} else ""
 
 
 def _normalize_limit(value: Any) -> int:
@@ -366,22 +418,35 @@ def _safe_int(value: Any) -> Optional[int]:
 
 def _extract_after_keyword(text: str, keywords: List[str]) -> str:
     for keyword in keywords:
-        m = re.search(rf"{re.escape(keyword)}[:：]?\s*([^\s，,。；;]+)", text)
+        m = re.search(rf"{re.escape(keyword)}[:：]?\s*([^\s\uff0c,\u3002\uff1b;]+)", text or "")
         if m:
             return m.group(1).strip()
     return ""
 
 
 def _extract_quoted_keyword(text: str) -> str:
-    m = re.search(r"[\"“](.+?)[\"”]", text)
+    m = re.search(r"[\"“](.+?)[\"”]", text or "")
     return m.group(1).strip()[:60] if m else ""
 
 
 def _extract_keyword_from_sentence(text: str, lowered: str) -> str:
-    if not _contains_any(text, ["搜索", "查找", "包含", "关键字", "关键词", "名字", "名称"]):
+    if not _contains_any(text, ["\u641c\u7d22", "\u67e5\u627e", "\u5305\u542b", "\u5173\u952e\u5b57", "\u5173\u952e\u8bcd", "\u540d\u5b57", "\u540d\u79f0"]):
         return ""
-    cleaned = re.sub(r"[，。；;,.!?！？]", " ", text).strip()
-    for noisy in ["搜索", "查找", "包含", "关键字", "关键词", "名字", "名称", "的", "记录", "数据", "资产", "日报"]:
+    cleaned = re.sub(r"[\uff0c\u3002\uff1b;,.!?！？]", " ", text or "").strip()
+    for noisy in [
+        "\u641c\u7d22",
+        "\u67e5\u627e",
+        "\u5305\u542b",
+        "\u5173\u952e\u5b57",
+        "\u5173\u952e\u8bcd",
+        "\u540d\u5b57",
+        "\u540d\u79f0",
+        "\u7684",
+        "\u8bb0\u5f55",
+        "\u6570\u636e",
+        "\u8d44\u4ea7",
+        "\u65e5\u62a5",
+    ]:
         cleaned = cleaned.replace(noisy, " ")
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     if not cleaned or len(cleaned) > 40:
@@ -391,24 +456,89 @@ def _extract_keyword_from_sentence(text: str, lowered: str) -> str:
     return cleaned
 
 
+def _sanitize_daily_merged_filters(filters: Dict[str, Any], message: str) -> Dict[str, Any]:
+    sanitized = dict(filters or {})
+    keyword = str(sanitized.get("keyword") or "").strip()
+    if keyword:
+        if not _contains_any(message, ["搜索", "查找", "包含", "关键词", "关键字", "名字", "名称"]):
+            sanitized.pop("keyword", None)
+        elif keyword in {
+            "今天",
+            "昨天",
+            "前天",
+            "本周",
+            "这周",
+            "本星期",
+            "这星期",
+            "上周",
+            "待审核",
+            "已通过",
+            "已驳回",
+            "驳回",
+            "通过",
+            "日报",
+            "记录",
+        }:
+            sanitized.pop("keyword", None)
+        elif len(keyword) <= 1:
+            sanitized.pop("keyword", None)
+    return sanitized
+
+
 def _contains_any(text: str, tokens: List[str]) -> bool:
     src = str(text or "")
     return any(token in src for token in tokens)
+
+
+def _resolve_daily_date_range(filters: Dict[str, Any]) -> Tuple[Optional[date], Optional[date]]:
+    report_date = _normalize_date(filters.get("report_date"))
+    if report_date:
+        try:
+            d = date.fromisoformat(report_date)
+            return d, d
+        except Exception:
+            return None, None
+
+    scope = str(filters.get("time_scope") or "").strip().lower()
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=6)
+    if scope == "this_week":
+        return week_start, week_end
+    if scope == "last_week":
+        last_start = week_start - timedelta(days=7)
+        return last_start, last_start + timedelta(days=6)
+    return None, None
+
+
+def _is_row_in_date_range(row: Dict[str, Any], start_date: date, end_date: date) -> bool:
+    token = str(row.get("report_date") or "").strip()
+    if not token:
+        return False
+    try:
+        d = date.fromisoformat(token)
+    except Exception:
+        return False
+    return start_date <= d <= end_date
 
 
 def _filter_daily_rows(rows: List[Dict[str, Any]], filters: Dict[str, Any]) -> List[Dict[str, Any]]:
     keyword = str(filters.get("keyword") or "").strip().lower()
     lab_name = str(filters.get("lab_name") or "").strip().lower()
     reporter_name = str(filters.get("reporter_name") or "").strip().lower()
-    if not keyword and not lab_name and not reporter_name:
+    campus_name = str(filters.get("campus_name") or "").strip().lower()
+    if not keyword and not lab_name and not reporter_name and not campus_name:
         return rows
 
     def _hit(row: Dict[str, Any]) -> bool:
         lab_text = str(row.get("lab_name") or "").lower()
         reporter_text = str(row.get("reporter_name") or "").lower()
+        campus_text = str(row.get("campus_name") or "").lower()
         if lab_name and lab_name not in lab_text:
             return False
         if reporter_name and reporter_name not in reporter_text:
+            return False
+        if campus_name and campus_name not in campus_text:
             return False
         if not keyword:
             return True
@@ -500,3 +630,11 @@ def _compact_filters(filters: Dict[str, Any]) -> Dict[str, Any]:
             continue
         compacted[key] = value
     return compacted
+
+
+def _is_blank_filter_value(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str) and not value.strip():
+        return True
+    return False

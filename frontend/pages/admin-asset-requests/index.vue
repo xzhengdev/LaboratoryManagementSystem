@@ -462,6 +462,7 @@ export default {
           this.selectedStatus = ''
         }
         this.nlReply = String(result?.reply || '查询完成')
+        uni.showToast({ title: '查询成功', icon: 'success' })
       } catch (error) {
         uni.showToast({ title: error?.message || 'AI查询失败', icon: 'none' })
       } finally {
@@ -1282,4 +1283,3 @@ page {
   }
 }
 </style>
-
