@@ -4,6 +4,7 @@ from decimal import Decimal
 from sqlalchemy import case, func
 
 from app.models import (
+    AssetBudgetLedger,
     AssetItem,
     AssetPurchaseRequest,
     CampusSummarySnapshot,
@@ -84,10 +85,26 @@ def _collect_one_campus_snapshot(campus_id):
         )
 
         asset_item_count = int(session.query(AssetItem.id).count() or 0)
-        total_amount = Decimal("0.00")
-        locked_amount = Decimal("0.00")
-        used_amount = Decimal("0.00")
-        available_amount = Decimal("0.00")
+
+        # 校区预算：从流水表取最新状态，否则按资产项价格汇总
+        last_ledger = (
+            session.query(AssetBudgetLedger)
+            .filter_by(campus_id=int(campus_id))
+            .order_by(AssetBudgetLedger.id.desc())
+            .first()
+        )
+        if last_ledger is not None:
+            total_amount = _safe_decimal(last_ledger.after_locked) + _safe_decimal(last_ledger.after_used)
+            locked_amount = _safe_decimal(last_ledger.after_locked)
+            used_amount = _safe_decimal(last_ledger.after_used)
+            available_amount = Decimal("0.00")
+        else:
+            # 无流水时，按该校区资产项入库价格汇总作为 used_amount
+            campus_used = session.query(func.coalesce(func.sum(AssetItem.price), 0)).scalar()
+            used_amount = _safe_decimal(campus_used)
+            locked_amount = Decimal("0.00")
+            total_amount = used_amount
+            available_amount = Decimal("0.00")
 
         campus_name = f"校区{campus_id}"
         first_reservation = session.query(Reservation).first()

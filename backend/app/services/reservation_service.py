@@ -7,18 +7,52 @@ from flask import current_app
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models import Approval, IdempotencyRecord, Laboratory, OperationLog, Reservation
+from app.models import Approval, IdempotencyRecord, Laboratory, OperationLog, Reservation, User
 from app.services.cache_service import (
     get_cached_lab_schedule,
     invalidate_lab_schedule_cache,
     invalidate_statistics_cache,
     set_cached_lab_schedule,
 )
-from app.services.db_router_service import campus_db_session, get_routed_campus_ids
+from app.services.db_router_service import campus_db_session, get_routed_campus_ids, summary_db_session
 from app.services.distributed_lock_service import reservation_slot_lock
 from app.services.event_bus_service import publish_async_event
 from app.utils.exceptions import AppError
 from app.utils.validators import parse_date, parse_time, require_fields
+
+def _load_user_name_map(user_ids):
+    """从汇总库批量查询用户姓名，返回 {user_id: user_name}"""
+    ids = sorted({int(uid) for uid in (user_ids or []) if uid})
+    if not ids:
+        return {}
+
+    def _query_names(session):
+        rows = session.query(User).filter(User.id.in_(ids)).all()
+        return {
+            int(row.id): (str(row.real_name or "").strip() or str(row.username or "").strip() or f"用户#{row.id}")
+            for row in rows
+        }
+
+    try:
+        with summary_db_session() as session:
+            return _query_names(session)
+    except Exception:
+        from app.extensions import db as _db
+        return _query_names(_db.session)
+
+
+def _enrich_user_names(rows):
+    """为预约列表补充 user_name 字段"""
+    if not rows:
+        return rows
+    user_ids = [item.get("user_id") for item in rows if isinstance(item, dict) and item.get("user_id")]
+    name_map = _load_user_name_map(user_ids)
+    for item in rows:
+        if isinstance(item, dict):
+            uid = item.get("user_id")
+            item["user_name"] = name_map.get(int(uid), "") if uid else ""
+    return rows
+
 
 ACTIVE_RESERVATION_STATUSES = {"pending", "approved"}
 IDEMPOTENCY_ENDPOINT_CREATE_RESERVATION = "create_reservation"
@@ -470,22 +504,22 @@ def list_reservations(current_user, filters):
         if current_user.role == "lab_admin" and target_campus_id != current_user.campus_id:
             raise AppError("只能查看本校区预约", 403, 40360)
         with campus_db_session(target_campus_id) as session:
-            return _list_reservations_in_session(session, current_user, filters)
+            return _enrich_user_names(_list_reservations_in_session(session, current_user, filters))
 
     if current_user.role == "system_admin":
         campus_ids = get_routed_campus_ids()
         if not campus_ids:
             with campus_db_session(0) as session:
-                return _list_reservations_in_session(session, current_user, filters)
+                return _enrich_user_names(_list_reservations_in_session(session, current_user, filters))
         rows = []
         for campus_id in campus_ids:
             with campus_db_session(campus_id) as session:
                 rows.extend(_list_reservations_in_session(session, current_user, filters))
         rows.sort(key=lambda item: item.get("created_at") or "", reverse=True)
-        return rows
+        return _enrich_user_names(rows)
 
     with campus_db_session(current_user.campus_id) as session:
-        return _list_reservations_in_session(session, current_user, filters)
+        return _enrich_user_names(_list_reservations_in_session(session, current_user, filters))
 
 
 def list_pending_approvals(current_user):
@@ -502,16 +536,16 @@ def list_pending_approvals(current_user):
         campus_ids = get_routed_campus_ids()
         if not campus_ids:
             with campus_db_session(0) as session:
-                return _query_pending(session)
+                return _enrich_user_names(_query_pending(session))
         rows = []
         for campus_id in campus_ids:
             with campus_db_session(campus_id) as session:
                 rows.extend(_query_pending(session))
         rows.sort(key=lambda item: item.get("created_at") or "", reverse=True)
-        return rows
+        return _enrich_user_names(rows)
 
     with campus_db_session(current_user.campus_id) as session:
-        return _query_pending(session)
+        return _enrich_user_names(_query_pending(session))
 
 
 def approve_reservation(current_user, reservation, approval_status, remark):
