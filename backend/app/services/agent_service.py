@@ -1,10 +1,12 @@
 ﻿import json
 import re
+import traceback
 from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 import requests
+from sqlalchemy.orm import joinedload
 from app.config import Config
 from app.models import Laboratory, Reservation
 from app.services.agent_debug import debug_log as _debug_log
@@ -1033,9 +1035,75 @@ def _has_available_slot(schedule: Dict[str, Any], min_duration: int = 60) -> boo
             return True
     return False
 
+def _campus_aware_query(model_class, query_fn, user):
+    """
+    校区数据库路由感知查询
+    - 当 ENABLE_CAMPUS_DB_ROUTING=1 时，跨所有配置的校区库查询并合并结果
+    - 否则使用默认 db.session
+    """
+    from app.services.db_router_service import _routing_enabled as _route_enabled
+    from app.services.db_router_service import aggregate_across_campuses
+
+    if _route_enabled():
+        return aggregate_across_campuses(model_class, query_fn)
+    return query_fn(db.session)
+
+
+def _campus_aware_get(model_class, obj_id, user, eager=None):
+    """
+    校区数据库路由感知的单条查询（按主键）
+    eager: 可选的预加载关系列表，例如 [Reservation.lab]
+    """
+    from app.services.db_router_service import _routing_enabled as _route_enabled
+    from app.services.db_router_service import find_across_campuses, get_routed_campus_ids, campus_db_session
+
+    try:
+        oid = int(obj_id) if obj_id is not None else None
+    except (TypeError, ValueError):
+        return None
+    if oid is None:
+        return None
+
+    if _route_enabled():
+        item, _ = find_across_campuses(model_class, oid)
+        if item is not None and eager:
+            cid = getattr(item, 'campus_id', None)
+            if cid is not None:
+                with campus_db_session(cid) as sess:
+                    q = sess.query(model_class)
+                    for rel in eager:
+                        q = q.options(joinedload(rel))
+                    item = q.get(oid)
+        return item
+    q = model_class.query
+    if eager:
+        for rel in eager:
+            q = q.options(joinedload(rel))
+    return q.get(oid)
+
+
+def _campus_aware_get_for_user(model_class, obj_id, user):
+    """同 _campus_aware_get，语义别名"""
+    return _campus_aware_get(model_class, obj_id, user)
+
+
 #=======================================================工具实现函数========================================
 def _query_labs(date_text: str, campus: str, lab_type: str, participant_count: Optional[int] = None) -> List[Laboratory]:
-    labs = Laboratory.query.filter_by(status="active").order_by(Laboratory.id.asc()).all()
+    from app.services.db_router_service import _routing_enabled as _route_enabled
+
+    if _route_enabled():
+        labs = _campus_aware_query(
+            Laboratory,
+            lambda sess: sess.query(Laboratory)
+                .options(joinedload(Laboratory.campus))
+                .filter_by(status="active")
+                .order_by(Laboratory.id.asc())
+                .all(),
+            None,
+        )
+        labs.sort(key=lambda l: l.id)
+    else:
+        labs = Laboratory.query.options(joinedload(Laboratory.campus)).filter_by(status="active").order_by(Laboratory.id.asc()).all()
 
     if campus:
         labs = [lab for lab in labs if lab.campus and campus in (lab.campus.campus_name or "")]
@@ -1074,11 +1142,23 @@ def _query_schedule(date_text: str, lab_id: Optional[int]) -> Dict[str, Any]:
     except Exception:
         return {"ok": False, "message": "日期格式不正确，请使用 YYYY-MM-DD。"}
     if lab_id:
-        lab = Laboratory.query.get(lab_id)
+        lab = _campus_aware_get(Laboratory, lab_id, None)
         if not lab:
             return {"ok": False, "message": f"未找到实验室ID {lab_id}。"}
         return {"ok": True, "schedules": [{"lab": lab, "schedule": get_lab_schedule(lab, d)}]}
-    labs = Laboratory.query.filter_by(status="active").order_by(Laboratory.id.asc()).limit(12).all()
+    labs = _campus_aware_query(
+        Laboratory,
+        lambda sess: sess.query(Laboratory)
+            .options(joinedload(Laboratory.campus))
+            .filter_by(status="active")
+            .order_by(Laboratory.id.asc())
+            .limit(12)
+            .all(),
+        None,
+    )
+    if len(labs) > 12:
+        labs.sort(key=lambda l: l.id)
+        labs = labs[:12]
     return {"ok": True, "schedules": [{"lab": lab, "schedule": get_lab_schedule(lab, d)} for lab in labs]}
 
 '''
@@ -2112,7 +2192,7 @@ def _handle_check_availability(tool: str, params: Dict[str, Any], user, session:
     except Exception:
         return _tool_result(tool, False, "日期格式不正确，请使用 YYYY-MM-DD。", error_code="invalid_date")
 
-    lab = Laboratory.query.get(lab_id)
+    lab = _campus_aware_get(Laboratory, lab_id, user)
     if not lab:
         return _tool_result(tool, False, "实验室不存在", error_code="not_found")
 
@@ -2204,7 +2284,7 @@ def _handle_recommend_lab(tool: str, params: Dict[str, Any], user, session: Dict
 
 def _handle_get_lab_detail(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
     # 处理实验室详情查询工具，返回指定实验室的基本信息
-    lab = Laboratory.query.get(_safe_int(params.get("lab_id")))
+    lab = _campus_aware_get(Laboratory, _safe_int(params.get("lab_id")), user)
     if not lab:
         return _tool_result(tool, False, "实验室不存在", error_code="not_found")
     text = f"{lab.lab_name}，容量{lab.capacity}，位置{lab.location}"
@@ -2230,7 +2310,7 @@ def _handle_create_reservation(tool: str, params: Dict[str, Any], user, session:
             error_message="missing required params",
             extra={"missing_fields": ["participant_count"]},
         )
-    lab = Laboratory.query.get(payload["lab_id"])
+    lab = _campus_aware_get(Laboratory, payload["lab_id"], user)
     if not lab:
         return _tool_result(tool, False, "实验室不存在", error_code="not_found")
     payload["campus_id"] = lab.campus_id
@@ -2252,7 +2332,7 @@ def _handle_create_reservation(tool: str, params: Dict[str, Any], user, session:
 
 def _handle_update_reservation(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
     reservation_id = _safe_int(params.get("reservation_id"))
-    reservation = Reservation.query.get(reservation_id)
+    reservation = _campus_aware_get(Reservation, reservation_id, user, eager=[Reservation.lab])
     if not reservation:
         return _tool_result(tool, False, "预约不存在", error_code="not_found")
 
@@ -2330,13 +2410,22 @@ def _handle_update_reservation(tool: str, params: Dict[str, Any], user, session:
 
 
 def _handle_my_reservations(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
-    rows = (
-        Reservation.query.filter_by(user_id=user.id)
-        .filter(~Reservation.status.in_(["cancelled", "canceled"]))
-        .order_by(Reservation.id.desc())
-        .limit(8)
-        .all()
+    rows = _campus_aware_query(
+        Reservation,
+        lambda sess: (
+            sess.query(Reservation)
+            .options(joinedload(Reservation.lab))
+            .filter_by(user_id=user.id)
+            .filter(~Reservation.status.in_(["cancelled", "canceled"]))
+            .order_by(Reservation.id.desc())
+            .limit(8)
+            .all()
+        ),
+        user,
     )
+    rows.sort(key=lambda r: r.id, reverse=True)
+    rows = rows[:8]
+
     if not rows:
         session["last_reservations"] = []
         session["last_choice_type"] = ""
@@ -2357,7 +2446,7 @@ def _handle_my_reservations(tool: str, params: Dict[str, Any], user, session: Di
 
 def _handle_cancel_reservation(tool: str, params: Dict[str, Any], user, session: Dict[str, Any]) -> Dict[str, Any]:
     # 处理预约取消工具，调用取消服务撤销指定预约
-    reservation = Reservation.query.get(_safe_int(params.get("reservation_id")))
+    reservation = _campus_aware_get(Reservation, _safe_int(params.get("reservation_id")), user)
     if not reservation:
         return _tool_result(tool, False, "预约不存在", error_code="not_found")
     try:
@@ -3251,12 +3340,12 @@ def chat(user, message):
                 # 首选方案：LLM Agent 循环（智能决策）
                 result = _agent_loop(user, text, session, trace_id)
             except Exception:
-                _debug_log(trace_id, "agent_loop_exception_fallback", reason="agent_loop_exception")
+                _debug_log(trace_id, "agent_loop_exception_fallback", reason="agent_loop_exception", error=traceback.format_exc())
                 # 降级方案1：规则引擎（基于正则匹配的简单处理）
                 try:
                     result = _rule_agent_chat(user, text, session, trace_id)
                 except Exception:
-                    _debug_log(trace_id, "fallback_exception_general_llm", reason="fallback_exception")
+                    _debug_log(trace_id, "fallback_exception_general_llm", reason="fallback_exception", error=traceback.format_exc())
                     # 降级方案2：通用 LLM 兜底
                     result = _call_general_llm(user, text)
             
