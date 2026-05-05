@@ -1,7 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from app.extensions import db
+
+_CST = timezone(timedelta(hours=8))
 
 
 def serialize_value(value):
@@ -11,6 +13,8 @@ def serialize_value(value):
     if isinstance(value, Decimal):
         return float(value)
     if hasattr(value, "isoformat"):
+        if isinstance(value, datetime) and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc).astimezone(_CST)
         return value.isoformat()
     return value
 
