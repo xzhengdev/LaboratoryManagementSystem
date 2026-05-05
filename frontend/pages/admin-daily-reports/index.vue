@@ -28,7 +28,7 @@
 
     <view class="card table-card">
       <view class="table-header report-grid">
-        <text>提交日期</text>
+        <text>日报日期</text>
         <text>实验室</text>
         <text>提交人</text>
         <text>内容</text>
@@ -40,10 +40,7 @@
       <view v-if="!filteredList.length" class="empty-text">暂无日报记录</view>
 
       <view v-for="item in pagedList" :key="rowKey(item)" class="table-row report-grid">
-        <view>
-          <view>{{ item.report_date || '--' }}</view>
-          <view class="row-sub">{{ timeText(item.created_at) }}</view>
-        </view>
+        <view>{{ item.report_date || '--' }}</view>
         <view>
           <view class="strong">{{ item.lab_name || '--' }}</view>
           <view class="row-sub">{{ item.campus_name || '--' }}</view>
