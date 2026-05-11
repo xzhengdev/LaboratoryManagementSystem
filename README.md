@@ -27,6 +27,22 @@ Web(H5, uni-app) ─┐
                                 └── Agent（rule / openai / deepseek）
 ```
 
+## 项目截图
+
+> 每张截图同时展示 PC 端、H5 端、微信小程序端
+
+| 登录 | 首页 | 实验室列表 |
+|------|------|------------|
+| ![](screenshots/login.png) | ![](screenshots/home.png) | ![](screenshots/lab-list.png) |
+
+| 实验室详情 | 实验室预约 | 校区列表 |
+|------------|------------|----------|
+| ![](screenshots/lab-detail.png) | ![](screenshots/lab-reserve.png) | ![](screenshots/campus-list.png) |
+
+| 我的预约 | AI 助手 |
+|----------|---------|
+| ![](screenshots/my-reservations.png) | ![](screenshots/ai-assistant.png) |
+
 ## 技术栈
 
 ### 后端
@@ -289,20 +305,19 @@ python scripts/seed_shards.py
 
 本仓库用于毕业设计项目开发、演示与持续迭代。
 
-## �׶� C���ֲ�ʽ��ʾ������
+## 阶段 C：分布式部署说明
 
-- ѹ�ⱨ�棺`docs/ѹ�ⱨ��_2026-04-27_ԤԼ����.md`
-- �׶� C ˵����`docs/�׶�Cʵʩ˵��.md`
-- Docker ���ţ�`infra/docker/docker-compose.stage-c.yml`
-- Nginx ���ã�`infra/nginx/lab-stage-c.conf`
+- 压测报告：`benchmark/`
+- Docker 部署：`infra/docker/docker-compose.stage-c.yml`
+- Nginx 配置：`infra/nginx/lab-stage-c.conf`
 
-�������
+启动命令：
 
 ```bash
 docker compose -f infra/docker/docker-compose.stage-c.yml up -d --build
 ```
 
-ͳһ��ڣ�
+统一入口：
 
 - `http://127.0.0.1:8080/api/*`
 - `http://127.0.0.1:8080/api/health`

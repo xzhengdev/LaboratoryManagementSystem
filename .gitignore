@@ -27,6 +27,10 @@ backend/.env
 backend/instance/
 backend/uploads/
 
+# Test / benchmark outputs
+backend/test-results/
+benchmark/results/
+
 # Node / npm
 node_modules/
 .npm_cache/
@@ -48,5 +52,6 @@ miniprogram/project.private.config.json
 .DS_Store
 Thumbs.db
 
-# Presentation
+# Presentation & thesis
 答辩PPT/
+毕业论文/
